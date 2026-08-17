@@ -1,0 +1,55 @@
+{
+  "name": "pkgdiet",
+  "version": "1.1.0",
+  "description": "Put your node_modules on a diet — find unused, bloated, and unhealthy npm packages",
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "bin": {
+    "pkgdiet": "./bin/cli.js"
+  },
+  "main": "src/index.js",
+  "files": [
+    "bin/",
+    "src/",
+    "data/",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "npm",
+    "cli",
+    "dependencies",
+    "unused",
+    "bloat",
+    "optimization",
+    "health",
+    "devtools",
+    "dependency-audit",
+    "package-analyzer",
+    "node-modules",
+    "code-quality",
+    "developer-experience",
+    "dead-code",
+    "npm-audit",
+    "package-json"
+  ],
+  "author": "Om Tajne <om-tajne@users.noreply.github.com> (https://github.com/om-tajne)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/om-tajne/pkgdiet.git"
+  },
+  "homepage": "https://github.com/om-tajne/pkgdiet#readme",
+  "bugs": {
+    "url": "https://github.com/om-tajne/pkgdiet/issues"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@babel/parser": "^7.27.0",
+    "chalk": "^5.4.1",
+    "commander": "^13.1.0",
+    "glob": "^13.0.6",
+    "ora": "^8.2.0"
+  }
+}

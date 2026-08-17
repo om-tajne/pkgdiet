@@ -1,0 +1,10 @@
+node_modules/
+.pkgdiet-cache.json
+.depsweep-cache.json
+qa-*/
+temp-express/
+*.tgz
+.env
+qa-output.json
+qa-final.json
+package-lock.json
