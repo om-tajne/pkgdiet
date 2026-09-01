@@ -7,7 +7,7 @@
 
 Put your `node_modules` on a diet.
 
-PkgDiet is a proactive dependency governance tool that evaluates the necessity, health, and cost of your NPM packages. It doesn't just ask *"is it safe?"* — it asks *"is it optimal?"*
+PkgDiet is a proactive dependency governance tool that helps you find unused dependencies, analyze package health, and reduce `node_modules` size. It doesn't just ask *"is it safe?"* — it asks *"is it optimal?"*
 
 ---
 

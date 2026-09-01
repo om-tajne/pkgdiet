@@ -1,7 +1,7 @@
 {
   "name": "pkgdiet",
   "version": "1.2.0",
-  "description": "Put your node_modules on a diet — find unused, bloated, and unhealthy npm packages",
+  "description": "Put your node_modules on a diet — find unused dependencies, analyze package health, and reduce size",
   "type": "module",
   "engines": {
     "node": ">=18.0.0"
