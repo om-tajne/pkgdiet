@@ -9,6 +9,8 @@ Put your `node_modules` on a diet.
 
 PkgDiet is a proactive dependency governance tool that helps you find unused dependencies, analyze package health, and reduce `node_modules` size. It doesn't just ask *"is it safe?"* — it asks *"is it optimal?"*
 
+> **Our Vision:** PkgDiet's mission is to become the open standard for dependency intelligence in AI-assisted software development. Our goal is simple: whenever a developer, CI pipeline, or AI agent needs to evaluate, install, replace, or audit a dependency, PkgDiet should be the trusted, opt-in source of truth.
+
 ---
 
 ## Quick Start
