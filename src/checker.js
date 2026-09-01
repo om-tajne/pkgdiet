@@ -20,6 +20,18 @@ export async function checkPackage(packageSpec, projectPath = process.cwd(), opt
 
   if (healthResult.skipped) {
     if (healthResult.notFound) {
+      if (packageName.startsWith('@')) {
+        return {
+          name: packageName,
+          verdict: 'ALLOW',
+          reasons: ['Scoped package not found in public registry. Assuming private internal package.'],
+          healthScore: null,
+          costEstimate: estimateCostImpact(null),
+          alternatives: [],
+          flags: [],
+          efficiencyFlag: false
+        };
+      }
       return {
         name: packageName,
         verdict: 'WARN',
