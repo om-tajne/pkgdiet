@@ -18,4 +18,6 @@ jobs:
           curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
           chmod +x mcp-publisher
       - name: Publish to MCP Registry
-        run: ./mcp-publisher publish
+        run: |
+          ./mcp-publisher login github
+          ./mcp-publisher publish
