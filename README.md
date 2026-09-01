@@ -38,15 +38,15 @@ PkgDiet scans your codebase's AST and NPM registry data in seconds to give you a
 - Analyzing dependency sizes...
 ✓ Size analysis complete: 40.5 MB total
 
-╭──────────────────────────────────────────────────────
-│ 🥗 PkgDiet v1.2.0
-│ Put your node_modules on a diet...
-│ Project: express
-│ Dependencies: 44 direct │ 141 files scanned
-│ node_modules: 40.5 MB
-│    Overall Score:  67/100  ⚠️
-│    ████████████████████░░░░░░░░░░
-╰──────────────────────────────────────────────────────
+╭──────────────────────────────────────────────────────╮
+│ 🥗 PkgDiet v1.2.0                                    │
+│ Put your node_modules on a diet...                   │
+│ Project: express                                     │
+│ Dependencies: 44 direct │ 141 files scanned          │
+│ node_modules: 40.5 MB                                │
+│    Overall Score:  67/100  ⚠️                        │
+│    ████████████████████░░░░░░░░░░                    │
+╰──────────────────────────────────────────────────────╯
 
 🗑️  UNUSED DEPENDENCIES (1 found — saves ~21.2 KB)
 ────────────────────────────────────────────────────────
