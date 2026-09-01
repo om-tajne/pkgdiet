@@ -18,20 +18,18 @@
     "CHANGELOG.md"
   ],
   "keywords": [
-    "npm",
-    "cli",
-    "dependencies",
-    "governance",
-    "ci",
+    "node_modules",
+    "unused-dependencies",
+    "cleanup",
+    "health-check",
+    "bundle-size",
+    "npm-audit",
+    "mcp-server",
     "mcp",
     "ai-agent",
-    "unused",
-    "bloat",
-    "optimization",
-    "health",
-    "devtools",
-    "dependency-audit",
-    "package-analyzer"
+    "cursor",
+    "claude",
+    "copilot"
   ],
   "author": "Om Tajne <om-tajne@users.noreply.github.com> (https://github.com/om-tajne)",
   "repository": {
