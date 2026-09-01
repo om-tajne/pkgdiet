@@ -139,18 +139,54 @@ program
     const fs = await import('fs');
     const path = await import('path');
     
-    fs.writeFileSync('.pkgdietrc.json', JSON.stringify({
-      minHealthScore: 40,
-      blockedPackages: [],
-      telemetry: true
-    }, null, 2));
+    if (!fs.existsSync('.pkgdietrc.json')) {
+      fs.writeFileSync('.pkgdietrc.json', JSON.stringify({
+        minHealthScore: 40,
+        blockedPackages: [],
+        telemetry: true
+      }, null, 2));
+      console.log('✅ Created .pkgdietrc.json');
+    } else {
+      console.log('⏭️  .pkgdietrc.json already exists, skipping.');
+    }
     
     const githubDir = '.github/workflows';
     if (!fs.existsSync(githubDir)) {
       fs.mkdirSync(githubDir, { recursive: true });
     }
     
-    const gateYml = `name: PkgDiet PR Gate
+    const driftPath = path.join(githubDir, 'pkgdiet-drift.yml');
+    if (!fs.existsSync(driftPath)) {
+      const driftYml = `name: PkgDiet Weekly Drift Scan
+on:
+  schedule:
+    - cron: '0 0 * * 1' # Every Monday at 00:00
+jobs:
+  drift-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install -g pkgdiet
+      - run: pkgdiet drift
+`;
+      fs.writeFileSync(driftPath, driftYml);
+      console.log('✅ Created .github/workflows/pkgdiet-drift.yml');
+    } else {
+      console.log('⏭️  .github/workflows/pkgdiet-drift.yml already exists, skipping.');
+    }
+
+    const gatePath = path.join(githubDir, 'pkgdiet-gate.yml');
+    
+    // Check package manager
+    const hasNpm = fs.existsSync('package-lock.json');
+    const hasPnpm = fs.existsSync('pnpm-lock.yaml');
+    const hasYarn = fs.existsSync('yarn.lock');
+
+    if (!hasNpm && (hasPnpm || hasYarn)) {
+      console.log('⚠️  CI PR gate currently requires npm (package-lock.json).');
+      console.log('   Skipping PR gate generation. MCP, CLI, and Drift scanning are fully installed.');
+    } else if (!fs.existsSync(gatePath)) {
+      const gateYml = `name: PkgDiet PR Gate
 on: [pull_request]
 jobs:
   pkgdiet:
@@ -182,25 +218,11 @@ jobs:
               });
             }
 `;
-    fs.writeFileSync(path.join(githubDir, 'pkgdiet-gate.yml'), gateYml);
-    
-    const driftYml = `name: PkgDiet Weekly Drift Scan
-on:
-  schedule:
-    - cron: '0 0 * * 1' # Every Monday at 00:00
-jobs:
-  drift-scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: npm install -g pkgdiet
-      - run: pkgdiet drift
-`;
-    fs.writeFileSync(path.join(githubDir, 'pkgdiet-drift.yml'), driftYml);
-    
-    console.log('✅ Created .pkgdietrc.json');
-    console.log('✅ Created .github/workflows/pkgdiet-gate.yml');
-    console.log('✅ Created .github/workflows/pkgdiet-drift.yml');
+      fs.writeFileSync(gatePath, gateYml);
+      console.log('✅ Created .github/workflows/pkgdiet-gate.yml');
+    } else {
+      console.log('⏭️  .github/workflows/pkgdiet-gate.yml already exists, skipping.');
+    }
   });
 
 // Handle default command if no args (fallback to audit for backward compatibility)
