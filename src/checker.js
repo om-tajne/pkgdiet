@@ -3,6 +3,7 @@ import { loadPolicy, evaluatePolicy } from './policy.js';
 import { estimateCostImpact } from './cost.js';
 import { recordCheckMetric } from './telemetry.js';
 import { findAlternatives } from './alternatives.js';
+import { isScopeMappedInNpmrc } from './npmrc.js';
 
 export async function checkPackage(packageSpec, projectPath = process.cwd(), options = {}) {
   const startTime = Date.now();
@@ -20,11 +21,11 @@ export async function checkPackage(packageSpec, projectPath = process.cwd(), opt
 
   if (healthResult.skipped) {
     if (healthResult.notFound) {
-      if (packageName.startsWith('@')) {
+      if (isScopeMappedInNpmrc(packageName, projectPath)) {
         return {
           name: packageName,
           verdict: 'ALLOW',
-          reasons: ['Scoped package not found in public registry. Assuming private internal package.'],
+          reasons: ['Scoped package mapped to private registry in .npmrc. Assuming internal package.'],
           healthScore: null,
           costEstimate: estimateCostImpact(null),
           alternatives: [],
