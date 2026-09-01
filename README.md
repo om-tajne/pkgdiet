@@ -100,10 +100,13 @@ PkgDiet works out of the box with zero configuration. However, teams can enforce
 {
   "minHealthScore": 60,
   "maxNodeModulesSizeMB": 300,
-  "ignoreRules": ["chalk"]
+  "ignoreRules": ["chalk"],
+  "telemetry": false
 }
 ```
 
+### Telemetry (Local Only)
+By default, PkgDiet writes anonymous, **purely local** usage metrics to a `.pkgdiet-metrics.json` file in your repository to track the amount of time and disk space saved. **No data is ever sent off your machine.** You can disable this local logging entirely by adding `"telemetry": false` to your `.pkgdietrc.json` or by setting the `PKGDYET_TELEMETRY_DISABLED=1` environment variable.
 
 ---
 
