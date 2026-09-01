@@ -204,22 +204,22 @@ export async function fetchPackageHealth(packageName, projectPath, useCache) {
   // Generate flags
   const flags = [];
   if (deprecated) {
-    flags.push({ type: 'critical', label: 'DEPRECATED', detail: deprecated });
+    flags.push({ type: 'critical', label: `Deprecated: ${deprecated}` });
   }
   if (lastPublish) {
     const { years } = timeSince(lastPublish);
     if (years >= 2) {
-      flags.push({ type: 'critical', label: 'UNMAINTAINED', detail: `No updates in ${years} years` });
+      flags.push({ type: 'critical', label: `Unmaintained (${years}yr)` });
     }
   }
   if (maintainers.length === 1) {
-    flags.push({ type: 'warning', label: 'SINGLE MAINTAINER', detail: `Bus factor = 1 (${maintainers[0]?.name || 'unknown'})` });
+    flags.push({ type: 'warning', label: 'Single maintainer' });
   }
   if (monthlyDownloads < 1000) {
-    flags.push({ type: 'warning', label: 'LOW DOWNLOADS', detail: `Only ${monthlyDownloads.toLocaleString()} downloads/month` });
+    flags.push({ type: 'warning', label: 'Low downloads' });
   }
   if (installScripts.length > 0) {
-    flags.push({ type: 'warning', label: 'INSTALL SCRIPTS', detail: `Contains ${installScripts.join(', ')}` });
+    flags.push({ type: 'warning', label: `Install scripts (${installScripts.join(', ')})` });
   }
 
   // Size and Cost info
