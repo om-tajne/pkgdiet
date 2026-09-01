@@ -268,8 +268,54 @@ If the tool returns a WARN or BLOCK verdict (e.g. low health score, unmaintained
 
   });
 
+program
+  .command('mcp-install')
+  .description('Automatically configure PkgDiet as an MCP server for Claude Desktop')
+  .action(async () => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const os = await import('os');
+
+    const homedir = os.homedir();
+    let configPath = '';
+
+    if (process.platform === 'win32') {
+      configPath = path.join(process.env.APPDATA || path.join(homedir, 'AppData', 'Roaming'), 'Claude', 'claude_desktop_config.json');
+    } else if (process.platform === 'darwin') {
+      configPath = path.join(homedir, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
+    } else {
+      console.log('⚠️  Auto-install is currently only supported for Claude Desktop on Windows and macOS.');
+      console.log('   Please add this manually to your MCP client config:');
+      console.log('   "pkgdiet": { "command": "npx", "args": ["pkgdiet", "mcp"] }');
+      process.exit(0);
+    }
+
+    try {
+      let config = { mcpServers: {} };
+      if (fs.existsSync(configPath)) {
+        config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        if (!config.mcpServers) config.mcpServers = {};
+      } else {
+        const dir = path.dirname(configPath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      }
+
+      config.mcpServers.pkgdiet = {
+        command: "npx",
+        args: ["pkgdiet", "mcp"]
+      };
+
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+      console.log('✅ Successfully installed PkgDiet MCP Server for Claude Desktop!');
+      console.log('   Please restart Claude Desktop for the changes to take effect.');
+    } catch (err) {
+      console.error(`❌ Failed to configure Claude Desktop: ${err.message}`);
+      console.log('   Please add this manually: "pkgdiet": { "command": "npx", "args": ["pkgdiet", "mcp"] }');
+    }
+  });
+
 // Handle default command if no args (fallback to audit for backward compatibility)
-if (process.argv.length === 2 || (process.argv.length > 2 && !['audit', 'check', 'mcp', 'drift', 'init'].includes(process.argv[2]))) {
+if (process.argv.length === 2 || (process.argv.length > 2 && !['audit', 'check', 'mcp', 'drift', 'init', 'mcp-install'].includes(process.argv[2]))) {
   process.argv.splice(2, 0, 'audit');
 }
 

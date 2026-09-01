@@ -85,7 +85,7 @@ PkgDiet scans your codebase's AST and NPM registry data in seconds to give you a
 - **Health & Rot Scoring:** Detects the "Bus Factor" (single maintainer) and abandoned packages before they become technical debt.
 - **Smart Alternatives:** Recommends modern, lightweight replacements for legacy bloat (e.g., `dayjs` instead of `moment`, `picocolors` instead of `chalk`).
 - **Pre-Install Gate:** Run `pkgdiet check <package>` to evaluate a library *before* adding it to your project.
-- **MCP Server for AI Agents:** Run `pkgdiet mcp` to start a Model Context Protocol (MCP) server. Give Antigravity, Claude Code, Cursor, Windsurf, Aider, Codex, or GitHub Copilot the ability to natively evaluate dependency health so they stop hallucinating deprecated packages into your codebase.
+- **MCP Server for AI Agents:** Give Claude Code, Cursor, or GitHub Copilot the ability to natively evaluate dependency health so they stop hallucinating deprecated packages. Install globally in one click: `npx pkgdiet mcp-install`
 - **CI/CD Ready:** Use `pkgdiet ci` to parse `package-lock.json` diffs in GitHub Actions and block PRs that introduce unhealthy dependencies.
 
 ---
@@ -115,6 +115,7 @@ PkgDiet works out of the box with zero configuration. However, teams can enforce
 | `npx pkgdiet init` | Generate config and GitHub Actions workflows |
 | `npx pkgdiet ci` | Run PR gate checks based on lockfile diffs |
 | `npx pkgdiet mcp` | Start the JSON-RPC server for AI agents |
+| `npx pkgdiet mcp-install` | Auto-configure MCP for Claude Desktop |
 
 ---
 
