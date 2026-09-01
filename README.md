@@ -187,6 +187,7 @@ pkgdiet --no-cache   # bypass cache, fetch fresh
 ## Limitations
 
 - **pnpm / Yarn**: The CI gate (`pkgdiet ci`) currently only parses npm's `package-lock.json` (v2/v3 format) diffs to find transitive dependencies. `pnpm-lock.yaml` and `yarn.lock` parsing are fast-follows. Size analysis (`pkgdiet audit`) also requires a local `node_modules` folder, which PnP setups lack.
+- **Private Registries**: Scoped internal packages are automatically permitted if mapped in `.npmrc` or via `NPM_CONFIG_*` environment variables. Yarn Berry's `.yarnrc.yml` `npmScopes` syntax is not currently parsed.
 - **Dynamic imports with string variables**: `require(someVar)` cannot be statically analyzed for unused detection — these are rare.
 
 ---
