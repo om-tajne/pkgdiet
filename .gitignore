@@ -9,3 +9,7 @@ qa-output.json
 qa-final.json
 package-lock.json
 .pkgdiet-metrics.json
+.pkgdiet-metrics.json
+test-diff.js
+test-drift/
+.pkgdiet-cache.json
