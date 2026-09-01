@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.om-tajne/pkgdiet",
   "version": "1.2.0",
-  "description": "Dependency intelligence for AI agents. Evaluates package health, rot, and size.",
+  "description": "Put your node_modules on a diet - find unused dependencies, analyze health, and reduce size",
   "repository": {
     "type": "git",
     "url": "https://github.com/om-tajne/pkgdiet.git"
