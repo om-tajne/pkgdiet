@@ -135,11 +135,12 @@ program
 program
   .command('init')
   .description('Initialize PkgDiet policy and CI actions')
-  .action(async () => {
+  .option('-f, --force', 'Overwrite existing config and workflow files')
+  .action(async (options) => {
     const fs = await import('fs');
     const path = await import('path');
     
-    if (!fs.existsSync('.pkgdietrc.json')) {
+    if (options.force || !fs.existsSync('.pkgdietrc.json')) {
       fs.writeFileSync('.pkgdietrc.json', JSON.stringify({
         minHealthScore: 40,
         blockedPackages: [],
@@ -147,7 +148,7 @@ program
       }, null, 2));
       console.log('✅ Created .pkgdietrc.json');
     } else {
-      console.log('⏭️  .pkgdietrc.json already exists, skipping.');
+      console.log('⏭️  .pkgdietrc.json already exists, skipping. Use --force to overwrite.');
     }
     
     const githubDir = '.github/workflows';
@@ -156,7 +157,7 @@ program
     }
     
     const driftPath = path.join(githubDir, 'pkgdiet-drift.yml');
-    if (!fs.existsSync(driftPath)) {
+    if (options.force || !fs.existsSync(driftPath)) {
       const driftYml = `name: PkgDiet Weekly Drift Scan
 on:
   schedule:
@@ -172,7 +173,7 @@ jobs:
       fs.writeFileSync(driftPath, driftYml);
       console.log('✅ Created .github/workflows/pkgdiet-drift.yml');
     } else {
-      console.log('⏭️  .github/workflows/pkgdiet-drift.yml already exists, skipping.');
+      console.log('⏭️  .github/workflows/pkgdiet-drift.yml already exists, skipping. Use --force to overwrite.');
     }
 
     const gatePath = path.join(githubDir, 'pkgdiet-gate.yml');
@@ -185,7 +186,7 @@ jobs:
     if (!hasNpm && (hasPnpm || hasYarn)) {
       console.log('⚠️  CI PR gate currently requires npm (package-lock.json).');
       console.log('   Skipping PR gate generation. MCP, CLI, and Drift scanning are fully installed.');
-    } else if (!fs.existsSync(gatePath)) {
+    } else if (options.force || !fs.existsSync(gatePath)) {
       const gateYml = `name: PkgDiet PR Gate
 on: [pull_request]
 jobs:
@@ -221,7 +222,7 @@ jobs:
       fs.writeFileSync(gatePath, gateYml);
       console.log('✅ Created .github/workflows/pkgdiet-gate.yml');
     } else {
-      console.log('⏭️  .github/workflows/pkgdiet-gate.yml already exists, skipping.');
+      console.log('⏭️  .github/workflows/pkgdiet-gate.yml already exists, skipping. Use --force to overwrite.');
     }
   });
 
