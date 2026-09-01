@@ -93,23 +93,52 @@ Run PkgDiet in any npm project:
 npx pkgdiet
 ```
 
-### Options
+### Commands & Options
 
 ```text
-  -p, --path <path>    Path to the project to analyze (default: ".")
-  --unused             Only show unused dependencies
-  --health             Only show health analysis
-  --size               Only show size analysis
-  --alternatives       Only show alternative suggestions
-  --prod               Exclude devDependencies from analysis (alias: --exclude-dev)
-  --exclude-dev        Alias for --prod
-  --json               Output as JSON (for CI/CD integration)
-  --fix                Preview dependency removal (dry-run)
-  --fix --yes          Actually remove unused dependencies
-  --no-cache           Skip local cache, fetch fresh data from npm
-  -v, --version        Show version number
-  -h, --help           Show help
+  audit [options]      Run full repository audit (default)
+    -p, --path <path>  Path to the project to analyze
+    --unused           Only show unused dependencies
+    --health           Only show health analysis
+    --size             Only show size analysis
+    --alternatives     Only show alternative suggestions
+    --prod             Exclude devDependencies from analysis
+    --json             Output as JSON
+    --fix              Preview dependency removal
+    --no-cache         Skip local cache
+
+  check <package>      Check a single package for health, size, and policy compliance (Pre-install Gate)
+  init                 Initialize PkgDiet policy and GitHub Actions (PR Gate & Weekly Drift)
+  ci                   Run CI PR gate checks based on lockfile diff
+  drift                Scan project for dependency health drift over time
+  mcp                  Start the MCP JSON-RPC Server for AI coding agents
 ```
+
+---
+
+## 🛡️ Dependency Risk & Cost Gate (Phase 2)
+
+PkgDiet v1.2.0 evolves beyond a post-hoc audit tool into an active **governance gate** for both human developers and AI coding agents.
+
+### Instant CLI Gate
+Check any package *before* you `npm install` it to get an instant verdict based on health, size, and cost:
+```bash
+pkgdiet check moment
+# Verdict: WARN
+# Health: 100/100
+# Reasons: Efficiency Flag: Better alternatives exist for moment.
+# Cost Impact: $0.032/mo CI, 4.15MB
+# Alternatives: dayjs, date-fns, luxon
+```
+
+### AI Agent Support (MCP Server)
+AI coding agents (Cursor, Claude Code, Copilot) can natively call `pkgdiet mcp` to evaluate packages mid-task. It prevents AI agents from silently injecting deprecated, bloated, or hallucinatory packages into your codebase.
+
+### CI PR Gate & Drift Scanning
+Run `pkgdiet init` to instantly generate:
+- `.pkgdietrc.json`: Configure your team's `minHealthScore`, size limits, and `ignoreRules`.
+- `pkgdiet-gate.yml`: A GitHub Action that runs `pkgdiet ci` to parse `package-lock.json` diffs and automatically post a markdown report to PRs if dependencies degrade.
+- `pkgdiet-drift.yml`: A weekly cron job that runs `pkgdiet drift` to catch previously healthy packages that have since been abandoned.
 
 ---
 
@@ -157,9 +186,8 @@ pkgdiet --no-cache   # bypass cache, fetch fresh
 
 ## Limitations
 
-- **Monorepos**: Run inside a specific package directory — workspace roots are not supported in v1
-- **pnpm / Yarn Berry (PnP)**: Size analysis requires a local `node_modules` folder. Health, unused, and alternatives analysis work normally
-- **Dynamic imports with string variables**: `require(someVar)` cannot be statically analyzed — these are rare
+- **pnpm / Yarn**: The CI gate (`pkgdiet ci`) currently only parses npm's `package-lock.json` diffs to find transitive dependencies. `pnpm-lock.yaml` and `yarn.lock` parsing are fast-follows. Size analysis (`pkgdiet audit`) also requires a local `node_modules` folder, which PnP setups lack.
+- **Dynamic imports with string variables**: `require(someVar)` cannot be statically analyzed for unused detection — these are rare.
 
 ---
 
