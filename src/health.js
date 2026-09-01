@@ -37,6 +37,7 @@ async function fetchWithRetry(url, retries = MAX_RETRIES) {
       }
 
       if (!response.ok) {
+        if (response.status === 404) return { _notFound: true };
         return null;
       }
 
@@ -85,7 +86,7 @@ async function withConcurrency(tasks, limit) {
 /**
  * Fetch health data for a single package from npm registry.
  */
-async function fetchPackageHealth(packageName, projectPath, useCache) {
+export async function fetchPackageHealth(packageName, projectPath, useCache) {
   // Check cache first
   if (useCache) {
     const cached = getCached(projectPath, packageName, 'health');
@@ -108,6 +109,18 @@ async function fetchPackageHealth(packageName, projectPath, useCache) {
       flags: ['skipped'],
       reason: 'Could not fetch registry data (private registry or network error)',
       skipped: true,
+      notFound: false,
+    };
+  }
+
+  if (registryData._notFound) {
+    return {
+      name: packageName,
+      score: null,
+      flags: ['skipped'],
+      reason: 'Package not found in registry (potential typo or hallucination)',
+      skipped: true,
+      notFound: true,
     };
   }
 
@@ -118,6 +131,16 @@ async function fetchPackageHealth(packageName, projectPath, useCache) {
   const latestMeta = latestVersion ? registryData.versions?.[latestVersion] : null;
   const monthlyDownloads = downloadsData?.downloads || 0;
   const deprecated = registryData.versions?.[latestVersion]?.deprecated || null;
+
+  // Extract install scripts for security checks
+  const installScripts = [];
+  if (latestMeta && latestMeta.scripts) {
+    for (const scriptName of ['preinstall', 'install', 'postinstall']) {
+      if (latestMeta.scripts[scriptName]) {
+        installScripts.push(scriptName);
+      }
+    }
+  }
 
   // Check for TypeScript types
   let hasTypes = false;
@@ -195,6 +218,13 @@ async function fetchPackageHealth(packageName, projectPath, useCache) {
   if (monthlyDownloads < 1000) {
     flags.push({ type: 'warning', label: 'LOW DOWNLOADS', detail: `Only ${monthlyDownloads.toLocaleString()} downloads/month` });
   }
+  if (installScripts.length > 0) {
+    flags.push({ type: 'warning', label: 'INSTALL SCRIPTS', detail: `Contains ${installScripts.join(', ')}` });
+  }
+
+  // Size and Cost info
+  const unpackedSize = latestMeta?.dist?.unpackedSize || 0;
+  const dependencyCount = Object.keys(latestMeta?.dependencies || {}).length;
 
   const result = {
     name: packageName,
@@ -207,6 +237,9 @@ async function fetchPackageHealth(packageName, projectPath, useCache) {
     monthlyDownloads,
     hasTypes: hasTypes || hasExternalTypes,
     typesSource: hasTypes ? 'bundled' : hasExternalTypes ? '@types' : 'none',
+    installScripts,
+    unpackedSize,
+    dependencyCount,
     skipped: false,
   };
 

@@ -1,0 +1,20 @@
+{
+  "totalChecks": 8,
+  "latencyMs": [
+    357,
+    1100,
+    315,
+    1248,
+    663,
+    185,
+    152,
+    437
+  ],
+  "verdicts": {
+    "ALLOW": 3,
+    "WARN": 3,
+    "BLOCK": 2
+  },
+  "bypasses": 0,
+  "alternativesSuggested": 5
+}

@@ -48,14 +48,7 @@ export async function run(options = {}) {
 
   const projectName = pkg.name || 'unknown';
 
-  // Detect monorepos — v1 does not support workspace roots
-  if (pkg.workspaces) {
-    console.error('\n  ❌ Monorepo workspaces detected.');
-    console.error('     PkgDiet v1 supports single-package repos only.');
-    console.error('     Run it inside a specific package directory instead:');
-    console.error(`     e.g.  pkgdiet --path packages/my-app\n`);
-    process.exit(1);
-  }
+  // Workspace support is now enabled
 
   // Determine which sections to show
   const showAll = !options.unused && !options.health && !options.size && !options.alternatives;
