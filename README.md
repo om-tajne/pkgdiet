@@ -9,7 +9,7 @@ Put your `node_modules` on a diet.
 
 PkgDiet is a proactive dependency governance tool that helps you find unused dependencies, analyze package health, and reduce `node_modules` size. It doesn't just ask *"is it safe?"* — it asks *"is it optimal?"*
 
-> **Our Vision:** PkgDiet's mission is to become the open standard for dependency intelligence in AI-assisted software development. Our goal is simple: whenever a developer, CI pipeline, or AI agent needs to evaluate, install, replace, or audit a dependency, PkgDiet should be the trusted, opt-in source of truth.
+> **Our Vision:** PkgDiet's mission is to become an open standard for dependency intelligence in AI-assisted software development. Our goal is simple: whenever a developer, CI pipeline, or compatible AI agent needs to evaluate, install, replace, or audit a dependency, PkgDiet should provide trusted, machine-readable insights through transparent, opt-in integrations.
 
 ---
 
@@ -87,7 +87,7 @@ PkgDiet scans your codebase's AST and NPM registry data in seconds to give you a
 - **Health & Rot Scoring:** Detects the "Bus Factor" (single maintainer) and abandoned packages before they become technical debt.
 - **Smart Alternatives:** Recommends modern, lightweight replacements for legacy bloat (e.g., `dayjs` instead of `moment`, `picocolors` instead of `chalk`).
 - **Pre-Install Gate:** Run `pkgdiet check <package>` to evaluate a library *before* adding it to your project.
-- **MCP Server for AI Agents:** Give Claude Code, Cursor, or GitHub Copilot the ability to natively evaluate dependency health so they stop hallucinating deprecated packages. Install globally in one click: `npx pkgdiet mcp-install`
+- **MCP Server for AI Agents:** Give compatible AI coding assistants the ability to evaluate dependency health using PkgDiet's machine-readable data before recommending or installing packages. Install globally in one click: `npx pkgdiet mcp-install`
 - **CI/CD Ready:** Use `pkgdiet ci` to parse `package-lock.json` diffs in GitHub Actions and block PRs that introduce unhealthy dependencies.
 
 ---
@@ -106,7 +106,7 @@ PkgDiet works out of the box with zero configuration. However, teams can enforce
 ```
 
 ### Telemetry (Local Only)
-By default, PkgDiet writes anonymous, **purely local** usage metrics to a `.pkgdiet-metrics.json` file in your repository to track the amount of time and disk space saved. **No data is ever sent off your machine.** You can disable this local logging entirely by adding `"telemetry": false` to your `.pkgdietrc.json` or by setting the `PKGDYET_TELEMETRY_DISABLED=1` environment variable.
+By default, PkgDiet writes anonymous, **purely local** usage metrics to a `.pkgdiet-metrics.json` file in your repository to track the amount of time and disk space saved. **No data is ever sent off your machine.** You can disable this local logging entirely by adding `"telemetry": false` to your `.pkgdietrc.json` or by setting the `PKGDIET_TELEMETRY_DISABLED=1` environment variable.
 
 ---
 
@@ -115,7 +115,7 @@ By default, PkgDiet writes anonymous, **purely local** usage metrics to a `.pkgd
 | Command | Description |
 |---|---|
 | `npx pkgdiet` | Run full repository audit |
-| `npx pkgdiet --fix` | Preview and remove unused dependencies |
+| `npx pkgdiet --fix` | Preview unused dependencies and apply approved removals |
 | `npx pkgdiet check <pkg>` | Check health/size of a single package |
 | `npx pkgdiet init` | Generate config and GitHub Actions workflows |
 | `npx pkgdiet ci` | Run PR gate checks based on lockfile diffs |
