@@ -35,7 +35,11 @@
     "windsurf",
     "aider",
     "openai",
-    "chatgpt"
+    "chatgpt",
+    "llm",
+    "autonomous-agent",
+    "devin",
+    "rag"
   ],
   "author": "Om Tajne <om-tajne@users.noreply.github.com> (https://github.com/om-tajne)",
   "repository": {
