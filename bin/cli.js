@@ -121,8 +121,8 @@ program
     const fs = await import('fs');
     fs.writeFileSync('pkgdiet-pr-comment.md', result.markdown);
     
-    if (result.hasBlocks) {
-      console.log('❌ PR Gate failed: BLOCKED packages detected.');
+    if (result.hasBlocks || policyModified) {
+      console.log('❌ PR Gate failed: BLOCKED packages or policy tampering detected.');
       process.exit(1);
     }
   });

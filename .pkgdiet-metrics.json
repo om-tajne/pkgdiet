@@ -1,5 +1,5 @@
 {
-  "totalChecks": 8,
+  "totalChecks": 10,
   "latencyMs": [
     357,
     1100,
@@ -8,13 +8,15 @@
     663,
     185,
     152,
-    437
+    437,
+    388,
+    3
   ],
   "verdicts": {
     "ALLOW": 3,
-    "WARN": 3,
+    "WARN": 5,
     "BLOCK": 2
   },
   "bypasses": 0,
-  "alternativesSuggested": 5
+  "alternativesSuggested": 7
 }
