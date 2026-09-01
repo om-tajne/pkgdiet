@@ -4,8 +4,8 @@
   "version": "1.2.0",
   "description": "Put your node_modules on a diet - find unused dependencies, analyze health, and reduce size",
   "repository": {
-    "type": "git",
-    "url": "https://github.com/om-tajne/pkgdiet.git"
+    "source": "github",
+    "url": "https://github.com/om-tajne/pkgdiet"
   },
   "packages": [
     {
