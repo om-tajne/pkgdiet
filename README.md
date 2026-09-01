@@ -26,45 +26,61 @@ It provides **Dependency Intelligence & Optimization** by combining 4 things no 
 ## Demo
 
 ```text
+- Scanning imports...
 ✓ Scanned 141 files, found 54 imports
-✓ Health check complete: 11 issue(s) found
+- Checking health of 44 packages...
+✓ Health check complete: 10 issues found
+- Analyzing dependency sizes...
 ✓ Size analysis complete: 40.5 MB total
 
 ╭──────────────────────────────────────────────────────╮
-│ 🥗 PkgDiet v1.1.0                                    │
+│ 🥗 PkgDiet v1.2.0                                    │
 │ Put your node_modules on a diet...                   │
 │ Project: express                                     │
 │ Dependencies: 44 direct │ 141 files scanned          │
 │ node_modules: 40.5 MB                                │
-│    Overall Score:  61/100  ⚠️                        │
-│    ██████████████████░░░░░░░░░░░░                    │
+│    Overall Score:  67/100  ⚠️                        │
+│    ████████████████████░░░░░░░░░░                    │
 ╰──────────────────────────────────────────────────────╯
 
-🗑️  UNUSED DEPENDENCIES (1 found — removing saves ~21.2 KB)
-──────────────────────────────────────────────────────────
-   Package        Type    Size      Action
-   ─────────────────────────────────────────────────────
-   ⚫ hbs          dev     21.2 KB   npm uninstall hbs
+🗑️  UNUSED DEPENDENCIES (1 found — saves ~21.2 KB)
+────────────────────────────────────────────────────────
 
-🏥  HEALTH WARNINGS (11 issue(s))
-──────────────────────────────────────────────────────────
-   🔴 pbkdf2-password   15   UNMAINTAINED: No updates in 4 years
-   🔴 after             43   UNMAINTAINED: No updates in 4 years
-   🔴 vhost             43   UNMAINTAINED: No updates in 2 years
-   🔴 depd              49   UNMAINTAINED: No updates in 4 years
-   🔴 escape-html       49   UNMAINTAINED: No updates in 2 years
-   + 6 more issues — run pkgdiet --json for full list
+   ⚫ hbs                      dev      21.2 KB      → npm uninstall hbs
 
-📦  SIZE ANALYSIS (Top 10 heaviest)
-──────────────────────────────────────────────────────────
-   🟧 eslint      2.77 MB   6.8%
-   🟧 mocha       2.22 MB   5.5%
-   🟩 marked       740 KB   1.8%
+🏥  HEALTH WARNINGS (10 issues)
+────────────────────────────────────────────────────────
 
-💡  BETTER ALTERNATIVES AVAILABLE (1 suggestion)
-──────────────────────────────────────────────────────────
-   🔌 body-parser — Built into Express 4.16+ as express.json()
-      → express.json() (0KB) No separate install needed
+   Package                    Score    Issue
+   ──────────────────────────────────────────────────────────────────────
+   🔴 pbkdf2-password          29       Unmaintained (4yr) · Single maintainer · Low downloads
+   🔴 vhost                    43       Unmaintained (2yr) · Low downloads
+   🔴 depd                     49       Unmaintained (4yr) · Single maintainer
+   🔴 escape-html              49       Unmaintained (2yr) · Single maintainer
+   🔴 merge-descriptors        55       Unmaintained (2yr) · Single maintainer
+   🔴 encodeurl                57       Unmaintained (2yr)
+   🔴 after                    57       Unmaintained (4yr)
+   🔴 method-override          63       Unmaintained (2yr)
+   🟡 supertest                64       Low downloads
+   🟡 once                     70       Single maintainer
+
+📦  SIZE ANALYSIS
+────────────────────────────────────────────────────────
+
+   Package                      Install Size    % of node_modules
+   ─────────────────────────────────────────────────────────────────
+   🟧 eslint                     2.77 MB         6.8%
+   🟧 mocha                      2.22 MB         5.5%
+   ✓  42 other packages under 5% — no action needed
+
+💡  BETTER ALTERNATIVES (1 suggestion)
+────────────────────────────────────────────────────────
+
+   🔌 body-parser → express.json() built into Express 4.16+, no separate install needed
+
+────────────────────────────────────────────────────────
+  Action summary: 1 to remove · 10 to investigate · 1 to swap
+  Run pkgdiet --fix to remove unused · --json for full machine-readable output
 ```
 
 ---
@@ -192,9 +208,9 @@ pkgdiet --no-cache   # bypass cache, fetch fresh
 
 ---
 
-## Upgrading from v1.0.0
+## Upgrading from v1.1.0
 
-PkgDiet v1.1.0 improves glob filtering to strictly isolate your project's source files and prevent scanning `node_modules` internals. You may notice significantly faster scan times and more accurate unused dependency detection. See [CHANGELOG.md](CHANGELOG.md) for full release details.
+PkgDiet v1.2.0 drastically improves the readability of the CLI report. We've removed noise, collapsed health warnings, and added a clean action summary footer. It's now easier than ever to spot actionable dependency bloat. See [CHANGELOG.md](CHANGELOG.md) for full release details.
 
 ---
 

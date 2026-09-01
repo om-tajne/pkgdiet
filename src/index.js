@@ -4,6 +4,7 @@
  */
 
 import ora from 'ora';
+import chalk from 'chalk';
 import { readPackageJson, resolveProjectPath } from './utils.js';
 import { scanDependencies } from './scanner.js';
 import { analyzeHealth } from './health.js';
@@ -63,7 +64,7 @@ export async function run(options = {}) {
     const spinner = ora({ text: 'Scanning imports...', color: 'cyan' }).start();
     try {
       scanResult = await scanDependencies(projectPath, { prod: options.prod });
-      spinner.succeed(`Scanned ${scanResult.totalFiles} files, found ${scanResult.totalImports} imports`);
+      spinner.stopAndPersist({ symbol: chalk.green('✓'), text: `Scanned ${scanResult.totalFiles} files, found ${scanResult.totalImports} imports` });
     } catch (err) {
       spinner.fail(`Scan failed: ${err.message}`);
       process.exit(1);
@@ -109,7 +110,7 @@ export async function run(options = {}) {
       const skipped = healthResults.filter(h => h.skipped).length;
       let suffix = '';
       if (skipped > 0) suffix = `, ${skipped} skipped`;
-      spinner.succeed(`Health check complete: ${issues} issue(s) found${suffix}`);
+      spinner.stopAndPersist({ symbol: chalk.green('✓'), text: `Health check complete: ${issues} issue${issues === 1 ? '' : 's'} found${suffix}` });
     } catch (err) {
       spinner.warn(`Health check partially failed: ${err.message}`);
     }
@@ -122,7 +123,7 @@ export async function run(options = {}) {
     const spinner = ora({ text: 'Analyzing dependency sizes...', color: 'cyan' }).start();
     try {
       sizeResult = await analyzeSize(allPkgNames, projectPath, scanResult.unused);
-      spinner.succeed(`Size analysis complete: ${formatBytesSimple(sizeResult.totalNodeModules)} total`);
+      spinner.stopAndPersist({ symbol: chalk.green('✓'), text: `Size analysis complete: ${formatBytesSimple(sizeResult.totalNodeModules)} total` });
     } catch (err) {
       spinner.warn(`Size analysis partially failed: ${err.message}`);
     }

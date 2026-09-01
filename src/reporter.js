@@ -20,10 +20,17 @@ const BOX = {
 function boxHeader(lines, width = 54) {
   const top = `${BOX.topLeft}${BOX.horizontal.repeat(width)}${BOX.topRight}`;
   const bottom = `${BOX.bottomLeft}${BOX.horizontal.repeat(width)}${BOX.bottomRight}`;
+  
   const padded = lines.map(line => {
     // Strip ANSI codes for length calculation
-    const plainLength = line.replace(/\x1b\[[0-9;]*m/g, '').length;
-    const padding = Math.max(0, width - plainLength - 2);
+    const plain = line.replace(/\x1b\[[0-9;]*m/g, '');
+    let visualLength = plain.length;
+    // ⚠️ is string length 2 but renders as 1 column in most terminals
+    if (plain.includes('⚠️')) visualLength -= 1;
+    // ✅ is string length 1 but renders as 2 columns
+    if (plain.includes('✅')) visualLength += 1;
+
+    const padding = Math.max(0, width - visualLength - 2);
     return `${BOX.vertical} ${line}${' '.repeat(padding)} ${BOX.vertical}`;
   });
 
@@ -146,7 +153,7 @@ export function renderReport(results, options = {}) {
   output.push('');
   output.push(boxHeader([
     '',
-    `${chalk.bold.cyan('🥗 PkgDiet')} ${chalk.gray('v1.1.0')}`,
+    `${chalk.bold.cyan('🥗 PkgDiet')} ${chalk.gray('v1.2.0')}`,
     chalk.gray('Put your node_modules on a diet...'),
     '',
     `${chalk.gray('Project:')} ${chalk.white(projectName || 'unknown')}`,
@@ -163,25 +170,19 @@ export function renderReport(results, options = {}) {
     if (scanResult.unused.length > 0) {
       const unusedSize = sizeResult ? sizeResult.unusedSize : 0;
       output.push(sectionHeader('🗑️', 'UNUSED DEPENDENCIES',
-        `${scanResult.unused.length} found${unusedSize ? ` — removing saves ~${formatBytes(unusedSize)}` : ''}`
+        `${scanResult.unused.length} found${unusedSize ? ` — saves ~${formatBytes(unusedSize)}` : ''}`
       ));
       output.push('');
-
-      // Table header
-      output.push(
-        `   ${chalk.gray(pad('Package', 28))} ${chalk.gray(pad('Type', 10))} ${chalk.gray(pad('Size', 12))} ${chalk.gray('Action')}`
-      );
-      output.push(chalk.gray(`   ${'─'.repeat(70)}`));
 
       // Find size info for each unused package
       for (const pkgName of scanResult.unused) {
         const sizeInfo = sizeResult?.packages?.find(p => p.name === pkgName);
         const size = sizeInfo ? formatBytes(sizeInfo.size) : '—';
         const isDevDep = scanResult.devDeps.includes(pkgName);
-        const type = isDevDep ? chalk.gray('dev') : chalk.white('prod');
+        const type = isDevDep ? chalk.gray('dev') : chalk.gray('prod');
 
         output.push(
-          `   ${chalk.red('⚫')} ${pad(chalk.white(pkgName), 26)} ${pad(type, 10)} ${pad(size, 12)} ${chalk.gray(`npm uninstall ${pkgName}`)}`
+          `   ${chalk.red('⚫')} ${pad(chalk.white(pkgName), 24)} ${pad(type, 8)} ${pad(size, 12)} ${chalk.gray(`→ npm uninstall ${pkgName}`)}`
         );
       }
 
@@ -202,7 +203,7 @@ export function renderReport(results, options = {}) {
     const skipped = healthResults.filter(h => h.skipped);
 
     if (issues.length > 0) {
-      output.push(sectionHeader('🏥', 'HEALTH WARNINGS', `${issues.length} issue(s)`));
+      output.push(sectionHeader('🏥', 'HEALTH WARNINGS', `${issues.length} issue${issues.length === 1 ? '' : 's'}`));
       output.push('');
 
       output.push(
@@ -214,21 +215,15 @@ export function renderReport(results, options = {}) {
       const sorted = [...issues].sort((a, b) => (a.score || 0) - (b.score || 0));
 
       for (const pkg of sorted) {
-        const mainFlag = pkg.flags[0];
-        const icon = flagIcon(mainFlag.type);
+        const icon = flagIcon(pkg.flags[0].type);
         const scoreStr = pkg.score !== null ? String(pkg.score) : '—';
         const scoreColor = pkg.score >= 70 ? chalk.green : pkg.score >= 40 ? chalk.yellow : chalk.red;
 
-        output.push(
-          `   ${icon} ${pad(chalk.white(pkg.name), 24)} ${pad(scoreColor(scoreStr), 8)} ${chalk.gray(mainFlag.label)}: ${mainFlag.detail || ''}`
-        );
+        const joinedFlags = pkg.flags.map(f => f.label).join(' · ');
 
-        // Show additional flags indented
-        for (const flag of pkg.flags.slice(1)) {
-          output.push(
-            `      ${' '.repeat(26)} ${chalk.gray(flag.label)}: ${flag.detail || ''}`
-          );
-        }
+        output.push(
+          `   ${icon} ${pad(chalk.white(pkg.name), 24)} ${pad(scoreColor(scoreStr), 8)} ${chalk.gray(joinedFlags)}`
+        );
       }
     } else {
       output.push(sectionHeader('✅', 'ALL DEPENDENCIES HEALTHY', 'no issues'));
@@ -248,35 +243,39 @@ export function renderReport(results, options = {}) {
       output.push(chalk.yellow(`   ⚠️  ${sizeResult.unsupportedReason}`));
       output.push(chalk.gray('   Size penalty is excluded from overall score for this project.'));
     } else if (sizeResult.packages.length > 0) {
-    output.push(sectionHeader('📦', 'SIZE ANALYSIS', `Top 10 heaviest`));
-    output.push('');
+    const actionable = sizeResult.packages.filter(p => p.exists && p.percentage >= 5);
+    const nonActionableCount = sizeResult.packages.filter(p => p.exists && p.percentage < 5).length;
 
-    output.push(
-      `   ${chalk.gray(pad('Package', 28))} ${chalk.gray(pad('Install Size', 15))} ${chalk.gray('% of node_modules')}`
-    );
-    output.push(chalk.gray(`   ${'─'.repeat(65)}`));
-
-    const top10 = sizeResult.packages.filter(p => p.exists).slice(0, 10);
-
-    for (const pkg of top10) {
-      let sizeIcon;
-      if (pkg.percentage >= 10) sizeIcon = chalk.red('🟥');
-      else if (pkg.percentage >= 5) sizeIcon = chalk.yellow('🟧');
-      else if (pkg.percentage >= 2) sizeIcon = chalk.yellow('🟨');
-      else sizeIcon = chalk.green('🟩');
-
-      const pctStr = pkg.percentage.toFixed(1) + '%';
+    if (actionable.length > 0) {
+      output.push(sectionHeader('📦', 'SIZE ANALYSIS'));
+      output.push('');
 
       output.push(
-        `   ${sizeIcon} ${pad(chalk.white(pkg.name), 26)} ${pad(formatBytes(pkg.size), 15)} ${chalk.gray(pctStr)}`
+        `   ${chalk.gray(pad('Package', 28))} ${chalk.gray(pad('Install Size', 15))} ${chalk.gray('% of node_modules')}`
       );
+      output.push(chalk.gray(`   ${'─'.repeat(65)}`));
+
+      for (const pkg of actionable) {
+        let sizeIcon = pkg.percentage >= 10 ? chalk.red('🟥') : chalk.yellow('🟧');
+        const pctStr = pkg.percentage.toFixed(1) + '%';
+        output.push(
+          `   ${sizeIcon} ${pad(chalk.white(pkg.name), 26)} ${pad(formatBytes(pkg.size), 15)} ${chalk.gray(pctStr)}`
+        );
+      }
+      
+      if (nonActionableCount > 0) {
+        output.push(`   ${chalk.green('✓')}  ${nonActionableCount} other packages under 5% — no action needed`);
+      }
+    } else {
+      output.push(sectionHeader('📦', 'SIZE ANALYSIS'));
+      output.push(chalk.green(`   All packages are small and efficient — no action needed.`));
     }
     }
   }
 
   // ─── Better Alternatives ─────────────────────────────
   if (showAlternatives && alternatives && alternatives.length > 0) {
-    output.push(sectionHeader('💡', 'BETTER ALTERNATIVES AVAILABLE', `${alternatives.length} suggestion(s)`));
+    output.push(sectionHeader('💡', 'BETTER ALTERNATIVES', `${alternatives.length} suggestion${alternatives.length === 1 ? '' : 's'}`));
     output.push('');
 
     for (const alt of alternatives) {
@@ -288,37 +287,33 @@ export function renderReport(results, options = {}) {
         'optimization': chalk.blue('⚡'),
       }[alt.category] || '💡';
 
-      output.push(`   ${categoryIcon} ${chalk.bold.white(alt.current)} ${chalk.gray('—')} ${chalk.gray(alt.reason)}`);
-
-      for (const suggestion of alt.alternatives) {
-        const sizeNote = suggestion.size ? chalk.cyan(`(${suggestion.size})`) : '';
-        output.push(`      ${chalk.green('→')} ${chalk.green(suggestion.name)} ${sizeNote} ${chalk.gray(suggestion.note || '')}`);
-      }
-      output.push('');
+      const suggestion = alt.alternatives[0];
+      const reasonStr = suggestion.note || alt.reason;
+      const lowerReason = reasonStr.charAt(0).toLowerCase() + reasonStr.slice(1);
+      
+      output.push(`   ${categoryIcon} ${chalk.bold.white(alt.current)} ${chalk.gray('→')} ${chalk.green(suggestion.name)} ${chalk.gray(lowerReason)}`);
     }
   }
 
-  // ─── Footer ─────────────────────────────
   output.push('');
   output.push(chalk.gray('─'.repeat(56)));
-
-  // Summary stats
-  const summaryParts = [];
-  if (scanResult.unused.length > 0 && sizeResult) {
-    summaryParts.push(`💾 Potential savings: ${chalk.bold.green(formatBytes(sizeResult.unusedSize))} from removing unused deps`);
+  
+  const removeCount = scanResult.unused.length;
+  const investigateCount = healthResults ? healthResults.filter(h => !h.skipped && h.flags && h.flags.length > 0).length : 0;
+  const swapCount = alternatives ? alternatives.length : 0;
+  
+  const actions = [];
+  if (removeCount > 0) actions.push(`${removeCount} to remove`);
+  if (investigateCount > 0) actions.push(`${investigateCount} to investigate`);
+  if (swapCount > 0) actions.push(`${swapCount} to swap`);
+  
+  if (actions.length > 0) {
+    output.push(`  Action summary: ${actions.join(' · ')}`);
+    output.push(`  Run ${chalk.cyan('pkgdiet --fix')} to remove unused · ${chalk.cyan('--json')} for full machine-readable output`);
+  } else {
+    output.push(`  ${chalk.green('All good!')} No actions needed.`);
   }
-  if (scanResult.unused.length > 0) {
-    summaryParts.push(`🔧 Auto-fix: run ${chalk.cyan('pkgdiet --fix')} to preview removal`);
-  }
-  summaryParts.push(`📄 JSON output: run ${chalk.cyan('pkgdiet --json')} for CI/CD integration`);
-
-  for (const part of summaryParts) {
-    output.push(`   ${part}`);
-  }
-
-  output.push(chalk.gray('─'.repeat(56)));
   output.push('');
-
   return output.join('\n');
 }
 
@@ -332,7 +327,7 @@ export function renderJson(results) {
 
   return JSON.stringify({
     tool: 'pkgdiet',
-    version: '1.0.0',
+    version: '1.2.0',
     project: projectName,
     overallScore,
     timestamp: new Date().toISOString(),
