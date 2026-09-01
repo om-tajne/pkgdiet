@@ -1,0 +1,12 @@
+{
+  "name": "io.github.om-tajne/pkgdiet",
+  "type": "stdio",
+  "description": "Dependency intelligence for AI agents. Evaluates NPM package health, maintenance status, and size to prevent legacy or bloated dependencies.",
+  "repository": "https://github.com/om-tajne/pkgdiet",
+  "packages": [
+    {
+      "registry": "npm",
+      "package": "pkgdiet"
+    }
+  ]
+}
