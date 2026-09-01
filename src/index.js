@@ -148,6 +148,12 @@ export async function run(options = {}) {
 
   if (options.json) {
     console.log(renderJson(results));
+  } else if (options.fix) {
+    if (options.yes) {
+      await applyFixes(projectPath, pkg, scanResult);
+    } else {
+      console.log(renderFixPreview(scanResult, sizeResult));
+    }
   } else {
     console.log(renderReport(results, {
       showUnused,
