@@ -7,7 +7,7 @@
     "node": ">=18.0.0"
   },
   "bin": {
-    "pkgdiet": "./bin/cli.js"
+    "pkgdiet": "bin/cli.js"
   },
   "main": "src/index.js",
   "files": [
