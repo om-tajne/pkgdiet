@@ -1,6 +1,6 @@
 import { checkPackage } from './checker.js';
 
-export async function runCiGate(packageNames, projectPath = process.cwd()) {
+export async function runCiGate(packageNames, projectPath = process.cwd(), policyModified = false) {
   const results = [];
   
   for (const pkg of packageNames) {
@@ -12,6 +12,11 @@ export async function runCiGate(packageNames, projectPath = process.cwd()) {
 
   // Build Markdown table
   let md = '### 🥗 PkgDiet PR Gate\n\n';
+  
+  if (policyModified) {
+    md += '> 🔴 **CRITICAL WARNING:** The `.pkgdietrc.json` policy file was modified in this PR. Ensure the author did not maliciously weaken security thresholds to bypass this gate.\n\n';
+  }
+
   md += '| Package | Verdict | Score | Size added | Cost Impact | Notes |\n';
   md += '|---|---|---|---|---|---|\n';
 

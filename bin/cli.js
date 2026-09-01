@@ -100,7 +100,20 @@ program
     }
     
     console.log(`[PkgDiet] Found ${addedPackages.length} new dependencies. Scanning...`);
-    const result = await runCiGate(addedPackages);
+    
+    // Check if the policy file itself was modified in this PR
+    let policyModified = false;
+    try {
+      const { execSync } = await import('child_process');
+      const changedFiles = execSync(`git diff --name-only ${options.base} HEAD`, { encoding: 'utf8' });
+      if (changedFiles.includes('.pkgdietrc.json')) {
+        policyModified = true;
+      }
+    } catch (e) {
+      // Ignore git errors here
+    }
+
+    const result = await runCiGate(addedPackages, process.cwd(), policyModified);
     console.log(result.markdown);
     
     // In a real GitHub action, we'd use GITHUB_TOKEN to post result.markdown to the PR.
