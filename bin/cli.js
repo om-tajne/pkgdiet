@@ -237,6 +237,35 @@ jobs:
     } else {
       console.log('⏭️  .github/workflows/pkgdiet-gate.yml already exists, skipping. Use --force to overwrite.');
     }
+
+    // Generate AI Agent Rules (.cursorrules & .windsurfrules)
+    const aiRuleContent = `You are working in a codebase protected by PkgDiet.
+
+CRITICAL RULE:
+Before you add or modify any dependencies (via npm install), you MUST verify the health and size of the package using PkgDiet.
+
+To do this, run:
+npx pkgdiet check <package_name>
+
+If the tool returns a WARN or BLOCK verdict (e.g. low health score, unmaintained, or bloated), you MUST search for a lighter, modern alternative and propose it to the user instead. Never install deprecated or bloated packages blindly.`;
+
+    ['.cursorrules', '.windsurfrules'].forEach(ruleFile => {
+      const rulePath = path.join(process.cwd(), ruleFile);
+      if (!fs.existsSync(rulePath) || options.force) {
+        fs.writeFileSync(rulePath, aiRuleContent);
+        console.log(`✅ ${options.force ? 'Overwrote' : 'Created'} ${ruleFile}`);
+      } else {
+        // File exists and we are not forcing. Politely append.
+        const existing = fs.readFileSync(rulePath, 'utf8');
+        if (!existing.includes('PkgDiet')) {
+          fs.appendFileSync(rulePath, '\n\n' + aiRuleContent);
+          console.log(`✅ Appended PkgDiet policy to existing ${ruleFile}`);
+        } else {
+          console.log(`⏭️  ${ruleFile} already contains PkgDiet policy, skipping.`);
+        }
+      }
+    });
+
   });
 
 // Handle default command if no args (fallback to audit for backward compatibility)
