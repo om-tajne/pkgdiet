@@ -1,6 +1,7 @@
 {
   "name": "pkgdiet",
   "version": "1.2.0",
+  "mcpName": "io.github.om-tajne/pkgdiet",
   "description": "Put your node_modules on a diet — find unused dependencies, analyze package health, and reduce size",
   "type": "module",
   "engines": {
