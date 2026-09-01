@@ -9,7 +9,7 @@ function getMetricsPath(projectPath) {
 }
 
 export function isTelemetryEnabled(policy) {
-  if (process.env.PKGDYET_TELEMETRY_DISABLED === '1') return false;
+  if (process.env.PKGDIET_TELEMETRY_DISABLED === '1') return false;
   if (policy && policy.telemetry === false) return false;
   return true;
 }
@@ -20,7 +20,7 @@ export function showFirstRunNoticeIfNeeded(projectPath, policy) {
   const metricsPath = getMetricsPath(projectPath);
   if (!existsSync(metricsPath) && !hasShownFirstRunNotice) {
     console.log('\n[PkgDiet] Notice: PkgDiet collects anonymous local usage metrics to show you this tool\'s impact.');
-    console.log('          Disable this by setting PKGDYET_TELEMETRY_DISABLED=1 or "telemetry": false in your config.\n');
+    console.log('          Disable this by setting PKGDIET_TELEMETRY_DISABLED=1 or "telemetry": false in your config.\n');
     hasShownFirstRunNotice = true;
     
     // Initialize the file
