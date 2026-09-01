@@ -201,3 +201,15 @@ PkgDiet v1.1.0 improves glob filtering to strictly isolate your project's source
 ## License
 
 MIT © [Om Tajne](https://github.com/om-tajne)
+
+---
+
+## Contributing
+
+Contributions, issues and feature requests are welcome!
+Feel free to check [issues page](https://github.com/om-tajne/pkgdiet/issues).
+
+## Show your support
+
+Give a ⭐️ if this project helped you reduce your node_modules size!
+

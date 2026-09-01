@@ -8,3 +8,4 @@ temp-express/
 qa-output.json
 qa-final.json
 package-lock.json
+.pkgdiet-metrics.json
