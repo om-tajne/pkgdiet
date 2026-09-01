@@ -1,6 +1,6 @@
 {
   "name": "pkgdiet",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Put your node_modules on a diet — find unused, bloated, and unhealthy npm packages",
   "type": "module",
   "engines": {
