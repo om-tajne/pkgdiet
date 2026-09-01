@@ -5,13 +5,13 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Node.js >=18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
 
-**Put your `node_modules` on a diet.** 
+Put your `node_modules` on a diet.
 
-PkgDiet is a proactive dependency governance tool that evaluates the necessity, health, and cost of your NPM packages. It doesn't just ask *"is it safe?"* — it asks **"is it optimal?"**
+PkgDiet is a proactive dependency governance tool that evaluates the necessity, health, and cost of your NPM packages. It doesn't just ask *"is it safe?"* — it asks *"is it optimal?"*
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 Run it instantly in any Node.js project (no installation required):
 
@@ -26,7 +26,7 @@ npx pkgdiet --fix
 
 ---
 
-## 📊 What You Get
+## What You Get
 
 PkgDiet scans your codebase's AST and NPM registry data in seconds to give you a pristine, actionable report:
 
@@ -76,11 +76,10 @@ PkgDiet scans your codebase's AST and NPM registry data in seconds to give you a
   Action summary: 1 to remove · 10 to investigate · 1 to swap
   Run pkgdiet --fix to remove unused · --json for full machine-readable output
 ```
-*(Report truncated for brevity)*
 
 ---
 
-## ✨ Features
+## Features
 
 - **AST-Based Unused Detection:** Safely flags installed packages that are never imported (handles TypeScript, JSX, dynamic imports, and NPM scripts).
 - **Health & Rot Scoring:** Detects the "Bus Factor" (single maintainer) and abandoned packages before they become technical debt.
@@ -91,7 +90,7 @@ PkgDiet scans your codebase's AST and NPM registry data in seconds to give you a
 
 ---
 
-## ⚙️ Configuration (Optional)
+## Configuration
 
 PkgDiet works out of the box with zero configuration. However, teams can enforce custom policies by running `npx pkgdiet init` to generate a `.pkgdietrc.json`:
 
@@ -105,7 +104,7 @@ PkgDiet works out of the box with zero configuration. However, teams can enforce
 
 ---
 
-## 🛠️ Commands
+## Commands
 
 | Command | Description |
 |---|---|
@@ -118,7 +117,7 @@ PkgDiet works out of the box with zero configuration. However, teams can enforce
 
 ---
 
-## 📄 License
+## License
 
 MIT © [Om Tajne](https://github.com/om-tajne)
 
