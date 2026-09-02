@@ -245,7 +245,7 @@ CRITICAL RULE:
 Before you add or modify any dependencies (via npm install), you MUST verify the health and size of the package using PkgDiet.
 
 To do this, run:
-npx pkgdiet check <package_name>
+npx pkgdiet@latest check <package_name>
 
 If the tool returns a WARN or BLOCK verdict (e.g. low health score, unmaintained, or bloated), you MUST search for a lighter, modern alternative and propose it to the user instead. Never install deprecated or bloated packages blindly.`;
 
