@@ -76,7 +76,7 @@ program
   });
 
 program
-  .command('mcp')
+  .command('mcp [args...]')
   .description('Start the MCP JSON-RPC Server over stdio')
   .action(async () => {
     const { runMcpServer } = await import('../src/mcp.js');
