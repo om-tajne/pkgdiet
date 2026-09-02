@@ -4,6 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/pkgdiet)](https://www.npmjs.com/package/pkgdiet)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Node.js >=18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
+[![PkgDiet MCP Server Score](https://glama.ai/mcp/servers/om-tajne/pkgdiet/badges/score.svg)](https://glama.ai/mcp/servers/om-tajne/pkgdiet)
 
 Put your `node_modules` on a diet.
 
