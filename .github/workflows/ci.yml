@@ -20,7 +20,6 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
-        cache: 'npm'
     - run: npm install
     # We will just verify it builds and runs the help command as a basic test for now
     - run: node ./bin/cli.js --help
