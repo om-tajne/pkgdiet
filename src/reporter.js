@@ -4,6 +4,13 @@
  */
 
 import chalk from 'chalk';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+const PKG_VERSION = pkg.version;
 import { formatBytes, formatNumber } from './utils.js';
 
 // ─── Box Drawing Characters ─────────────────────────
@@ -153,7 +160,7 @@ export function renderReport(results, options = {}) {
   output.push('');
   output.push(boxHeader([
     '',
-    `${chalk.bold.cyan('🥗 PkgDiet')} ${chalk.gray('v1.2.0')}`,
+    `${chalk.bold.cyan('🥗 PkgDiet')} ${chalk.gray('v' + PKG_VERSION)}`,
     chalk.gray('Put your node_modules on a diet...'),
     '',
     `${chalk.gray('Project:')} ${chalk.white(projectName || 'unknown')}`,
@@ -327,7 +334,7 @@ export function renderJson(results) {
 
   return JSON.stringify({
     tool: 'pkgdiet',
-    version: '1.2.0',
+    version: PKG_VERSION,
     project: projectName,
     overallScore,
     timestamp: new Date().toISOString(),

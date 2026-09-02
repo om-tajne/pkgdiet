@@ -22,15 +22,21 @@ export function runMcpServer(projectPath = process.cwd()) {
 
       // Initialize
       if (msg.method === 'initialize') {
-        send({
-          jsonrpc: '2.0',
-          id: msg.id,
-          result: {
-            protocolVersion: '2024-11-05',
-            capabilities: { tools: {} },
-            serverInfo: { name: 'pkgdiet-mcp', version: '1.1.0' }
-          }
-        });
+          const fs = await import('fs');
+          const path = await import('path');
+          const { fileURLToPath } = await import('url');
+          const __dirname = path.dirname(fileURLToPath(import.meta.url));
+          const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+          
+          send({
+            jsonrpc: '2.0',
+            id: msg.id,
+            result: {
+              protocolVersion: '2024-11-05',
+              capabilities: { tools: {} },
+              serverInfo: { name: 'pkgdiet-mcp', version: pkg.version }
+            }
+          });
       }
       // List Tools
       else if (msg.method === 'tools/list') {
