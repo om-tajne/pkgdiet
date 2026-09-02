@@ -266,6 +266,28 @@ If the tool returns a WARN or BLOCK verdict (e.g. low health score, unmaintained
       }
     });
 
+    // Generate .cursor/mcp.json for project-level MCP support
+    const cursorDir = path.join(process.cwd(), '.cursor');
+    if (!fs.existsSync(cursorDir)) {
+      fs.mkdirSync(cursorDir, { recursive: true });
+    }
+    
+    const cursorMcpPath = path.join(cursorDir, 'mcp.json');
+    if (!fs.existsSync(cursorMcpPath) || options.force) {
+      const cursorMcpConfig = {
+        mcpServers: {
+          pkgdiet: {
+            command: "npx",
+            args: ["-y", "pkgdiet@latest", "mcp"]
+          }
+        }
+      };
+      fs.writeFileSync(cursorMcpPath, JSON.stringify(cursorMcpConfig, null, 2));
+      console.log(`✅ ${options.force ? 'Overwrote' : 'Created'} .cursor/mcp.json`);
+    } else {
+      console.log('⏭️  .cursor/mcp.json already exists, skipping. Use --force to overwrite.');
+    }
+
   });
 
 program
