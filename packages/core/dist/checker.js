@@ -6,7 +6,10 @@ import { findAlternatives } from './alternatives.js';
 import { isScopeMappedInNpmrc } from './npmrc.js';
 export async function checkPackage(packageSpec, projectPath = process.cwd(), options = {}) {
     const startTime = Date.now();
-    const policy = loadPolicy(projectPath);
+    let policy = options.policy;
+    if (!policy) {
+        policy = loadPolicy(projectPath);
+    }
     // Parse `pkg@version` to `pkg` (MVP uses latest metadata for scoring regardless of version)
     let packageName = packageSpec;
     const atIndex = packageSpec.indexOf('@', 1); // skip first char in case of scoped package @org/pkg

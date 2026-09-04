@@ -1,10 +1,9 @@
 {
   "mcpServers": {
     "pkgdiet": {
-      "command": "npx",
+      "command": "node",
       "args": [
-        "-y",
-        "pkgdiet@latest",
+        "C:/Users/omtaj/Documents/antigravity/noble-rutherford/packages/cli/dist/cli.js",
         "mcp"
       ]
     }
