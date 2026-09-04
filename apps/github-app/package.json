@@ -1,0 +1,27 @@
+{
+  "name": "@pkgdiet/github-app",
+  "version": "2.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@octokit/app": "^15.0.0",
+    "@octokit/webhooks": "^13.0.0",
+    "@octokit/rest": "^21.0.0",
+    "@pkgdiet/core": "2.0.0",
+    "hono": "^4.0.0",
+    "prisma": "^6.0.0",
+    "@prisma/client": "^6.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "tsx": "^4.0.0"
+  }
+}

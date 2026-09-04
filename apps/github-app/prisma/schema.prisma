@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Org {
+  id           Int      @id @default(autoincrement())
+  githubOrgId  Int      @unique
+  slug         String
+  createdAt    DateTime @default(now())
+  repos        Repo[]
+  policies     Policy[]
+}
+
+model Repo {
+  id           Int      @id @default(autoincrement())
+  githubRepoId Int      @unique
+  orgId        Int
+  org          Org      @relation(fields: [orgId], references: [id])
+  name         String
+  fullName     String
+  createdAt    DateTime @default(now())
+  policies     Policy[]
+  checkRuns    CheckRun[]
+}
+
+model Policy {
+  id        Int      @id @default(autoincrement())
+  orgId     Int
+  repoId    Int?
+  org       Org      @relation(fields: [orgId], references: [id])
+  repo      Repo?    @relation(fields: [repoId], references: [id])
+  json      String   // sqlite doesn't have Json type, using String
+  createdAt DateTime @default(now())
+}
+
+model CheckRun {
+  id        Int      @id @default(autoincrement())
+  repoId    Int
+  repo      Repo     @relation(fields: [repoId], references: [id])
+  prNumber  Int
+  baseSha   String
+  headSha   String
+  verdict   String
+  detailsJson String // sqlite doesn't have Json type, using String
+  createdAt DateTime @default(now())
+}
