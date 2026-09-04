@@ -20,6 +20,10 @@
   },
   "dependencies": {
     "@babel/parser": "^7.27.0",
-    "glob": "^13.0.6"
+    "glob": "^13.0.6",
+    "js-yaml": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9"
   }
 }
