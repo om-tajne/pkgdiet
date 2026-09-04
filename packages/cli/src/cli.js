@@ -6,7 +6,7 @@
  */
 
 import { Command } from 'commander';
-import { run } from '../src/index.js';
+import { run } from '@pkgdiet/core';
 
 const program = new Command();
 
@@ -59,7 +59,7 @@ program
   .option('-p, --path <path>', 'Path to project policy (default: .)', '.')
   .option('--json', 'Output machine-readable JSON')
   .action(async (pkgName, options) => {
-    const { checkPackage } = await import('../src/checker.js');
+    const { checkPackage } = await import('@pkgdiet/core/dist/checker.js');
     const result = await checkPackage(pkgName, options.path);
     if (options.json) {
       console.log(JSON.stringify(result, null, 2));
@@ -79,8 +79,8 @@ program
   .command('mcp [args...]')
   .description('Start the MCP JSON-RPC Server over stdio')
   .action(async () => {
-    const { runMcpServer } = await import('../src/mcp.js');
-    runMcpServer();
+    const { startMcpServer } = await import('@pkgdiet/mcp');
+    await startMcpServer();
   });
 
 program
@@ -88,8 +88,8 @@ program
   .description('Run CI PR gate checks based on lockfile diff')
   .option('--base <ref>', 'Base git ref to compare against', 'HEAD^')
   .action(async (options) => {
-    const { getAddedDependenciesFromGit } = await import('../src/diff.js');
-    const { runCiGate } = await import('../src/ci-gate.js');
+    const { getAddedDependenciesFromGit } = await import('@pkgdiet/core/dist/diff.js');
+    const { runCiGate } = await import('@pkgdiet/core/dist/ci-gate.js');
     
     console.log(`[PkgDiet] Analyzing package-lock.json diff against ${options.base}...`);
     const addedPackages = getAddedDependenciesFromGit(options.base);
@@ -132,7 +132,7 @@ program
   .description('Scan project for dependency health drift over time')
   .option('-p, --path <path>', 'Path to project (default: .)', '.')
   .action(async (options) => {
-    const { scanDrift } = await import('../src/drift.js');
+    const { scanDrift } = await import('@pkgdiet/core/dist/drift.js');
     const { driftedPackages } = await scanDrift(options.path);
     if (driftedPackages.length === 0) {
       console.log('✅ No drift detected.');
