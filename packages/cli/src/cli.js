@@ -86,25 +86,15 @@ program
 program
   .command('ci')
   .description('Run CI PR gate checks based on lockfile diff')
-  .option('--base <ref>', 'Base git ref to compare against', 'HEAD^')
+  .option('--base <ref>', 'Base git ref to compare against', 'HEAD~1')
   .action(async (options) => {
-    const { getAddedDependenciesFromGit } = await import('@pkgdiet/core/dist/diff.js');
+    const { getLockfileDiff } = await import('@pkgdiet/core/dist/lockfile/index.js');
     const { runCiGate } = await import('@pkgdiet/core/dist/ci-gate.js');
     
-    console.log(`[PkgDiet] Analyzing package-lock.json diff against ${options.base}...`);
-    const addedPackages = getAddedDependenciesFromGit(options.base);
-    
-    if (addedPackages.length === 0) {
-      console.log('✅ No new dependencies found in package-lock.json.');
-      process.exit(0);
-    }
-    
-    console.log(`[PkgDiet] Found ${addedPackages.length} new dependencies. Scanning...`);
-    
-    // Check if the policy file itself was modified in this PR
+    // 1. Anti-tampering check for policy files
+    const { execSync } = await import('child_process');
     let policyModified = false;
     try {
-      const { execSync } = await import('child_process');
       const changedFiles = execSync(`git diff --name-only ${options.base} HEAD`, { encoding: 'utf8' });
       if (changedFiles.includes('.pkgdietrc.json')) {
         policyModified = true;
@@ -112,6 +102,15 @@ program
     } catch (e) {
       // Ignore git errors here
     }
+
+    const diff = getLockfileDiff(options.base, 'HEAD');
+    if (!diff.added || diff.added.length === 0) {
+      console.log(`✅ No new dependencies found in ${diff.type} lockfile.`);
+      process.exit(0);
+    }
+    
+    console.log(`[PkgDiet] Found ${diff.added.length} new dependencies in ${diff.type} lockfile. Scanning...`);
+    const addedPackages = diff.added.map(d => d.name);
 
     const result = await runCiGate(addedPackages, process.cwd(), policyModified);
     console.log(result.markdown);
@@ -337,7 +336,7 @@ program
   });
 
 // Handle default command if no args (fallback to audit for backward compatibility)
-if (process.argv.length === 2 || (process.argv.length > 2 && !['audit', 'check', 'mcp', 'drift', 'init', 'mcp-install'].includes(process.argv[2]))) {
+if (process.argv.length === 2 || (process.argv.length > 2 && !['audit', 'check', 'mcp', 'drift', 'init', 'mcp-install', 'ci'].includes(process.argv[2]))) {
   process.argv.splice(2, 0, 'audit');
 }
 
