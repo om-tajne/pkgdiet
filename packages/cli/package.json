@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "type": "module",
   "bin": {
-    "pkgdiet": "./dist/cli.js"
+    "pkgdiet": "dist/cli.js"
   },
   "main": "dist/cli.js",
   "files": [
