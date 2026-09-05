@@ -3,20 +3,31 @@ import { join } from 'path';
 export const DEFAULT_POLICY = {
     minHealthScore: 40,
     warnHealthScore: 60,
-    maxPackageSizeBytes: 15 * 1024 * 1024, // 15MB
+    maxPackageSizeBytes: 15_728_640, // 15MB
     blockedPackages: [],
     allowedPackages: [],
     ignoreRules: [],
     blockDeprecated: true,
-    blockInstallScripts: false, // WARN by default, but don't BLOCK unless true
-    failOn: 'BLOCK', // CI exit code behavior: FAIL on BLOCK, PASS on WARN
-    telemetry: true
+    blockInstallScripts: false,
+    failOn: 'BLOCK', // CI exit behavior: 'BLOCK' | 'WARN' | 'NONE'
+    // Sprint 7: Security hardening
+    securityMode: 'fail-open', // 'fail-open' | 'fail-closed'
+    internalNamePrefixes: [], // e.g. ['corp-', 'acme-'] — blocks public installs
+    blockOnIntegrityMismatch: false,
+    requireProvenanceFor: [], // e.g. ['@internal/*']
+    // Sprint 7: Per-environment policies
+    environments: {}, // Record<string, Partial<Policy>>
+    policyVersion: 1,
+    telemetry: true,
 };
+/**
+ * Load and merge policy from disk. Looks for:
+ *  1. .pkgdietrc.json
+ *  2. pkgdiet.config.json
+ *  3. package.json "pkgdiet" field
+ */
 export function loadPolicy(projectPath) {
-    const configs = [
-        '.pkgdietrc.json',
-        'pkgdiet.config.json'
-    ];
+    const configs = ['.pkgdietrc.json', 'pkgdiet.config.json'];
     for (const file of configs) {
         const configPath = join(projectPath, file);
         if (existsSync(configPath)) {
@@ -29,7 +40,6 @@ export function loadPolicy(projectPath) {
             }
         }
     }
-    // Check package.json for "pkgdiet" field
     const pkgJsonPath = join(projectPath, 'package.json');
     if (existsSync(pkgJsonPath)) {
         try {
@@ -42,12 +52,87 @@ export function loadPolicy(projectPath) {
             // ignore
         }
     }
-    return DEFAULT_POLICY;
+    return { ...DEFAULT_POLICY };
 }
 /**
- * Checks if a package name matches an ignore rule.
- * An ignore rule can be a string (exact match) or an object `{ package: 'foo', reason: '...' }`.
+ * Apply an environment overlay on top of a base policy.
+ * Merges: DEFAULT_POLICY → base → environments[envName]
  */
+export function applyEnvironment(policy, envName) {
+    if (!envName || !policy.environments || !policy.environments[envName]) {
+        return policy;
+    }
+    const overlay = policy.environments[envName];
+    return {
+        ...policy,
+        ...overlay,
+        blockedPackages: overlay.blockedPackages ?? policy.blockedPackages,
+        allowedPackages: overlay.allowedPackages ?? policy.allowedPackages,
+        ignoreRules: overlay.ignoreRules ?? policy.ignoreRules,
+    };
+}
+/**
+ * Validate a policy object for errors (must fix) and warnings (should review).
+ * @param {object} policy
+ * @returns {{ errors: string[], warnings: string[] }}
+ */
+export function validatePolicy(policy) {
+    const errors = [];
+    const warnings = [];
+    // ── Errors ──────────────────────────────────────────────────────────────────
+    if (typeof policy.minHealthScore !== 'number' ||
+        policy.minHealthScore < 0 || policy.minHealthScore > 100) {
+        errors.push('`minHealthScore` must be a number between 0 and 100.');
+    }
+    if (typeof policy.warnHealthScore !== 'number' ||
+        policy.warnHealthScore < 0 || policy.warnHealthScore > 100) {
+        errors.push('`warnHealthScore` must be a number between 0 and 100.');
+    }
+    if (typeof policy.minHealthScore === 'number' &&
+        typeof policy.warnHealthScore === 'number' &&
+        policy.warnHealthScore < policy.minHealthScore) {
+        errors.push(`\`warnHealthScore\` (${policy.warnHealthScore}) is less than \`minHealthScore\` (${policy.minHealthScore}). ` +
+            'Thresholds are inverted — all warned packages would also be blocked.');
+    }
+    if (!['BLOCK', 'WARN', 'NONE'].includes(policy.failOn)) {
+        errors.push('`failOn` must be "BLOCK", "WARN", or "NONE".');
+    }
+    if (!['fail-open', 'fail-closed'].includes(policy.securityMode)) {
+        errors.push('`securityMode` must be "fail-open" or "fail-closed".');
+    }
+    // Contradictory rules: same package in blocked AND allowed
+    const blocked = new Set(policy.blockedPackages || []);
+    const allowed = new Set(policy.allowedPackages || []);
+    for (const pkg of blocked) {
+        if (allowed.has(pkg)) {
+            errors.push(`Package '${pkg}' is in both \`blockedPackages\` and \`allowedPackages\`. ` +
+                '`allowedPackages` wins — this effectively removes the block.');
+        }
+    }
+    // ── Warnings ─────────────────────────────────────────────────────────────────
+    if (typeof policy.minHealthScore === 'number' && policy.minHealthScore < 20) {
+        warnings.push(`\`minHealthScore\` is ${policy.minHealthScore} (very lax). ` +
+            'Packages with a score this low are often deprecated or unmaintained.');
+    }
+    if (typeof policy.maxPackageSizeBytes === 'number' &&
+        policy.maxPackageSizeBytes > 100_000_000) {
+        warnings.push(`\`maxPackageSizeBytes\` is ${(policy.maxPackageSizeBytes / 1_000_000).toFixed(0)}MB (>100MB). ` +
+            'This effectively disables the size check.');
+    }
+    if (policy.blockDeprecated === false) {
+        warnings.push('`blockDeprecated` is false. Deprecated packages will not be blocked — ' +
+            'this may expose your project to unmaintained dependencies.');
+    }
+    const knownEnvs = new Set(['ci', 'dev', 'prod', 'staging', 'test']);
+    for (const envKey of Object.keys(policy.environments || {})) {
+        if (!knownEnvs.has(envKey)) {
+            warnings.push(`Unknown environment key '${envKey}' in \`environments\`. ` +
+                'Known keys are: ci, dev, prod, staging, test. This may be a typo.');
+        }
+    }
+    return { errors, warnings };
+}
+// ── Policy evaluation helpers ──────────────────────────────────────────────────
 function isIgnored(packageName, ignoreRules) {
     if (!ignoreRules || !Array.isArray(ignoreRules))
         return false;
@@ -60,22 +145,22 @@ function isIgnored(packageName, ignoreRules) {
     });
 }
 /**
- * Evaluates a package's health and size against the policy.
- * Returns { verdict: 'ALLOW' | 'WARN' | 'BLOCK', reasons: string[], ignored: boolean }
+ * Evaluate a package against policy.
+ * @returns {{ verdict: 'ALLOW'|'WARN'|'BLOCK', reasons: string[], ignored: boolean }}
  */
 export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
     const reasons = [];
     let verdict = 'ALLOW';
     // 1. Hard blocked/allowed lists
-    if (policy.blockedPackages.includes(packageName)) {
+    if ((policy.blockedPackages || []).includes(packageName)) {
         return { verdict: 'BLOCK', reasons: ['Package is explicitly blocked in policy.'], ignored: false };
     }
-    if (policy.allowedPackages.includes(packageName)) {
+    if ((policy.allowedPackages || []).includes(packageName)) {
         return { verdict: 'ALLOW', reasons: ['Package is explicitly allowed in policy.'], ignored: true };
     }
-    // 2. Ignore rules (escape hatch)
+    // 2. Ignore rules
     const ignored = isIgnored(packageName, policy.ignoreRules);
-    // 3. Evaluate health score
+    // 3. Health score
     if (pkgHealth) {
         if (pkgHealth.score < policy.minHealthScore) {
             verdict = 'BLOCK';
@@ -85,19 +170,19 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
             verdict = verdict === 'BLOCK' ? 'BLOCK' : 'WARN';
             reasons.push(`Health score ${pkgHealth.score} is below warning threshold (${policy.warnHealthScore}).`);
         }
-        if (policy.blockDeprecated && pkgHealth.flags.some(f => f.label === 'DEPRECATED')) {
+        if (policy.blockDeprecated && pkgHealth.flags.some(f => f.label === 'DEPRECATED' || String(f.label).startsWith('Deprecated'))) {
             verdict = 'BLOCK';
             reasons.push('Package is deprecated.');
         }
     }
-    // 4. Evaluate size
+    // 4. Size
     if (sizeInfo && sizeInfo.unpackedSize > policy.maxPackageSizeBytes) {
         const sizeMB = (sizeInfo.unpackedSize / (1024 * 1024)).toFixed(2);
         const maxMB = (policy.maxPackageSizeBytes / (1024 * 1024)).toFixed(2);
         verdict = verdict === 'BLOCK' ? 'BLOCK' : 'WARN';
         reasons.push(`Package size (${sizeMB}MB) exceeds limit (${maxMB}MB).`);
     }
-    // 5. Evaluate install scripts
+    // 5. Install scripts
     const hasInstallScripts = pkgHealth?.installScripts?.length > 0;
     if (hasInstallScripts) {
         if (policy.blockInstallScripts) {
@@ -110,7 +195,6 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
         }
     }
     if (ignored && (verdict === 'BLOCK' || verdict === 'WARN')) {
-        // Override triggered
         return { verdict: 'ALLOW', reasons: [`(Overridden by ignore rules): ${reasons.join(' ')}`], ignored: true };
     }
     return { verdict, reasons, ignored: false };

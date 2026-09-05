@@ -8,7 +8,8 @@ import { timeSince } from './utils.js';
 
 const NPM_REGISTRY = 'https://registry.npmjs.org';
 const NPM_DOWNLOADS = 'https://api.npmjs.org/downloads/point';
-const MAX_CONCURRENT = 15;
+// Sprint 7: configurable via PKGDIET_CONCURRENCY env var (default: 15)
+const MAX_CONCURRENT = Number(process.env.PKGDIET_CONCURRENCY || '15');
  const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 

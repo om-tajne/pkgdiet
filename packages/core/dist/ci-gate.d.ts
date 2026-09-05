@@ -15,7 +15,9 @@ export function runCiGate(packageNames: any, projectPath?: string, policyModifie
         };
         alternatives: any[];
         flags: any[];
-        efficiencyFlag?: undefined;
+        efficiencyFlag: boolean;
+        hasProvenance: boolean;
+        integrityCheck: string;
     } | {
         name: any;
         verdict: string;
@@ -27,8 +29,26 @@ export function runCiGate(packageNames: any, projectPath?: string, policyModifie
             serverlessColdStartClass: string;
             addedSizeMB: number;
         };
+        alternatives: any[];
+        flags: any[];
+        hasProvenance: boolean;
+        integrityCheck: string;
+        efficiencyFlag?: undefined;
+    } | {
+        name: any;
+        verdict: "BLOCK" | "ALLOW" | "WARN";
+        reasons: string[];
+        healthScore: any;
+        costEstimate: {
+            ciInstallTimeSeconds: number;
+            monthlyCiCost100Builds: number;
+            serverlessColdStartClass: string;
+            addedSizeMB: number;
+        };
         alternatives: any;
         flags: any;
         efficiencyFlag: boolean;
+        hasProvenance: boolean;
+        integrityCheck: string;
     })[];
 }>;

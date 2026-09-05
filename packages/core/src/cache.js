@@ -7,11 +7,11 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
 const CACHE_FILE = '.pkgdiet-cache.json';
-const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-/**
- * Load cache from disk.
- */
+// Sprint 7: configurable TTL via env var
+const CACHE_TTL_HOURS = Number(process.env.PKGDIET_CACHE_TTL_HOURS || '24');
+const CACHE_TTL_MS = CACHE_TTL_HOURS * 60 * 60 * 1000;
+
 function loadCache(projectPath) {
   const cachePath = join(projectPath, CACHE_FILE);
   if (!existsSync(cachePath)) {
@@ -29,9 +29,6 @@ function loadCache(projectPath) {
   }
 }
 
-/**
- * Save cache to disk.
- */
 function saveCache(projectPath, cache) {
   const cachePath = join(projectPath, CACHE_FILE);
   writeFileSync(cachePath, JSON.stringify(cache, null, 2), 'utf-8');
@@ -46,7 +43,7 @@ export function getCached(projectPath, packageName, key) {
   if (!entry || !entry[key]) return null;
 
   const age = Date.now() - new Date(entry.fetchedAt).getTime();
-  if (age > DEFAULT_TTL_MS) {
+  if (age > CACHE_TTL_MS) {
     return null; // expired
   }
 
@@ -67,7 +64,7 @@ export function setCached(projectPath, packageName, key, data) {
 }
 
 /**
- * Batch save multiple entries at once (more efficient than individual saves).
+ * Batch save multiple entries at once.
  */
 export function batchSetCached(projectPath, entries) {
   const cache = loadCache(projectPath);
@@ -87,4 +84,27 @@ export function batchSetCached(projectPath, entries) {
 export function clearCache(projectPath) {
   const cache = { version: 1, entries: {} };
   saveCache(projectPath, cache);
+}
+
+/**
+ * Sprint 7: Prune cache entries older than `olderThanMs` milliseconds.
+ * @param {string} projectPath
+ * @param {number} olderThanMs
+ * @returns {number} number of entries removed
+ */
+export function pruneCache(projectPath, olderThanMs) {
+  const cache = loadCache(projectPath);
+  const now = Date.now();
+  let removed = 0;
+
+  for (const [pkgName, entry] of Object.entries(cache.entries)) {
+    const age = now - new Date(entry.fetchedAt).getTime();
+    if (age > olderThanMs) {
+      delete cache.entries[pkgName];
+      removed++;
+    }
+  }
+
+  saveCache(projectPath, cache);
+  return removed;
 }
