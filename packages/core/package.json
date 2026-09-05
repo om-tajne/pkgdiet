@@ -9,6 +9,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./alternatives": {
+      "import": "./dist/alternatives.js"
+    },
+    "./data/alternatives.json": "./data/alternatives.json",
     "./dist/*.js": "./dist/*.js"
   },
   "files": [
