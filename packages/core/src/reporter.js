@@ -7,11 +7,11 @@ import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { formatBytes, formatNumber } from './utils.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
 const PKG_VERSION = pkg.version;
-import { formatBytes, formatNumber } from './utils.js';
 
 // ─── Box Drawing Characters ─────────────────────────
 const BOX = {

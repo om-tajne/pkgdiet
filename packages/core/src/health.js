@@ -10,7 +10,7 @@ const NPM_REGISTRY = 'https://registry.npmjs.org';
 const NPM_DOWNLOADS = 'https://api.npmjs.org/downloads/point';
 // Sprint 7: configurable via PKGDIET_CONCURRENCY env var (default: 15)
 const MAX_CONCURRENT = Number(process.env.PKGDIET_CONCURRENCY || '15');
- const MAX_RETRIES = 3;
+const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 
 /**
@@ -154,7 +154,7 @@ export async function fetchPackageHealth(packageName, projectPath, useCache) {
   if (!hasTypes && !packageName.startsWith('@types/')) {
     const typesName = `@types/${packageName.replace('@', '').replace('/', '__')}`;
     const typesData = await fetchWithRetry(`${NPM_REGISTRY}/${encodeURIComponent(typesName).replace('%40', '@')}`);
-    hasExternalTypes = typesData !== null && !typesData.error;
+    hasExternalTypes = typesData !== null && !typesData._notFound;
   }
 
   // Calculate scores for each factor

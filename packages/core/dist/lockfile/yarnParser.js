@@ -1,5 +1,7 @@
 export function parseYarnLockfile(lockContent) {
     const result = new Map();
+    if (!lockContent || !lockContent.trim())
+        return result;
     const lines = lockContent.split(/\r?\n/);
     let currentName = null;
     for (const line of lines) {

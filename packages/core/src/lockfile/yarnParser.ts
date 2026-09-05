@@ -2,6 +2,7 @@ import { DepEntry } from "./types.js";
 
 export function parseYarnLockfile(lockContent: string): Map<string, DepEntry> {
   const result = new Map<string, DepEntry>();
+  if (!lockContent || !lockContent.trim()) return result;
   const lines = lockContent.split(/\r?\n/);
   
   let currentName: string | null = null;

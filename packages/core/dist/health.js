@@ -136,7 +136,7 @@ export async function fetchPackageHealth(packageName, projectPath, useCache) {
     if (!hasTypes && !packageName.startsWith('@types/')) {
         const typesName = `@types/${packageName.replace('@', '').replace('/', '__')}`;
         const typesData = await fetchWithRetry(`${NPM_REGISTRY}/${encodeURIComponent(typesName).replace('%40', '@')}`);
-        hasExternalTypes = typesData !== null && !typesData.error;
+        hasExternalTypes = typesData !== null && !typesData._notFound;
     }
     // Calculate scores for each factor
     const scores = {};

@@ -2,9 +2,11 @@ import * as yaml from "js-yaml";
 import { DepEntry } from "./types.js";
 
 export function parsePnpmLockfile(lockContent: string): Map<string, DepEntry> {
+  const result = new Map<string, DepEntry>();
+  if (!lockContent || !lockContent.trim()) return result;
+
   const doc = yaml.load(lockContent) as any;
   const packages = doc?.packages || {};
-  const result = new Map<string, DepEntry>();
 
   for (const key of Object.keys(packages)) {
     // key examples: "/accepts/1.3.8", "/@scope/pkg/1.2.3"
