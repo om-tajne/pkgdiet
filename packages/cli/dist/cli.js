@@ -9,7 +9,7 @@ const program = new Command();
 program
     .name('pkgdiet')
     .description('🥗 Put your node_modules on a diet — find unused, bloated, and unhealthy npm packages')
-    .version('1.1.0', '-v, --version');
+    .version('2.0.0', '-v, --version');
 program
     .command('audit')
     .description('Run full repository audit (default)')
@@ -60,13 +60,21 @@ program
         console.log(JSON.stringify(result, null, 2));
     }
     else {
-        console.log(`Health: ${result.healthScore !== null ? result.healthScore + '/100' : 'N/A'}`);
-        console.log(`Verdict: ${result.verdict}`);
-        console.log(`Reasons: ${result.reasons.join(' ')}`);
-        console.log(`Added Size: ${result.costEstimate.addedSizeMB}MB`);
-        if (result.alternatives.length > 0) {
-            console.log(`Alternatives: ${result.alternatives.map(a => a.replacement).join(', ')}`);
+        const icon = result.verdict === 'BLOCK' ? '🔴' : result.verdict === 'WARN' ? '🟡' : '🟢';
+        console.log(`\n${icon} ${pkgName}`);
+        console.log(`  Health:      ${result.healthScore !== null ? result.healthScore + '/100' : 'N/A'}`);
+        console.log(`  Verdict:     ${result.verdict}`);
+        console.log(`  Reasons:     ${result.reasons.join('; ')}`);
+        console.log(`  Added Size:  ${result.costEstimate?.addedSizeMB ?? '?'}MB`);
+        console.log(`  Cost Impact: $${result.costEstimate?.monthlyCiCost100Builds?.toFixed(3) ?? '?'}/mo CI`);
+        if (result.alternatives && result.alternatives.length > 0) {
+            const alts = result.alternatives
+                .map(a => typeof a === 'string' ? a : (a.replacement || a.name))
+                .filter(Boolean)
+                .join(', ');
+            console.log(`  Alternatives: ${alts}`);
         }
+        console.log('');
     }
     if (result.verdict === 'BLOCK')
         process.exit(1);
