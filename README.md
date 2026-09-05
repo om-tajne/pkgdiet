@@ -240,11 +240,121 @@ npm run dev   # → http://localhost:3001
 |---|---|
 | `pkgdiet audit` | Full audit of current project |
 | `pkgdiet check <pkg>` | Check a single package |
+| `pkgdiet check <pkg> --env ci` | Check with environment policy overlay |
 | `pkgdiet ci` | CI gate — diff lockfile and gate new deps |
+| `pkgdiet ci --dry-run` | Evaluate without enforcing (always exits 0) |
+| `pkgdiet ci --env ci` | CI gate with environment policy overlay |
 | `pkgdiet drift` | Drift scan (health changes since last scan) |
 | `pkgdiet init` | Scaffold `.pkgdietrc.json` and CI workflow |
 | `pkgdiet mcp` | Start MCP server over stdio |
 | `pkgdiet mcp-install` | Generate AI agent config files |
+| `pkgdiet policy-check` | Validate `.pkgdietrc.json` for errors |
+| `pkgdiet cache prune` | Remove stale cache entries |
+| `pkgdiet cache clear` | Clear entire local cache |
+
+---
+
+## Security Hardening (v2.0 Sprint 7)
+
+### Fail-closed mode
+
+```json
+// .pkgdietrc.json
+{ "securityMode": "fail-closed" }
+```
+
+In `fail-closed` mode, any network error or unreachable registry returns `BLOCK` instead of `ALLOW`. Designed for finance, government, and health environments where unknown = denied.
+
+### Dependency confusion / hallucination protection
+
+```json
+{
+  "internalNamePrefixes": ["corp-", "acme-", "internal-"]
+}
+```
+
+If an AI agent or developer tries to install a package named `corp-utils` and it **doesn't exist on the public registry**, PkgDiet blocks it with a clear supply-chain attack warning. If it **does** exist (suspicious), it warns.
+
+### Policy validation
+
+```bash
+pkgdiet policy-check
+```
+
+Detects:
+- **Errors:** inverted thresholds (`warnHealthScore < minHealthScore`), contradictory rules (same package in blocked + allowed), invalid `failOn` values
+- **Warnings:** very lax thresholds, disabled `blockDeprecated`, unknown environment keys
+
+### Per-environment policies
+
+```json
+{
+  "minHealthScore": 30,
+  "environments": {
+    "ci": { "minHealthScore": 50, "failOn": "BLOCK" },
+    "dev": { "minHealthScore": 20, "failOn": "WARN" }
+  }
+}
+```
+
+```bash
+pkgdiet ci --env ci      # uses stricter CI thresholds
+pkgdiet check moment --env dev   # uses dev thresholds
+```
+
+### Dry-run mode
+
+```bash
+pkgdiet ci --dry-run
+```
+
+Evaluates and prints the full table but always exits 0. Useful for rolling out stricter policies — run with `--dry-run` for a week to see what would be blocked, then remove the flag to enforce.
+
+---
+
+## Performance Tuning
+
+```bash
+# Tune cache TTL (default: 24h)
+PKGDIET_CACHE_TTL_HOURS=48 pkgdiet audit
+
+# Tune concurrent registry fetches (default: 15)
+PKGDIET_CONCURRENCY=5 pkgdiet audit
+
+# Remove stale cache entries
+pkgdiet cache prune --older-than 7    # remove entries older than 7 days
+pkgdiet cache clear                   # wipe entire cache
+```
+
+---
+
+## Operational Observability (GitHub App)
+
+```bash
+# Emit JSON logs for log aggregators (Datadog, Loki, CloudWatch)
+PKGDIET_LOG_FORMAT=json node apps/github-app/dist/index.js
+```
+
+Example JSON log line:
+```json
+{
+  "level": "info",
+  "component": "github-app",
+  "message": "Evaluation summary",
+  "correlationId": "pr-42-a1b2c3d",
+  "repo": "acme/backend",
+  "blocked": 1,
+  "warned": 2,
+  "allowed": 10,
+  "policyVersion": 1
+}
+```
+
+**Readiness probe** for Kubernetes / load balancers:
+```bash
+GET /ready  → { "status": "ok", "db": "ok", "registry": "ok", "version": "2.0.0" }
+```
+Returns `200` when DB + registry are reachable, `503` otherwise.
 
 ---
 
