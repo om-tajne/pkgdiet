@@ -5,7 +5,7 @@ import { checkPackage } from "@pkgdiet/core/dist/checker.js";
 
 // Input schema for check_dependency
 const CheckDependencyInputSchema = z.object({
-  packageName: z.string().describe("npm package name, e.g. 'moment' or '@org/pkg'"),
+  packageName: z.string().min(1, "packageName must not be empty").describe("npm package name, e.g. 'moment' or '@org/pkg'"),
   context: z
     .object({
       registry: z.string().optional().describe("Optional custom npm registry URL"),

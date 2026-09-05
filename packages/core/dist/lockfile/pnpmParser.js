@@ -1,8 +1,10 @@
 import * as yaml from "js-yaml";
 export function parsePnpmLockfile(lockContent) {
+    const result = new Map();
+    if (!lockContent || !lockContent.trim())
+        return result;
     const doc = yaml.load(lockContent);
     const packages = doc?.packages || {};
-    const result = new Map();
     for (const key of Object.keys(packages)) {
         // key examples: "/accepts/1.3.8", "/@scope/pkg/1.2.3"
         const parts = key.split("/").filter(Boolean);

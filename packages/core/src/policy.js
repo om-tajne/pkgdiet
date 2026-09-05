@@ -214,7 +214,10 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
       reasons.push(`Health score ${pkgHealth.score} is below warning threshold (${policy.warnHealthScore}).`);
     }
 
-    if (policy.blockDeprecated && pkgHealth.flags.some(f => f.label === 'DEPRECATED' || String(f.label).startsWith('Deprecated'))) {
+    if (policy.blockDeprecated && pkgHealth.flags.some(f => {
+      const label = typeof f === 'string' ? f : (f.label || '');
+      return label === 'DEPRECATED' || label.startsWith('Deprecated');
+    })) {
       verdict = 'BLOCK';
       reasons.push('Package is deprecated.');
     }
