@@ -297,20 +297,26 @@ program
 
 program
   .command('agent-setup')
-  .description('Configure PkgDiet for AI coding agents (Cursor, Windsurf, etc.)')
-  .option('-a, --agents <agents...>', 'Agents to configure (cursor, windsurf)')
+  .description('Configure PkgDiet for AI coding agents (Cursor, Windsurf, Cline, Copilot, etc.)')
+  .option('-a, --agent <agents...>', 'Agents to configure (cursor, windsurf, cline, copilot, claude-code)')
+  .option('--all', 'Configure all supported agents')
+  .option('--dry-run', 'Show what would be modified without making changes')
+  .option('--remove', 'Remove PkgDiet configuration from agents')
   .action(async (options) => {
-    let agents = options.agents;
-    if (!agents || agents.length === 0) {
+    const { setupAgents, SUPPORTED_AGENTS } = await import('./agentSetup.js');
+    let agents = [];
+    
+    if (options.all) {
+      agents = SUPPORTED_AGENTS;
+    } else if (options.agent && options.agent.length > 0) {
+      agents = options.agent;
+    } else {
       const prompts = (await import('prompts')).default;
       const response = await prompts({
         type: 'multiselect',
         name: 'agents',
         message: 'Select AI agents to configure:',
-        choices: [
-          { title: 'Cursor', value: 'cursor' },
-          { title: 'Windsurf', value: 'windsurf' }
-        ]
+        choices: SUPPORTED_AGENTS.map(a => ({ title: a, value: a }))
       });
       agents = response.agents || [];
     }
@@ -320,11 +326,10 @@ program
       return;
     }
 
-    const { setupAgents } = await import('./agentSetup.js');
-    await setupAgents(agents, process.cwd());
-    console.log(`✅ PkgDiet is now configured for: ${agents.join(', ')}.`);
-    console.log('   Your agent will call `check_dependency` before installing packages.');
-    console.log('   To disable: remove the "pkgdiet" entry from your agent config / rules.');
+    await setupAgents(agents, process.cwd(), { 
+      dryRun: options.dryRun,
+      remove: options.remove
+    });
   });
 
 // ─── init ─────────────────────────────────────────────────────────────────────
