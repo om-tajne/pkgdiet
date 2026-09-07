@@ -194,33 +194,80 @@ program
     }
   });
 
+// ─── setup & agent-setup ────────────────────────────────────────────────────────
+program
+  .command('setup')
+  .description('Interactive setup wizard to configure PkgDiet policies and AI agents')
+  .action(async () => {
+    const { runSetupWizard } = await import('./setupWizard.js');
+    await runSetupWizard();
+  });
+
+program
+  .command('agent-setup')
+  .description('Configure PkgDiet for AI coding agents (Cursor, Windsurf, etc.)')
+  .option('-a, --agents <agents...>', 'Agents to configure (cursor, windsurf)')
+  .action(async (options) => {
+    let agents = options.agents;
+    if (!agents || agents.length === 0) {
+      const prompts = (await import('prompts')).default;
+      const response = await prompts({
+        type: 'multiselect',
+        name: 'agents',
+        message: 'Select AI agents to configure:',
+        choices: [
+          { title: 'Cursor', value: 'cursor' },
+          { title: 'Windsurf', value: 'windsurf' }
+        ]
+      });
+      agents = response.agents || [];
+    }
+    
+    if (agents.length === 0) {
+      console.log('No agents selected. Exiting.');
+      return;
+    }
+
+    const { setupAgents } = await import('./agentSetup.js');
+    await setupAgents(agents, process.cwd());
+    console.log(`✅ PkgDiet is now configured for: ${agents.join(', ')}.`);
+    console.log('   Your agent will call `check_dependency` before installing packages.');
+    console.log('   To disable: remove the "pkgdiet" entry from your agent config / rules.');
+  });
+
 // ─── init ─────────────────────────────────────────────────────────────────────
 
 program
   .command('init')
   .description('Initialize PkgDiet policy and CI actions')
   .option('-f, --force', 'Overwrite existing config and workflow files')
+  .option('-i, --interactive', 'Run interactive setup wizard to generate custom config')
   .action(async (options) => {
     const fs = await import('fs');
     const path = await import('path');
 
-    if (options.force || !fs.existsSync('.pkgdietrc.json')) {
-      fs.writeFileSync('.pkgdietrc.json', JSON.stringify({
-        minHealthScore: 40,
-        warnHealthScore: 60,
-        securityMode: 'fail-open',
-        internalNamePrefixes: [],
-        environments: {
-          ci: { minHealthScore: 50, failOn: 'BLOCK' },
-          dev: { minHealthScore: 30, failOn: 'WARN' }
-        },
-        blockedPackages: [],
-        telemetry: true,
-        policyVersion: 1,
-      }, null, 2));
-      console.log('✅ Created .pkgdietrc.json');
+    if (options.interactive) {
+      const { runSetupWizard } = await import('./setupWizard.js');
+      await runSetupWizard();
     } else {
-      console.log('⏭️  .pkgdietrc.json already exists, skipping. Use --force to overwrite.');
+      if (options.force || !fs.existsSync('.pkgdietrc.json')) {
+        fs.writeFileSync('.pkgdietrc.json', JSON.stringify({
+          minHealthScore: 40,
+          warnHealthScore: 60,
+          securityMode: 'fail-open',
+          internalNamePrefixes: [],
+          environments: {
+            ci: { minHealthScore: 50, failOn: 'BLOCK' },
+            dev: { minHealthScore: 30, failOn: 'WARN' }
+          },
+          blockedPackages: [],
+          telemetry: true,
+          policyVersion: 1,
+        }, null, 2));
+        console.log('✅ Created .pkgdietrc.json');
+      } else {
+        console.log('⏭️  .pkgdietrc.json already exists, skipping. Use --force to overwrite.');
+      }
     }
 
     const githubDir = '.github/workflows';
