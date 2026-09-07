@@ -4,7 +4,7 @@
   
   [![npm version](https://img.shields.io/npm/v/pkgdiet.svg)](https://www.npmjs.com/package/pkgdiet) [![npm downloads](https://img.shields.io/npm/dm/pkgdiet.svg)](https://www.npmjs.com/package/pkgdiet) [![CI](https://github.com/om-tajne/pkgdiet/actions/workflows/ci.yml/badge.svg)](https://github.com/om-tajne/pkgdiet/actions) [![License](https://img.shields.io/github/license/om-tajne/pkgdiet.svg)](LICENSE) [![Node.js](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](https://nodejs.org/) [![MCP Compatible](https://img.shields.io/badge/MCP-compatible-5A45FF.svg)](https://modelcontextprotocol.io/)
 
-  [![Glama MCP Server](https://img.shields.io/badge/Glama-AAA-FFB000?logo=glama&logoColor=white)](https://glama.ai/mcp/servers/om-tajne/pkgdiet)
+  [![Glama MCP server](https://glama.ai/mcp/servers/om-tajne/pkgdiet/badge)](https://glama.ai/mcp/servers/om-tajne/pkgdiet)
 
   <p>Check npm packages before you recommend or install them. Apply local policy, identify deprecated or unnecessarily heavy dependencies, and get safer alternatives—without an account or hosted service.</p>
 </div>
@@ -219,4 +219,5 @@ See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
 ## 🔬 Experimental Features
 
 The `apps/` directory in this repository contains highly experimental prototypes for a future Enterprise control plane (Dashboard, Webhooks, Postgres). **No hosted PkgDiet service exists.** These are internal playgrounds and are not supported for production use.
+
 
