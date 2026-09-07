@@ -1,19 +1,23 @@
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 
-export const SUPPORTED_AGENTS = ['cursor', 'windsurf', 'cline', 'copilot', 'claude-code'];
+export const SUPPORTED_AGENTS = ['cursor', 'windsurf', 'cline', 'copilot', 'claude-code', 'claude-desktop', 'antigravity'];
 
 export async function setupAgents(agents, cwd, options = {}) {
-  const { dryRun = false, remove = false, detect = false } = options;
+  const { dryRun = false, remove = false, detect = false, all = false } = options;
 
   let activeAgents = [...agents];
 
-  if (detect) {
+  if (all) {
+    activeAgents = SUPPORTED_AGENTS;
+  } else if (detect) {
     activeAgents = [];
     if (fs.existsSync(path.join(cwd, '.cursor'))) activeAgents.push('cursor');
     if (fs.existsSync(path.join(cwd, '.windsurf')) || fs.existsSync(path.join(cwd, '.windsurfrules'))) activeAgents.push('windsurf');
     if (fs.existsSync(path.join(cwd, 'cline_mcp_settings.json')) || fs.existsSync(path.join(cwd, '.cline'))) activeAgents.push('cline');
-    if (fs.existsSync(path.join(cwd, '.github', 'copilot'))) activeAgents.push('copilot'); // rough heuristic
+    if (fs.existsSync(path.join(cwd, '.github', 'copilot'))) activeAgents.push('copilot');
+    if (fs.existsSync(path.join(cwd, 'CLAUDE.md'))) activeAgents.push('claude-code');
     if (activeAgents.length === 0) {
       console.log('No supported agents detected in this project.');
       return;
@@ -21,11 +25,7 @@ export async function setupAgents(agents, cwd, options = {}) {
     console.log(`Detected agents: ${activeAgents.join(', ')}`);
   }
 
-  const aiRuleContent = `You are working in a codebase protected by PkgDiet.
-
-CRITICAL RULE:
-Before you add, install, or recommend any dependencies (e.g. via npm install), you MUST verify the package using the PkgDiet MCP server's \`check_dependency\` tool.
-If the tool returns a BLOCK verdict, DO NOT install the package. If it is WARN, explain alternatives to the user. Never install deprecated or bloated packages blindly.`;
+  const aiRuleContent = `Before recommending, adding, or installing an npm package, call the PkgDiet \`check_dependency\` MCP tool. Do not install packages with a BLOCK verdict. For WARN, explain the trade-off and prefer a compatible recommended alternative.`;
 
   const mcpEntry = {
     command: 'npx',
@@ -119,20 +119,50 @@ If the tool returns a BLOCK verdict, DO NOT install the package. If it is WARN, 
     }
 
     else if (agent === 'claude-code') {
-      console.log(remove 
-        ? "✓ Please manually remove PkgDiet from Claude Desktop/Code global config."
-        : "✓ To configure Claude natively, run: claude mcp add pkgdiet npx -y pkgdiet@latest mcp"
-      );
+      if (!remove && !dryRun) {
+        try {
+          execSync('claude mcp add pkgdiet -- npx -y pkgdiet@latest mcp', { stdio: 'ignore' });
+          console.log(`✓ Added pkgdiet MCP server to Claude Code via native CLI`);
+        } catch (e) {
+          console.log(`⚠ Could not execute 'claude mcp add'. Please run manually: claude mcp add pkgdiet -- npx -y pkgdiet@latest mcp`);
+        }
+      }
+      updateRuleFile(path.join(cwd, 'CLAUDE.md'));
+    }
+
+    else if (agent === 'claude-desktop') {
+      const isWin = process.platform === 'win32';
+      const isMac = process.platform === 'darwin';
+      const homedir = require('os').homedir();
+      let configPath = '';
+      if (isWin) {
+        configPath = path.join(process.env.APPDATA || path.join(homedir, 'AppData', 'Roaming'), 'Claude', 'claude_desktop_config.json');
+      } else if (isMac) {
+        configPath = path.join(homedir, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
+      }
+      if (configPath) {
+        updateJson(configPath, 'mcpServers.pkgdiet', mcpEntry);
+      } else {
+        console.log('⚠ Cannot determine Claude Desktop config path on this OS.');
+      }
+    }
+    
+    else if (agent === 'antigravity') {
+      const agyDir = path.join(cwd, '.gemini', 'antigravity', 'mcp', 'pkgdiet');
+      if (!dryRun && !remove) {
+        if (!fs.existsSync(agyDir)) fs.mkdirSync(agyDir, { recursive: true });
+        const configPath = path.join(agyDir, 'mcp.json');
+        fs.writeFileSync(configPath, JSON.stringify(mcpEntry, null, 2));
+        console.log(`✓ Configured Antigravity MCP at ${configPath}`);
+      }
     }
   }
 
   if (!dryRun) {
     if (remove) {
-      console.log('\n✅ PkgDiet agent guardrails have been removed.');
+      console.log('\n✨ PkgDiet agent guardrails have been removed.');
     } else {
-      console.log('\n✅ PkgDiet is active for the selected agents.');
-      console.log('Before installing or recommending an npm package, agents should now call: check_dependency({ packageName })');
-      console.log('\nUndo command: npx pkgdiet agent-setup --remove');
+      console.log('\n✨ PkgDiet is active for the selected agents.');
     }
   }
 }

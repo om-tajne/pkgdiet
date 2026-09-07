@@ -144,6 +144,7 @@ program
   .command('mcp [args...]')
   .description('Start the MCP JSON-RPC Server over stdio')
   .action(async () => {
+    process.env.PKGDIET_MCP_MODE = '1';
     const { startMcpServer } = await import('@pkgdiet/mcp');
     await startMcpServer();
   });
@@ -291,6 +292,7 @@ program
   .command('setup')
   .description('Interactive setup wizard to configure PkgDiet policies and AI agents')
   .action(async () => {
+    process.env.PKGDIET_MCP_MODE = '1';
     const { runSetupWizard } = await import('./setupWizard.js');
     await runSetupWizard();
   });
@@ -298,7 +300,7 @@ program
 program
   .command('agent-setup')
   .description('Configure PkgDiet for AI coding agents (Cursor, Windsurf, Cline, Copilot, etc.)')
-  .option('-a, --agent <agents...>', 'Agents to configure (cursor, windsurf, cline, copilot, claude-code)')
+  .option('-a, --agent <agents...>', 'Agents to configure (cursor, claude-code, claude-desktop, cline, windsurf, copilot, antigravity)')
   .option('--detect', 'Detect and configure agents used in this project')
   .option('--all', 'Configure all supported agents')
   .option('--dry-run', 'Show what would be modified without making changes')
@@ -531,6 +533,7 @@ program
   .command('mcp-install')
   .description('Automatically configure PkgDiet as an MCP server for Claude Desktop')
   .action(async () => {
+    process.env.PKGDIET_MCP_MODE = '1';
     const fs = await import('fs');
     const path = await import('path');
     const os = await import('os');
@@ -711,6 +714,8 @@ if (
 }
 
 program.parse();
+
+
 
 
 
