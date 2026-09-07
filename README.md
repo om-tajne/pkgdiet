@@ -1,14 +1,14 @@
 <div align="center">
   <h1>🥗 PkgDiet</h1>
-  <p><strong>A free, local-first npm dependency gate for AI coding agents and developers.</strong></p>
+  <p><strong>A local-first dependency gate for AI coding agents and Node.js developers.</strong></p>
   
-  [![npm version](https://img.shields.io/npm/v/pkgdiet.svg?color=blue)](https://www.npmjs.com/package/pkgdiet)
-  [![npm downloads](https://img.shields.io/npm/dm/pkgdiet.svg?color=blue)](https://www.npmjs.com/package/pkgdiet)
-  [![License: MIT](https://img.shields.io/github/license/om-tajne/pkgdiet.svg?color=blue)](LICENSE)
+  [![npm version](https://img.shields.io/npm/v/pkgdiet.svg)](https://www.npmjs.com/package/pkgdiet)
+  [![npm downloads](https://img.shields.io/npm/dm/pkgdiet.svg)](https://www.npmjs.com/package/pkgdiet)
+  [![License](https://img.shields.io/github/license/om-tajne/pkgdiet.svg)](LICENSE)
   [![CI](https://github.com/om-tajne/pkgdiet/actions/workflows/ci.yml/badge.svg)](https://github.com/om-tajne/pkgdiet/actions)
   [![MCP Compatible](https://img.shields.io/badge/MCP-compatible-5A45FF.svg)](https://modelcontextprotocol.io/)
 
-  <p>Help prevent deprecated, bloated, unverified, policy-violating, and suspicious npm packages from entering your project.</p>
+  <p>Check npm packages before you recommend or install them. Apply local policy, identify deprecated or unnecessarily heavy dependencies, and get safer alternatives—without an account or hosted service.</p>
 </div>
 
 ---
@@ -40,19 +40,52 @@ npx pkgdiet check moment
 
 ## 🤖 Supported AI Agents
 
-| Agent | Status | Installation | Tested version | Features verified |
-|---|---|---|---|---|
-| **Cursor** | Supported | `npx pkgdiet agent-setup --agent cursor` | 0.x | Tool discovery, `check_dependency`, policy WARN/BLOCK |
-| **Windsurf** | Supported | `npx pkgdiet agent-setup --agent windsurf` | 0.x | Rule behavior, check triggers |
-| **Claude Code** | Supported | `npx pkgdiet agent-setup --agent claude-code` | 0.x | Tool discovery, stdio lifecycle |
-| **Cline** | Experimental | `npx pkgdiet agent-setup --agent cline` | 0.x | Config generation only |
-| **Copilot** | Experimental | `npx pkgdiet agent-setup --agent copilot` | 0.x | Document exact supported scope |
+| Agent | Status | Installation |
+|---|---|---|
+| **Cursor** | Supported | `npx pkgdiet agent-setup --agent cursor` |
+| **Claude Code** | Supported | `npx pkgdiet agent-setup --agent claude-code` |
+| **Windsurf** | Supported | `npx pkgdiet agent-setup --agent windsurf` |
+| **Claude Desktop**| Supported | `npx pkgdiet agent-setup --agent claude-desktop` |
+| **Cline** | Experimental | `npx pkgdiet agent-setup --agent cline` |
+| **Copilot** | Experimental | `npx pkgdiet agent-setup --agent copilot` |
+| **Antigravity** | Experimental | `npx pkgdiet agent-setup --agent antigravity` |
+
+### Support Matrix
+
+| Integration type | Support level | How it uses PkgDiet |
+|---|---|---|
+| **Tested MCP agent** | Supported | `pkgdiet mcp` + generated config/rules |
+| **Untested MCP agent** | Generic MCP | Manual stdio configuration |
+| **Shell-capable, no MCP agent** | CLI fallback | `pkgdiet check --json` |
+| **Proprietary plugin agent** | Community adapter | Thin plugin on `@pkgdiet/core` |
+| **No MCP, plugin, or shell ability** | Not integrated | Developer/CI must run PkgDiet |
+
+Supported means PkgDiet’s generated configuration and MCP tools have been tested end-to-end with that agent. Experimental means PkgDiet can generate a configuration, but compatibility may vary by agent version, platform, or provider settings.
+
+Any MCP-compatible client can use PkgDiet with a generic stdio configuration:
+```json
+{
+  "command": "npx",
+  "args": ["-y", "pkgdiet@latest", "mcp"]
+}
+```
+
+### Other AI agents
+For an agent that supports shell commands but not MCP, configure it to run:
+```bash
+npx -y pkgdiet check <package-name> --json
+```
+before it recommends or installs an npm dependency. Do not install if the verdict is BLOCK. For WARN, review alternatives and explain trade-offs.
+
+For agents with a proprietary plugin/tool API, developers can build a thin adapter on top of `@pkgdiet/core` rather than reimplementing PkgDiet policy.
 
 ---
 
 ## 🛡️ How Agent Guardrails Work
 
-PkgDiet configures supported agents with an MCP server and dependency-safety rules that instruct the agent to call `check_dependency` before recommending or installing npm packages. 
+PkgDiet uses the Model Context Protocol (MCP) to give compatible AI coding agents a dependency-safety tool before they recommend or install npm packages.
+
+PkgDiet configures supported agents by adding dependency-safety instructions that tell the agent to call the PkgDiet MCP tools before recommending or installing npm packages. 
 
 When the configured agent calls `check_dependency`, PkgDiet evaluates the requested package against the active policy. The agent can call `suggest_alternative` to retrieve ranked alternatives and migration guidance.
 
@@ -78,12 +111,12 @@ PkgDiet provides the following tools via the Model Context Protocol (MCP):
 | `check_dependencies` | Before proposing a group of packages | Batch verdicts and a summary |
 | `suggest_alternative` | When a package is warned/blocked, or the user requests a replacement | Ranked alternatives, rationale, compatibility, migration notes |
 
-### `recommendation.action` Behavior
-When `check_dependency` is called, it returns a `recommendation.action` for the agent:
-- **`proceed`**: Package is allowed under policy.
-- **`review`**: Explain warning and trade-off before proceeding.
-- **`replace`**: Prefer the suggested alternative.
-- **`block`**: Do not install; select an alternative or request an intentional policy exception.
+### MCP failure behavior
+- Invalid input returns a structured tool error and does not attempt an npm lookup.
+- Missing public packages return a warning or a security block when an internal-name-prefix rule applies.
+- In `securityMode: "fail-open"`, temporary registry failures return a non-blocking result.
+- In `securityMode: "fail-closed"`, temporary registry failures return `BLOCK`.
+- AI agents should not treat a failed check as an approval.
 
 ---
 
@@ -139,10 +172,12 @@ PkgDiet works in GitHub Actions without an account, webhook, dashboard, or hoste
 
 ```yaml
 name: PkgDiet Dependency Gate
-on: pull_request
+on: [pull_request]
 jobs:
   pkgdiet:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -150,21 +185,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Check new dependencies
-        run: npx pkgdiet ci --env ci --base "${{ github.event.pull_request.base.sha }}"
+      - name: Evaluate newly added dependencies
+        run: npx -y pkgdiet@2.0.0 ci --env ci --base "${{ github.event.pull_request.base.sha }}"
 ```
+This workflow requires no PkgDiet account, GitHub App, database, dashboard, webhook, or hosted service.
 
 ---
 
 ## 🔒 Trust and Privacy
 
-PkgDiet is local-first.
-- The CLI and MCP server run on your machine.
-- MCP uses stdio; it does not open an HTTP port.
-- PkgDiet fetches public package metadata from npm registries and download data when enabled/available.
+- PkgDiet runs locally by default.
+- Its MCP server uses stdio and does not open a network port.
+- It queries npm registry metadata and download data when evaluating public packages.
 - PkgDiet does not upload your source code by default.
-- Local metrics are stored in `.pkgdiet-metrics.json`.
-- Cached metadata is stored locally and can be removed with: `npx pkgdiet cache clear`
+- Cache and optional local metrics remain in your project directory.
 - Disable local telemetry with: `PKGDIET_TELEMETRY_DISABLED=1`
 
 **Limitation:** PkgDiet provides policy and risk signals. It is not a substitute for vulnerability scanning, code review, package testing, or an organization’s broader supply-chain security program.
