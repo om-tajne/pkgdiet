@@ -1,9 +1,10 @@
 {
   "mcpServers": {
     "pkgdiet": {
-      "command": "node",
+      "command": "npx",
       "args": [
-        "REDACTED_LOCAL_PATH/packages/cli/dist/cli.js",
+        "-y",
+        "pkgdiet@latest",
         "mcp"
       ]
     }

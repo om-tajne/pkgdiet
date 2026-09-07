@@ -1,5 +1,20 @@
 {
-  "minHealthScore": 40,
+  "minHealthScore": 60,
+  "warnHealthScore": 80,
+  "blockDeprecated": true,
+  "securityMode": "fail-closed",
+  "internalNamePrefixes": [],
+  "environments": {
+    "ci": {
+      "minHealthScore": 70,
+      "failOn": "BLOCK"
+    },
+    "dev": {
+      "minHealthScore": 40,
+      "failOn": "WARN"
+    }
+  },
   "blockedPackages": [],
-  "telemetry": true
+  "telemetry": true,
+  "policyVersion": 1
 }
