@@ -1,417 +1,116 @@
-# 🥗 PkgDiet
+<div align="center">
+  <h1>🥗 PkgDiet</h1>
+  <p><strong>The dependency layer for AI-driven development.</strong></p>
+  
+  [![npm version](https://img.shields.io/npm/v/pkgdiet.svg?color=blue)](https://www.npmjs.com/package/pkgdiet)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-> **Put your `node_modules` on a diet** — AI-agent dependency gate, CI policy engine, and FinOps insights for npm, pnpm, and Yarn projects.
-
-[![npm](https://img.shields.io/npm/v/pkgdiet?color=green)](https://npmjs.com/package/pkgdiet)
-[![npm downloads](https://img.shields.io/npm/dw/pkgdiet)](https://npmjs.com/package/pkgdiet)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-22%2B-brightgreen)](https://nodejs.org)
-
----
-
-## What is PkgDiet?
-
-PkgDiet is a dependency governance tool that works at three levels:
-
-1. **AI-agent gate (MCP)** — Before an AI coding agent installs a package, it calls PkgDiet to get a health score, size estimate, cost impact, and lighter alternatives.
-2. **CI PR gate** — Every pull request is scanned for newly added heavy or deprecated packages. Bad deps get a `BLOCK` ❌; questionable ones get a `WARN` 🟡.
-3. **FinOps insights** — Track how many bloated dependencies your team avoided this week and the estimated CI cost savings.
+  <p>Stop AI agents (and developers) from installing deprecated, bloated, or malicious npm packages.</p>
+</div>
 
 ---
 
-## Quickstart
+## 🤔 The Problem
 
-```bash
-# Install once
-npm install -g pkgdiet
+AI coding agents (Cursor, Windsurf, Copilot) are incredible, but they hallucinate dependencies, suggest massive packages (like moment.js), and don't care about your CI costs or security policies. 
 
-# Or use without installing
-npx pkgdiet check moment
-npx pkgdiet audit
-npx pkgdiet init
-```
+**PkgDiet puts a policy brain between your agent and 
+pm install.**
 
-### Check a single package
+## 🚀 Quickstart (Zero-Friction Setup)
 
-```bash
-npx pkgdiet check moment
-```
+Get started in 30 seconds. No accounts, no dashboards.
 
-```
+`ash
+# 1. Initialize PkgDiet in your project
+npx pkgdiet setup
+
+# 2. Wire it into your AI Agent (Cursor, Windsurf, Claude Desktop, etc.)
+npx pkgdiet agent-setup
+`
+
+That's it. Your AI agent is now configured to automatically call PkgDiet via the **Model Context Protocol (MCP)** before recommending any new dependencies.
+
+## ✨ Features
+
+- **🤖 Native AI Guardrails:** Seamlessly hooks into Cursor, Windsurf, and Claude via MCP.
+- **⚡ FinOps & Size Impact:** Calculates exactly how much a package will bloat your 
+ode_modules and cost in CI.
+- **💡 1-Click Fixes:** Suggests modern, maintained alternatives (e.g., dayjs instead of moment).
+- **🛡️ Repo Safety Score:** Gamify your dependency health with a 0-100 score.
+- **💼 Batch Checking:** Run 
+px pkgdiet check moment lodash axios to instantly evaluate multiple packages.
+
+---
+
+## 🛠️ CLI Usage
+
+The CLI is your primary interface for manual checks and CI enforcement.
+
+### 1. Check Packages Before Installing
+`ash
+$ npx pkgdiet check moment
+
 🟡 moment
   Health:      100/100
   Verdict:     WARN
-  Reasons:     Efficiency Flag: Better alternatives exist for moment.
-  Added Size:  4.15MB
-  Cost Impact: $0.032/mo CI
-  Alternatives: dayjs, date-fns, luxon
-```
+  Reasons:     Size (4.15MB) exceeds maxPackageSizeBytes
+  Cost Impact: .250/mo CI
+  Alternatives: dayjs, date-fns
+  💡 Fix: Run 
+pm uninstall moment && npm install dayjs for a lighter alternative.
 
-### Run a full audit
+  🥗 Secured by PkgDiet · npx pkgdiet setup · pkgdiet.dev
+`
 
-```bash
+### 2. Audit Your Entire Project
+Generates a comprehensive Safety Score and flags unused or bloated dependencies.
+`ash
 npx pkgdiet audit
-```
+`
 
-### CI gate (auto-detects npm, pnpm, Yarn)
+### 3. Browse Alternatives
+PkgDiet maintains a rich dataset of package alternatives.
+`ash
+npx pkgdiet alternatives search request
+`
 
-```bash
-npx pkgdiet ci --base main
-```
-
----
-
-## AI Agent Integration (MCP)
-
-PkgDiet ships a production-grade [Model Context Protocol](https://modelcontextprotocol.io) server. Add it to any MCP-compatible agent and it will gate dependency installs automatically.
-
-### Cursor
-
-```json
-// .cursor/mcp.json
-{
-  "mcpServers": {
-    "pkgdiet": {
-      "command": "npx",
-      "args": ["pkgdiet", "mcp"]
-    }
-  }
-}
-```
-
-### Claude Code / OpenHands
-
-```json
-// ~/.claude/mcp_config.json  or  mcp_config.json in project root
-{
-  "mcpServers": {
-    "pkgdiet": {
-      "command": "npx",
-      "args": ["pkgdiet", "mcp"]
-    }
-  }
-}
-```
-
-### Antigravity (Google)
-
-```json
-// ~/.gemini/config/mcp_config.json
-{
-  "mcpServers": {
-    "pkgdiet": {
-      "command": "node",
-      "args": ["/path/to/pkgdiet/packages/cli/dist/cli.js", "mcp"]
-    }
-  }
-}
-```
-
-### `check_dependency` tool
-
-**Request:**
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "check_dependency",
-    "arguments": { "packageName": "moment" }
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "packageName": "moment",
-  "healthScore": 100,
-  "verdict": "WARN",
-  "reasons": ["Efficiency Flag: Better alternatives exist for moment."],
-  "addedSizeBytes": 4351590,
-  "costImpactPerMonthUsd": 0.032,
-  "alternatives": ["dayjs", "date-fns", "luxon"]
-}
-```
-
-The agent sees `WARN` + alternatives and proposes `dayjs` instead. You never see the bad dependency.
+### 4. CI/CD Enforcement
+Run PkgDiet in GitHub Actions to prevent bad dependencies from merging.
+`ash
+npx pkgdiet ci --env ci --base origin/main
+`
 
 ---
 
-## CI Gate
+## ⚙️ Configuration (.pkgdietrc.json)
 
-### GitHub Actions
+Configure your organization's policy, or use templates: 
+px pkgdiet init --template strict
 
-```yaml
-# .github/workflows/pkgdiet.yml
-name: PkgDiet CI Gate
-on: [pull_request]
-jobs:
-  pkgdiet:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - run: npm install -g pkgdiet
-      - run: pkgdiet ci --base ${{ github.event.pull_request.base.sha }}
-```
-
-Works with **npm**, **pnpm**, and **Yarn** lockfiles — auto-detected.
-
-### Policy file (`.pkgdietrc.json`)
-
-```json
+`json
 {
-  "minHealthScore": 60,
-  "maxPackageSizeBytes": 5000000,
-  "blockedPackages": ["moment", "request", "lodash"],
-  "allowedPackages": ["dayjs", "got"],
-  "warnOnAlternatives": true
-}
-```
-
----
-
-## Alternatives Dataset
-
-PkgDiet maintains a public dataset of 35+ heavy/deprecated packages and their modern alternatives:
-
-```js
-import { getAlternatives } from "@pkgdiet/core/alternatives";
-
-const entry = getAlternatives("moment");
-// {
-//   replacements: ["dayjs", "date-fns", "luxon"],
-//   reason: "Moment.js is in maintenance mode and is 289KB+ minified...",
-//   category: "bloat",
-//   details: [{ name: "dayjs", size: "2KB", note: "Drop-in replacement..." }, ...]
-// }
-```
-
-Or import the raw JSON:
-```js
-import data from "@pkgdiet/core/data/alternatives.json" assert { type: "json" };
-```
-
-PRs to expand the dataset are welcome — it's just a JSON file at [`packages/core/data/alternatives.json`](packages/core/data/alternatives.json).
-
-**Coverage includes:** moment, lodash, request, chalk, axios, joi, winston, bunyan, immutable, rxjs, backbone, bower, grunt, gulp, phantomjs, protractor, tslint, q, async, querystring, core-js, and more.
-
----
-
-## Org Policy Engine + GitHub App (MVP)
-
-For teams, PkgDiet v2.0 includes a layered policy engine:
-
-```
-Org policy → Repo override → Package exception
-```
-
-- Policies stored in SQLite (Postgres-ready)
-- GitHub App posts PR Check Runs on every push
-- Blocklist/allowlist per org, per repo, or per package
-
-See [`apps/github-app/`](apps/github-app/) for setup.
-
----
-
-## FinOps Dashboard
-
-A Next.js 15 dashboard shows:
-
-- Blocked/warned dependency counts per repo (last 7 days)
-- Estimated CI cost saved from blocked dependencies
-- Policy JSON per org/repo
-- Full PR check run history
-
-```bash
-cd apps/dashboard
-npm run dev   # → http://localhost:3001
-```
-
-> **Demo Mode**: No GitHub OAuth required to get started.  
-> Set `AUTH_MODE=demo` in `apps/dashboard/.env.local`.
-
----
-
-## Commands Reference
-
-| Command | Description |
-|---|---|
-| `pkgdiet audit` | Full audit of current project |
-| `pkgdiet check <pkg>` | Check a single package |
-| `pkgdiet check <pkg> --env ci` | Check with environment policy overlay |
-| `pkgdiet ci` | CI gate — diff lockfile and gate new deps |
-| `pkgdiet ci --dry-run` | Evaluate without enforcing (always exits 0) |
-| `pkgdiet ci --env ci` | CI gate with environment policy overlay |
-| `pkgdiet drift` | Drift scan (health changes since last scan) |
-| `pkgdiet init` | Scaffold `.pkgdietrc.json` and CI workflow |
-| `pkgdiet mcp` | Start MCP server over stdio |
-| `pkgdiet mcp-install` | Generate AI agent config files |
-| `pkgdiet policy-check` | Validate `.pkgdietrc.json` for errors |
-| `pkgdiet cache prune` | Remove stale cache entries |
-| `pkgdiet cache clear` | Clear entire local cache |
-
----
-
-## Security Hardening (v2.0 Sprint 7)
-
-### Fail-closed mode
-
-```json
-// .pkgdietrc.json
-{ "securityMode": "fail-closed" }
-```
-
-In `fail-closed` mode, any network error or unreachable registry returns `BLOCK` instead of `ALLOW`. Designed for finance, government, and health environments where unknown = denied.
-
-### Dependency confusion / hallucination protection
-
-```json
-{
-  "internalNamePrefixes": ["corp-", "acme-", "internal-"]
-}
-```
-
-If an AI agent or developer tries to install a package named `corp-utils` and it **doesn't exist on the public registry**, PkgDiet blocks it with a clear supply-chain attack warning. If it **does** exist (suspicious), it warns.
-
-### Policy validation
-
-```bash
-pkgdiet policy-check
-```
-
-Detects:
-- **Errors:** inverted thresholds (`warnHealthScore < minHealthScore`), contradictory rules (same package in blocked + allowed), invalid `failOn` values
-- **Warnings:** very lax thresholds, disabled `blockDeprecated`, unknown environment keys
-
-### Per-environment policies
-
-```json
-{
-  "minHealthScore": 30,
+  "minHealthScore": 40,
+  "warnHealthScore": 60,
+  "securityMode": "fail-closed",
   "environments": {
-    "ci": { "minHealthScore": 50, "failOn": "BLOCK" },
-    "dev": { "minHealthScore": 20, "failOn": "WARN" }
+    "ci": {
+      "minHealthScore": 60,
+      "failOn": "BLOCK"
+    }
   }
 }
-```
-
-```bash
-pkgdiet ci --env ci      # uses stricter CI thresholds
-pkgdiet check moment --env dev   # uses dev thresholds
-```
-
-### Dry-run mode
-
-```bash
-pkgdiet ci --dry-run
-```
-
-Evaluates and prints the full table but always exits 0. Useful for rolling out stricter policies — run with `--dry-run` for a week to see what would be blocked, then remove the flag to enforce.
+`
 
 ---
 
-## Performance Tuning
+## 🏢 Enterprise
 
-```bash
-# Tune cache TTL (default: 24h)
-PKGDIET_CACHE_TTL_HOURS=48 pkgdiet audit
+For organizations that need PR-level PR gates, multi-repo visibility, and organization-wide policy templates, PkgDiet provides a GitHub App and Dashboard (currently in early access / source-available). 
 
-# Tune concurrent registry fetches (default: 15)
-PKGDIET_CONCURRENCY=5 pkgdiet audit
-
-# Remove stale cache entries
-pkgdiet cache prune --older-than 7    # remove entries older than 7 days
-pkgdiet cache clear                   # wipe entire cache
-```
+*Contact us or see the pps/ directory to self-host via Docker Compose.*
 
 ---
-
-## Operational Observability (GitHub App)
-
-```bash
-# Emit JSON logs for log aggregators (Datadog, Loki, CloudWatch)
-PKGDIET_LOG_FORMAT=json node apps/github-app/dist/index.js
-```
-
-Example JSON log line:
-```json
-{
-  "level": "info",
-  "component": "github-app",
-  "message": "Evaluation summary",
-  "correlationId": "pr-42-a1b2c3d",
-  "repo": "acme/backend",
-  "blocked": 1,
-  "warned": 2,
-  "allowed": 10,
-  "policyVersion": 1
-}
-```
-
-**Readiness probe** for Kubernetes / load balancers:
-```bash
-GET /ready  → { "status": "ok", "db": "ok", "registry": "ok", "version": "2.0.0" }
-```
-Returns `200` when DB + registry are reachable, `503` otherwise.
-
----
-
-## Architecture (v2.0 monorepo)
-
-```
-packages/
-  core/         @pkgdiet/core — evaluation engine, policy, lockfile parsers, alternatives
-  cli/          pkgdiet     — CLI entry point
-  mcp/          @pkgdiet/mcp — MCP server (stdio transport)
-apps/
-  github-app/   @pkgdiet/github-app — Hono + Octokit webhook handler
-  dashboard/    @pkgdiet/dashboard  — Next.js 15 FinOps dashboard
-```
-
----
-
-## Contributing
-
-1. Fork and clone the repo
-2. `npm install` from root (npm workspaces)
-3. `npm run build` to build all packages
-4. `node packages/cli/dist/cli.js check moment` to test locally
-
-PRs for new alternatives entries, lockfile parser fixes, and MCP tool additions are especially welcome.
-
----
-
-## 🏢 Enterprise Deployment
-
-PkgDiet provides a Dashboard and GitHub App for organization-wide enforcement.
-
-### Option A: SaaS MVP / Cloud Deployment
-We recommend deploying the stack to Fly.io or Render:
-1. Provision a PostgreSQL database.
-2. Deploy the `github-app` package as a web service.
-3. Deploy the `dashboard` Next.js package as a web service.
-4. Go to `<dashboard-url>/setup` to install on your GitHub Organization.
-
-### Option B: Self-Hosted (Docker Compose)
-For strict security requirements, deploy the entire stack locally:
-```bash
-git clone https://github.com/your-org/pkgdiet.git
-cd pkgdiet
-
-# Provide your GitHub App credentials
-export GITHUB_APP_ID=12345
-export GITHUB_WEBHOOK_SECRET=your_secret
-export GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----..."
-
-# Start the stack (PostgreSQL + GitHub App + Dashboard)
-docker compose up -d
-```
-Access the dashboard at `http://localhost:3001` to complete setup.
-
----
-
-## License
-
-MIT © [om-tajne](https://github.com/om-tajne/pkgdiet)
+<div align="center">
+  <p>🥗 Secured by PkgDiet</p>
+</div>
