@@ -1,0 +1,35 @@
+{
+  "name": "@pkgdiet/core",
+  "version": "2.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./alternatives": {
+      "import": "./dist/alternatives.js"
+    },
+    "./data/alternatives.json": "./data/alternatives.json",
+    "./dist/*.js": "./dist/*.js"
+  },
+  "files": [
+    "dist",
+    "data"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@babel/parser": "^7.27.0",
+    "glob": "^13.0.6",
+    "js-yaml": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9"
+  }
+}
+
+
