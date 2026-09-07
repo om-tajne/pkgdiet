@@ -32,6 +32,77 @@ function DepRow({ dep, evalResult }: { dep: any; evalResult: any }) {
   );
 }
 
+// --- Top Actions Component ---
+function TopActions({ runs }: { runs: any[] }) {
+  // Extract all warned/blocked deps from recent runs
+  const actionableDeps = new Map();
+  
+  runs.forEach(run => {
+    let detailsObj: any = {};
+    try { detailsObj = JSON.parse(run.detailsJson); } catch {}
+    const results = Array.isArray(detailsObj) ? detailsObj : (detailsObj.results || []);
+    
+    results.forEach((r: any) => {
+      const depName = r.dep?.name || r.name; // depending on structure
+      const evalResult = r.evalResult || r;
+      if (evalResult.verdict === 'WARN' || evalResult.verdict === 'BLOCK') {
+        if (!actionableDeps.has(depName)) {
+          actionableDeps.set(depName, evalResult);
+        }
+      }
+    });
+  });
+
+  const topDeps = Array.from(actionableDeps.values())
+    .sort((a, b) => (b.costEstimate?.monthlyCiCost100Builds || 0) - (a.costEstimate?.monthlyCiCost100Builds || 0))
+    .slice(0, 5);
+
+  if (topDeps.length === 0) return null;
+
+  const potentialSavings = topDeps.reduce((sum, d) => sum + (d.costEstimate?.monthlyCiCost100Builds || 0), 0);
+
+  return (
+    <div style={{ background: '#f8f9fa', border: '1px solid #e1e4e8', borderRadius: '6px', padding: '16px', marginBottom: '24px' }}>
+      <h3 style={{ marginTop: 0, display: 'flex', justifyContent: 'space-between' }}>
+        <span>⚡ Top Actions: Packages to Replace</span>
+        <span style={{ color: '#28a745' }}>Potential Savings: ${potentialSavings.toFixed(2)}/mo</span>
+      </h3>
+      <table style={{ width: '100%', fontSize: '14px', borderCollapse: 'collapse', marginTop: '12px' }}>
+        <thead>
+          <tr style={{ borderBottom: '1px solid #e1e4e8', textAlign: 'left' }}>
+            <th style={{ paddingBottom: '8px' }}>Package</th>
+            <th style={{ paddingBottom: '8px' }}>Size / Cost</th>
+            <th style={{ paddingBottom: '8px' }}>Alternative</th>
+            <th style={{ paddingBottom: '8px' }}>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {topDeps.map((dep, i) => {
+            const alts = dep.alternatives || [];
+            const firstAlt = alts.length > 0 ? (typeof alts[0] === 'string' ? alts[0] : (alts[0].replacement || alts[0].name)) : null;
+            return (
+              <tr key={i} style={{ borderBottom: '1px solid #eaecef' }}>
+                <td style={{ padding: '8px 0' }}><strong>{dep.name}</strong> <VerdictBadge verdict={dep.verdict} /></td>
+                <td style={{ padding: '8px 0' }}>{dep.costEstimate?.addedSizeMB?.toFixed(2) || 0}MB <span style={{ color: '#666' }}>(${dep.costEstimate?.monthlyCiCost100Builds?.toFixed(3) || 0}/mo)</span></td>
+                <td style={{ padding: '8px 0' }}>{firstAlt || 'None'}</td>
+                <td style={{ padding: '8px 0' }}>
+                  {firstAlt ? (
+                    <code style={{ background: '#e1e4e8', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }} onClick={() => console.log('Copy to clipboard')}>
+                      npm rm {dep.name} && npm i {firstAlt}
+                    </code>
+                  ) : (
+                    <span style={{ color: '#666' }}>Find alternative</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default async function RepoPage({
   params,
 }: {
@@ -58,11 +129,13 @@ export default async function RepoPage({
 
       <div className="page-header">
         <h1>{repo.fullName}</h1>
-        <p>GitHub Repo ID: {repo.githubRepoId} · Tracked since {new Date(repo.createdAt).toLocaleDateString()}</p>
+        <p>GitHub Repo ID: {repo.githubRepoId} • Tracked since {new Date(repo.createdAt).toLocaleDateString()}</p>
       </div>
 
+      <TopActions runs={runs} />
+
       {/* FinOps Stats */}
-      <p className="section-label">FinOps Metrics · Last {metrics.days} days</p>
+      <p className="section-label">FinOps Metrics • Last {metrics.days} days</p>
       <div className="stats">
         <div className="stat">
           <div className="value">{metrics.totalRuns}</div>
@@ -122,8 +195,9 @@ export default async function RepoPage({
             </thead>
             <tbody>
               {runs.map((run) => {
-                let details: any[] = [];
-                try { details = JSON.parse(run.detailsJson); } catch {}
+                let detailsObj: any = {};
+                try { detailsObj = JSON.parse(run.detailsJson); } catch {}
+                const results = Array.isArray(detailsObj) ? detailsObj : (detailsObj.results || []);
                 return (
                   <>
                     <tr key={run.id} style={{ background: "var(--surface)" }}>
@@ -133,7 +207,7 @@ export default async function RepoPage({
                       <td><code style={{ fontSize: 11 }}>{run.baseSha.slice(0, 7)}</code></td>
                       <td><code style={{ fontSize: 11 }}>{run.headSha.slice(0, 7)}</code></td>
                     </tr>
-                    {details.length > 0 && (
+                    {results.length > 0 && (
                       <tr key={`${run.id}-deps`}>
                         <td colSpan={5} style={{ padding: "0 14px 16px 32px" }}>
                           <table style={{ width: "100%", fontSize: 12 }}>
@@ -148,9 +222,11 @@ export default async function RepoPage({
                               </tr>
                             </thead>
                             <tbody>
-                              {details.map((d, i) => (
-                                <DepRow key={i} dep={d.dep} evalResult={d.evalResult} />
-                              ))}
+                              {results.map((r: any, i: number) => {
+                                const dep = r.dep || { name: r.name, version: 'unknown' };
+                                const evalResult = r.evalResult || r;
+                                return <DepRow key={i} dep={dep} evalResult={evalResult} />;
+                              })}
                             </tbody>
                           </table>
                         </td>
@@ -166,3 +242,4 @@ export default async function RepoPage({
     </div>
   );
 }
+

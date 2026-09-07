@@ -23,6 +23,13 @@ export default async function HomePage() {
 
   return (
     <div>
+      {orgsWithRepos.length === 0 && (
+        <div style={{ background: '#e1f0fa', border: '1px solid #c8e1ff', padding: '16px', borderRadius: '6px', marginBottom: '24px' }}>
+          <h3 style={{ margin: '0 0 8px 0', color: '#0366d6' }}>👋 Welcome to PkgDiet!</h3>
+          <p style={{ margin: 0 }}>It looks like you haven't completed the setup yet. <a href="/setup" style={{ fontWeight: 'bold', color: '#0366d6' }}>Complete the Setup Wizard &rarr;</a></p>
+        </div>
+      )}
+
       <div className="demo-banner">
         ⚠️ <strong>Demo Mode</strong> — authenticated as{" "}
         <strong>{session?.user.email}</strong>. Set{" "}

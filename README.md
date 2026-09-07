@@ -383,6 +383,35 @@ PRs for new alternatives entries, lockfile parser fixes, and MCP tool additions 
 
 ---
 
+## 🏢 Enterprise Deployment
+
+PkgDiet provides a Dashboard and GitHub App for organization-wide enforcement.
+
+### Option A: SaaS MVP / Cloud Deployment
+We recommend deploying the stack to Fly.io or Render:
+1. Provision a PostgreSQL database.
+2. Deploy the `github-app` package as a web service.
+3. Deploy the `dashboard` Next.js package as a web service.
+4. Go to `<dashboard-url>/setup` to install on your GitHub Organization.
+
+### Option B: Self-Hosted (Docker Compose)
+For strict security requirements, deploy the entire stack locally:
+```bash
+git clone https://github.com/your-org/pkgdiet.git
+cd pkgdiet
+
+# Provide your GitHub App credentials
+export GITHUB_APP_ID=12345
+export GITHUB_WEBHOOK_SECRET=your_secret
+export GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----..."
+
+# Start the stack (PostgreSQL + GitHub App + Dashboard)
+docker compose up -d
+```
+Access the dashboard at `http://localhost:3001` to complete setup.
+
+---
+
 ## License
 
 MIT © [om-tajne](https://github.com/om-tajne/pkgdiet)
