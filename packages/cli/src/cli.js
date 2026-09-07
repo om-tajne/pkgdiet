@@ -299,6 +299,7 @@ program
   .command('agent-setup')
   .description('Configure PkgDiet for AI coding agents (Cursor, Windsurf, Cline, Copilot, etc.)')
   .option('-a, --agent <agents...>', 'Agents to configure (cursor, windsurf, cline, copilot, claude-code)')
+  .option('--detect', 'Detect and configure agents used in this project')
   .option('--all', 'Configure all supported agents')
   .option('--dry-run', 'Show what would be modified without making changes')
   .option('--remove', 'Remove PkgDiet configuration from agents')
@@ -306,7 +307,7 @@ program
     const { setupAgents, SUPPORTED_AGENTS } = await import('./agentSetup.js');
     let agents = [];
     
-    if (options.all) {
+    if (options.all || options.detect) {
       agents = SUPPORTED_AGENTS;
     } else if (options.agent && options.agent.length > 0) {
       agents = options.agent;
@@ -328,6 +329,7 @@ program
 
     await setupAgents(agents, process.cwd(), { 
       dryRun: options.dryRun,
+      detect: options.detect,
       remove: options.remove
     });
   });
@@ -709,4 +711,6 @@ if (
 }
 
 program.parse();
+
+
 

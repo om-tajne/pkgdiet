@@ -4,7 +4,22 @@ import path from 'path';
 export const SUPPORTED_AGENTS = ['cursor', 'windsurf', 'cline', 'copilot', 'claude-code'];
 
 export async function setupAgents(agents, cwd, options = {}) {
-  const { dryRun = false, remove = false } = options;
+  const { dryRun = false, remove = false, detect = false } = options;
+
+  let activeAgents = [...agents];
+
+  if (detect) {
+    activeAgents = [];
+    if (fs.existsSync(path.join(cwd, '.cursor'))) activeAgents.push('cursor');
+    if (fs.existsSync(path.join(cwd, '.windsurf')) || fs.existsSync(path.join(cwd, '.windsurfrules'))) activeAgents.push('windsurf');
+    if (fs.existsSync(path.join(cwd, 'cline_mcp_settings.json')) || fs.existsSync(path.join(cwd, '.cline'))) activeAgents.push('cline');
+    if (fs.existsSync(path.join(cwd, '.github', 'copilot'))) activeAgents.push('copilot'); // rough heuristic
+    if (activeAgents.length === 0) {
+      console.log('No supported agents detected in this project.');
+      return;
+    }
+    console.log(`Detected agents: ${activeAgents.join(', ')}`);
+  }
 
   const aiRuleContent = `You are working in a codebase protected by PkgDiet.
 
@@ -17,6 +32,15 @@ If the tool returns a BLOCK verdict, DO NOT install the package. If it is WARN, 
     args: ['-y', 'pkgdiet@latest', 'mcp']
   };
 
+  const backupFile = (filePath) => {
+    if (fs.existsSync(filePath) && !dryRun) {
+      const ts = new Date().toISOString().replace(/[:\-\.T]/g, '').slice(0, 14);
+      const backupPath = `${filePath}.pkgdiet-backup-${ts}`;
+      fs.copyFileSync(filePath, backupPath);
+      console.log(`✓ Created backup: ${path.basename(backupPath)}`);
+    }
+  };
+
   const updateJson = (filePath, keyPath, value) => {
     if (dryRun) {
       console.log(`[Dry Run] Would ${remove ? 'remove from' : 'update'} ${filePath}`);
@@ -24,6 +48,8 @@ If the tool returns a BLOCK verdict, DO NOT install the package. If it is WARN, 
     }
     const dir = path.dirname(filePath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+    backupFile(filePath);
 
     let data = {};
     if (fs.existsSync(filePath)) {
@@ -53,6 +79,7 @@ If the tool returns a BLOCK verdict, DO NOT install the package. If it is WARN, 
       console.log(`[Dry Run] Would ${remove ? 'remove rules from' : 'add rules to'} ${filePath}`);
       return;
     }
+    
     let rules = '';
     if (fs.existsSync(filePath)) rules = fs.readFileSync(filePath, 'utf8');
 
@@ -62,6 +89,7 @@ If the tool returns a BLOCK verdict, DO NOT install the package. If it is WARN, 
       }
     } else {
       if (!rules.includes('PkgDiet')) {
+        backupFile(filePath);
         fs.writeFileSync(filePath, rules ? rules + '\n\n' + aiRuleContent : aiRuleContent);
         console.log(`✓ Added PkgDiet rules to ${filePath}`);
       } else {
@@ -70,7 +98,7 @@ If the tool returns a BLOCK verdict, DO NOT install the package. If it is WARN, 
     }
   };
 
-  for (const agent of agents) {
+  for (const agent of activeAgents) {
     console.log(`\nConfiguring ${agent}...`);
 
     if (agent === 'cursor') {
@@ -93,7 +121,7 @@ If the tool returns a BLOCK verdict, DO NOT install the package. If it is WARN, 
     else if (agent === 'claude-code') {
       console.log(remove 
         ? "✓ Please manually remove PkgDiet from Claude Desktop/Code global config."
-        : "✓ To configure Claude natively, you can run: claude mcp add pkgdiet npx -y pkgdiet@latest mcp"
+        : "✓ To configure Claude natively, run: claude mcp add pkgdiet npx -y pkgdiet@latest mcp"
       );
     }
   }
@@ -104,6 +132,7 @@ If the tool returns a BLOCK verdict, DO NOT install the package. If it is WARN, 
     } else {
       console.log('\n✅ PkgDiet is active for the selected agents.');
       console.log('Before installing or recommending an npm package, agents should now call: check_dependency({ packageName })');
+      console.log('\nUndo command: npx pkgdiet agent-setup --remove');
     }
   }
 }

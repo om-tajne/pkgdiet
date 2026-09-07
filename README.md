@@ -31,6 +31,18 @@ npx pkgdiet agent-setup
 
 That's it. Your AI agent is now configured to automatically call PkgDiet via the **Model Context Protocol (MCP)** before recommending any new dependencies.
 
+## 🤖 Supported AI Agents
+
+| Agent | Status | Installation |
+|---|---|---|
+| **Cursor** | Supported | `npx pkgdiet agent-setup --agent cursor` |
+| **Windsurf** | Supported | `npx pkgdiet agent-setup --agent windsurf` |
+| **Claude Code** | Supported | `npx pkgdiet agent-setup --agent claude-code` |
+| **Cline** | Experimental | `npx pkgdiet agent-setup --agent cline` |
+| **Copilot** | Experimental | `npx pkgdiet agent-setup --agent copilot` |
+
+See [docs/agent-support.md](docs/agent-support.md) for full details.
+
 ## ✨ Features
 
 - **🤖 Native AI Guardrails:** Seamlessly hooks into Cursor, Windsurf, and Claude via MCP.
@@ -106,5 +118,6 @@ px pkgdiet init --template strict
 <div align="center">
   <p>🥗 Secured by PkgDiet</p>
 </div>
+
 
 
