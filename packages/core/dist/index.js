@@ -130,6 +130,8 @@ export async function run(options = {}) {
         const allPkgNames = [...scanResult.allDeps, ...scanResult.devDeps];
         alternatives = findAlternatives(allPkgNames);
     }
+    // ─── Phase 5: Repo Safety Score ─────────────────
+    const repoSafetyScore = computeRepoSafetyScore({ scanResult, healthResults, alternatives });
     // ─── Render output ─────────────────
     const results = {
         scanResult,
@@ -138,6 +140,7 @@ export async function run(options = {}) {
         alternatives,
         projectName,
         projectPath,
+        repoSafetyScore,
     };
     if (options.json) {
         console.log(renderJson(results));
@@ -150,6 +153,32 @@ export async function run(options = {}) {
             showAlternatives,
         }));
     }
+}
+/**
+ * Compute a Repo Safety Score (0–100) for the overall project.
+ */
+function computeRepoSafetyScore({ scanResult, healthResults, alternatives }) {
+    let score = 100;
+    const totalDeps = (scanResult?.allDeps?.length || 0) + (scanResult?.devDeps?.length || 0);
+    if (totalDeps === 0)
+        return 100;
+    // Penalty: unused deps (up to -20)
+    const unusedRatio = (scanResult?.unused?.length || 0) / totalDeps;
+    score -= Math.round(unusedRatio * 20);
+    // Penalty: health issues from avg score (up to -50)
+    if (healthResults && healthResults.length > 0) {
+        const healthyPkgs = healthResults.filter(h => !h.skipped);
+        if (healthyPkgs.length > 0) {
+            const avgScore = healthyPkgs.reduce((s, h) => s + (h.score || 50), 0) / healthyPkgs.length;
+            score -= Math.round((1 - avgScore / 100) * 50);
+            // Extra -5 per deprecated pkg (max -20)
+            const deprecatedCount = healthyPkgs.filter(h => h.flags?.some(f => f.label?.startsWith('Deprecated'))).length;
+            score -= Math.min(deprecatedCount * 5, 20);
+        }
+    }
+    // Penalty: packages with better alternatives (up to -10)
+    score -= Math.min((alternatives?.length || 0) * 2, 10);
+    return Math.max(0, Math.min(100, Math.round(score)));
 }
 /**
  * Simple bytes formatter for spinner messages.
