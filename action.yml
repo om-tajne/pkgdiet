@@ -1,0 +1,16 @@
+name: 'PkgDiet Dependency Gate'
+description: 'Local-first dependency gate. Intercepts deprecated, bloated, or dangerous npm dependencies in your pull requests.'
+branding:
+  icon: 'shield'
+  color: 'green'
+inputs:
+  environment:
+    description: 'The PkgDiet policy environment to use (e.g., ci, strict)'
+    required: false
+    default: 'ci'
+runs:
+  using: "composite"
+  steps:
+    - name: Run PkgDiet CI Gate
+      shell: bash
+      run: npx -y pkgdiet@2.0.0 ci --env ${{ inputs.environment }}

@@ -184,7 +184,7 @@ jobs:
         with:
           node-version: 22
       - name: Evaluate newly added dependencies
-        run: npx -y pkgdiet@2.0.0 ci --env ci --base "${{ github.event.pull_request.base.sha }}"
+        uses: om-tajne/pkgdiet@v2.0.0
 ```
 This workflow requires no PkgDiet account, GitHub App, database, dashboard, webhook, or hosted service.
 
@@ -219,6 +219,7 @@ See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
 ## 🔬 Experimental Features
 
 The `apps/` directory in this repository contains highly experimental prototypes for a future Enterprise control plane (Dashboard, Webhooks, Postgres). **No hosted PkgDiet service exists.** These are internal playgrounds and are not supported for production use.
+
 
 
 
