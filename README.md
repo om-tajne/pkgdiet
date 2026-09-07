@@ -166,7 +166,7 @@ Verify your active policy using `npx pkgdiet policy-check`.
 
 ## 🚦 CI Without a GitHub App
 
-PkgDiet works in GitHub Actions without an account, webhook, dashboard, or hosted service. It evaluates newly introduced dependencies in the pull request.
+PkgDiet works in GitHub Actions without an account, webhook, dashboard, or hosted service. It detects and analyzes the changed npm, pnpm, or Yarn lockfile against the base branch to evaluate newly introduced dependencies. Supported lockfiles: package-lock.json, pnpm-lock.yaml, and yarn.lock.
 
 ```yaml
 name: PkgDiet Dependency Gate
@@ -219,5 +219,6 @@ See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
 ## 🔬 Experimental Features
 
 The `apps/` directory in this repository contains highly experimental prototypes for a future Enterprise control plane (Dashboard, Webhooks, Postgres). **No hosted PkgDiet service exists.** These are internal playgrounds and are not supported for production use.
+
 
 
