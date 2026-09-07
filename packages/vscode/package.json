@@ -1,0 +1,36 @@
+{
+  "name": "pkgdiet-vscode",
+  "displayName": "PkgDiet",
+  "description": "Local-first dependency gate. Hovers over package.json to show npm package health, sizes, and policy warnings.",
+  "version": "2.0.0",
+  "publisher": "om-tajne",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": ["Linters", "Security", "Other"],
+  "activationEvents": [
+    "onLanguage:json"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "pkgdiet.audit",
+        "title": "PkgDiet: Audit Project Dependencies"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -b",
+    "watch": "tsc -b -w",
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@pkgdiet/core": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.0.0"
+  }
+}
