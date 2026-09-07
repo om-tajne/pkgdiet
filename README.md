@@ -1,131 +1,116 @@
-# 🥗 PkgDiet
+<div align="center">
+  <h1>🥗 PkgDiet</h1>
+  <p><strong>The dependency layer for AI-driven development.</strong></p>
+  
+  [![npm version](https://img.shields.io/npm/v/pkgdiet.svg?color=blue)](https://www.npmjs.com/package/pkgdiet)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-[![npm version](https://img.shields.io/npm/v/pkgdiet)](https://www.npmjs.com/package/pkgdiet)
-[![npm downloads](https://img.shields.io/npm/dm/pkgdiet)](https://www.npmjs.com/package/pkgdiet)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Node.js >=18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
-[![PkgDiet MCP Server Score](https://glama.ai/mcp/servers/om-tajne/pkgdiet/badges/score.svg)](https://glama.ai/mcp/servers/om-tajne/pkgdiet)
-
-Put your `node_modules` on a diet.
-
-PkgDiet is a proactive dependency governance tool that helps you find unused dependencies, analyze package health, and reduce `node_modules` size. It doesn't just ask *"is it safe?"* — it asks *"is it optimal?"*
-
-> **Our Vision:** PkgDiet's mission is to become an open standard for dependency intelligence in AI-assisted software development. Our goal is simple: whenever a developer, CI pipeline, or compatible AI agent needs to evaluate, install, replace, or audit a dependency, PkgDiet should provide trusted, machine-readable insights through transparent, opt-in integrations.
+  <p>Stop AI agents (and developers) from installing deprecated, bloated, or malicious npm packages.</p>
+</div>
 
 ---
 
-## Quick Start
+## 🤔 The Problem
 
-Run it instantly in any Node.js project (no installation required):
+AI coding agents (Cursor, Windsurf, Copilot) are incredible, but they hallucinate dependencies, suggest massive packages (like moment.js), and don't care about your CI costs or security policies. 
 
-```bash
-npx pkgdiet
-```
+**PkgDiet puts a policy brain between your agent and 
+pm install.**
 
-To clean up unused dependencies automatically:
-```bash
-npx pkgdiet --fix
-```
+## 🚀 Quickstart (Zero-Friction Setup)
 
----
+Get started in 30 seconds. No accounts, no dashboards.
 
-## What You Get
+`ash
+# 1. Initialize PkgDiet in your project
+npx pkgdiet setup
 
-PkgDiet scans your codebase's AST and NPM registry data in seconds to give you a pristine, actionable report:
+# 2. Wire it into your AI Agent (Cursor, Windsurf, Claude Desktop, etc.)
+npx pkgdiet agent-setup
+`
 
-```text
-- Scanning imports...
-✓ Scanned 141 files, found 54 imports
-- Checking health of 44 packages...
-✓ Health check complete: 10 issues found
-- Analyzing dependency sizes...
-✓ Size analysis complete: 40.5 MB total
+That's it. Your AI agent is now configured to automatically call PkgDiet via the **Model Context Protocol (MCP)** before recommending any new dependencies.
 
-╭──────────────────────────────────────────────────────╮
-│ 🥗 PkgDiet v1.2.3                                    │
-│ Put your node_modules on a diet...                   │
-│ Project: express                                     │
-│ Dependencies: 44 direct │ 141 files scanned          │
-│ node_modules: 40.5 MB                                │
-│    Overall Score:  67/100  ⚠️                        │
-│    ████████████████████░░░░░░░░░░                    │
-╰──────────────────────────────────────────────────────╯
+## ✨ Features
 
-🗑️  UNUSED DEPENDENCIES (1 found — saves ~21.2 KB)
-────────────────────────────────────────────────────────
-   ⚫ hbs                      dev      21.2 KB      → npm uninstall hbs
-
-🏥  HEALTH WARNINGS (10 issues)
-────────────────────────────────────────────────────────
-   Package                    Score    Issue
-   ──────────────────────────────────────────────────────────────────────
-   🔴 pbkdf2-password          29       Unmaintained (4yr) · Single maintainer · Low downloads
-   🔴 encodeurl                57       Unmaintained (2yr)
-   🟡 once                     70       Single maintainer
-
-📦  SIZE ANALYSIS
-────────────────────────────────────────────────────────
-   Package                      Install Size    % of node_modules
-   ─────────────────────────────────────────────────────────────────
-   🟧 eslint                     2.77 MB         6.8%
-   🟧 mocha                      2.22 MB         5.5%
-   ✓  42 other packages under 5% — no action needed
-
-💡  BETTER ALTERNATIVES (1 suggestion)
-────────────────────────────────────────────────────────
-   🔌 body-parser → express.json() built into Express 4.16+, no separate install needed
-
-────────────────────────────────────────────────────────
-  Action summary: 1 to remove · 10 to investigate · 1 to swap
-  Run pkgdiet --fix to remove unused · --json for full machine-readable output
-```
+- **🤖 Native AI Guardrails:** Seamlessly hooks into Cursor, Windsurf, and Claude via MCP.
+- **⚡ FinOps & Size Impact:** Calculates exactly how much a package will bloat your 
+ode_modules and cost in CI.
+- **💡 1-Click Fixes:** Suggests modern, maintained alternatives (e.g., dayjs instead of moment).
+- **🛡️ Repo Safety Score:** Gamify your dependency health with a 0-100 score.
+- **💼 Batch Checking:** Run 
+px pkgdiet check moment lodash axios to instantly evaluate multiple packages.
 
 ---
 
-## Features
+## 🛠️ CLI Usage
 
-- **AST-Based Unused Detection:** Safely flags installed packages that are never imported (handles TypeScript, JSX, dynamic imports, and NPM scripts).
-- **Health & Rot Scoring:** Detects the "Bus Factor" (single maintainer) and abandoned packages before they become technical debt.
-- **Smart Alternatives:** Recommends modern, lightweight replacements for legacy bloat (e.g., `dayjs` instead of `moment`, `picocolors` instead of `chalk`).
-- **Pre-Install Gate:** Run `pkgdiet check <package>` to evaluate a library *before* adding it to your project.
-- **MCP Server for AI Agents:** Give compatible AI coding assistants the ability to evaluate dependency health using PkgDiet's machine-readable data before recommending or installing packages. Install globally in one click: `npx pkgdiet mcp-install`
-- **CI/CD Ready:** Use `pkgdiet ci` to parse `package-lock.json` diffs in GitHub Actions and block PRs that introduce unhealthy dependencies.
+The CLI is your primary interface for manual checks and CI enforcement.
+
+### 1. Check Packages Before Installing
+`ash
+$ npx pkgdiet check moment
+
+🟡 moment
+  Health:      100/100
+  Verdict:     WARN
+  Reasons:     Size (4.15MB) exceeds maxPackageSizeBytes
+  Cost Impact: .250/mo CI
+  Alternatives: dayjs, date-fns
+  💡 Fix: Run 
+pm uninstall moment && npm install dayjs for a lighter alternative.
+
+  🥗 Secured by PkgDiet · npx pkgdiet setup · pkgdiet.dev
+`
+
+### 2. Audit Your Entire Project
+Generates a comprehensive Safety Score and flags unused or bloated dependencies.
+`ash
+npx pkgdiet audit
+`
+
+### 3. Browse Alternatives
+PkgDiet maintains a rich dataset of package alternatives.
+`ash
+npx pkgdiet alternatives search request
+`
+
+### 4. CI/CD Enforcement
+Run PkgDiet in GitHub Actions to prevent bad dependencies from merging.
+`ash
+npx pkgdiet ci --env ci --base origin/main
+`
 
 ---
 
-## Configuration
+## ⚙️ Configuration (.pkgdietrc.json)
 
-PkgDiet works out of the box with zero configuration. However, teams can enforce custom policies by running `npx pkgdiet init` to generate a `.pkgdietrc.json`:
+Configure your organization's policy, or use templates: 
+px pkgdiet init --template strict
 
-```json
+`json
 {
-  "minHealthScore": 60,
-  "maxNodeModulesSizeMB": 300,
-  "ignoreRules": ["chalk"],
-  "telemetry": false
+  "minHealthScore": 40,
+  "warnHealthScore": 60,
+  "securityMode": "fail-closed",
+  "environments": {
+    "ci": {
+      "minHealthScore": 60,
+      "failOn": "BLOCK"
+    }
+  }
 }
-```
-
-### Telemetry (Local Only)
-By default, PkgDiet writes anonymous, **purely local** usage metrics to a `.pkgdiet-metrics.json` file in your repository to track the amount of time and disk space saved. **No data is ever sent off your machine.** You can disable this local logging entirely by adding `"telemetry": false` to your `.pkgdietrc.json` or by setting the `PKGDIET_TELEMETRY_DISABLED=1` environment variable.
+`
 
 ---
 
-## Commands
+## 🏢 Enterprise
 
-| Command | Description |
-|---|---|
-| `npx pkgdiet` | Run full repository audit |
-| `npx pkgdiet --fix` | Preview unused dependencies and apply approved removals |
-| `npx pkgdiet check <pkg>` | Check health/size of a single package |
-| `npx pkgdiet init` | Generate config and GitHub Actions workflows |
-| `npx pkgdiet ci` | Run PR gate checks based on lockfile diffs |
-| `npx pkgdiet mcp` | Start the JSON-RPC server for AI agents |
-| `npx pkgdiet mcp-install` | Auto-configure MCP for Claude Desktop |
+For organizations that need PR-level PR gates, multi-repo visibility, and organization-wide policy templates, PkgDiet provides a GitHub App and Dashboard (currently in early access / source-available). 
+
+*Contact us or see the pps/ directory to self-host via Docker Compose.*
 
 ---
-
-## License
-
-MIT © [Om Tajne](https://github.com/om-tajne)
-
+<div align="center">
+  <p>🥗 Secured by PkgDiet</p>
+</div>

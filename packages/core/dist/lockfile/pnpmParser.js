@@ -1,0 +1,44 @@
+import * as yaml from "js-yaml";
+export function parsePnpmLockfile(lockContent) {
+    const result = new Map();
+    if (!lockContent || !lockContent.trim())
+        return result;
+    const doc = yaml.load(lockContent);
+    const packages = doc?.packages || {};
+    for (const key of Object.keys(packages)) {
+        // key examples: "/accepts/1.3.8", "/@scope/pkg/1.2.3"
+        const parts = key.split("/").filter(Boolean);
+        let name;
+        let version;
+        if (key.startsWith("/@")) {
+            // scoped: /@scope/name/version
+            name = `@${parts[0]}/${parts[1]}`;
+            version = parts.slice(2).join('/');
+        }
+        else {
+            // unscoped: /name/version
+            name = parts[0];
+            version = parts.slice(1).join('/');
+        }
+        if (!name || !version)
+            continue;
+        // For now, mark all as transitive; caller can override based on package.json.
+        result.set(`${name}@${version}`, {
+            name,
+            version,
+            isTransitive: true,
+        });
+    }
+    return result;
+}
+export function diffPnpmLockfiles(base, head) {
+    const baseMap = parsePnpmLockfile(base);
+    const headMap = parsePnpmLockfile(head);
+    const added = [];
+    for (const [key, entry] of headMap.entries()) {
+        if (!baseMap.has(key)) {
+            added.push(entry);
+        }
+    }
+    return added;
+}

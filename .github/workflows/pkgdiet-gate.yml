@@ -10,10 +10,10 @@ jobs:
         with:
           fetch-depth: 0 # Need history for git diff
       - run: npm install -g pkgdiet
-      
+
       # Run CI gate against the PR base branch
-      - run: pkgdiet ci --base ${{ github.event.pull_request.base.sha }}
-      
+      - run: pkgdiet ci --env ci --base ${{ github.event.pull_request.base.sha }}
+
       # Post PR Comment
       - uses: actions/github-script@v7
         if: always()
