@@ -97,7 +97,7 @@ program
           );
         }
         console.log('');
-        console.log(chalk.gray('  🥗 Secured by PkgDiet · npx pkgdiet setup · pkgdiet.dev'));
+        console.log(chalk.gray('  🥗 Secured by PkgDiet · npx pkgdiet setup · github.com/om-tajne/pkgdiet'));
         console.log('');
       }
       const hasBlock = results.some(r => r.verdict === 'BLOCK');
@@ -128,7 +128,7 @@ program
         const fixSuggestion = buildFixSuggestion(pkgName, result);
         if (fixSuggestion) console.log(`  💡 Fix: ${fixSuggestion}`);
         console.log('');
-        console.log(chalk.gray('  🥗 Secured by PkgDiet · npx pkgdiet setup · pkgdiet.dev'));
+        console.log(chalk.gray('  🥗 Secured by PkgDiet · npx pkgdiet setup · github.com/om-tajne/pkgdiet'));
         console.log('');
       }
       if (result.verdict === 'BLOCK') process.exit(1);
@@ -240,7 +240,7 @@ altsCmd
       console.log(`  ${col(pkg, 24)} ${col(alts, 28)} ${chalk.gray(data.category || 'optimization')}`);
     }
     console.log('');
-    console.log(chalk.gray('  🥗 Secured by PkgDiet · pkgdiet.dev'));
+    console.log(chalk.gray('  🥗 Secured by PkgDiet · github.com/om-tajne/pkgdiet'));
     console.log('');
   });
 
@@ -709,3 +709,4 @@ if (
 }
 
 program.parse();
+

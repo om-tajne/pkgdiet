@@ -60,7 +60,7 @@ $ npx pkgdiet check moment
   💡 Fix: Run 
 pm uninstall moment && npm install dayjs for a lighter alternative.
 
-  🥗 Secured by PkgDiet · npx pkgdiet setup · pkgdiet.dev
+  🥗 Secured by PkgDiet · npx pkgdiet setup · github.com/om-tajne/pkgdiet
 `
 
 ### 2. Audit Your Entire Project
@@ -103,14 +103,8 @@ px pkgdiet init --template strict
 `
 
 ---
-
-## 🏢 Enterprise
-
-For organizations that need PR-level PR gates, multi-repo visibility, and organization-wide policy templates, PkgDiet provides a GitHub App and Dashboard (currently in early access / source-available). 
-
-*Contact us or see the pps/ directory to self-host via Docker Compose.*
-
----
 <div align="center">
   <p>🥗 Secured by PkgDiet</p>
 </div>
+
+
