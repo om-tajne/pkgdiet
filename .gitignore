@@ -14,3 +14,4 @@ test-diff.js
 test-drift/
 .pkgdiet-cache.json
 tmp-app*.log
+*.vsix
