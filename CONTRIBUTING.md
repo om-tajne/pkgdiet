@@ -1,22 +1,10 @@
 # Contributing to PkgDiet
 
-First off, thank you for considering contributing to PkgDiet! 
+## Adding to the Alternatives Dataset
+We welcome additions to `packages/core/data/alternatives.json`.
+1. Fork the repo and create a branch.
+2. Edit the dataset to add a clear, factual alternative to a bloated or deprecated package.
+3. Submit a PR!
 
-## Local Development Setup
-
-1. Fork and clone the repository.
-2. Run `npm install` to install dependencies.
-3. You can test your local changes by running the CLI directly:
-   ```bash
-   node ./bin/cli.js
-   ```
-
-## Pull Request Process
-
-1. Ensure your code follows the existing style and conventions.
-2. Update the README.md with details of changes to the interface, if applicable.
-3. Submit a Pull Request targeting the `main` branch.
-4. A maintainer will review your code.
-
-## Submitting Issues
-If you find a bug or have a feature request, please use the provided Issue Templates in the GitHub repository.
+## Adding Agent Support
+If a new AI agent emerges that supports MCP or rules, modify `packages/cli/src/agentSetup.js` and submit a PR.
