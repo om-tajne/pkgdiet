@@ -188,6 +188,13 @@ export async function checkPackage(packageSpec, projectPath = process.cwd(), opt
     hasAlternatives: alternatives.length > 0,
   });
 
+  // 8. PkgDiet Certified: score >= 90, verdict ALLOW, no alternatives
+  const certified =
+    healthResult.score >= 90 &&
+    evaluation.verdict === 'ALLOW' &&
+    alternatives.length === 0 &&
+    !efficiencyFlag;
+
   return {
     name: packageName,
     verdict: evaluation.verdict,
@@ -199,5 +206,7 @@ export async function checkPackage(packageSpec, projectPath = process.cwd(), opt
     efficiencyFlag,
     hasProvenance,
     integrityCheck,
+    certified,
   };
 }
+

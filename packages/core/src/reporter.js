@@ -148,7 +148,7 @@ function sectionHeader(emoji, title, subtitle = '') {
  * Render the full PkgDiet report.
  */
 export function renderReport(results, options = {}) {
-  const { scanResult, healthResults, sizeResult, alternatives, projectName, projectPath } = results;
+  const { scanResult, healthResults, sizeResult, alternatives, projectName, projectPath, repoSafetyScore } = results;
   const { showUnused = true, showHealth = true, showSize = true, showAlternatives = true } = options;
 
   const output = [];
@@ -156,6 +156,11 @@ export function renderReport(results, options = {}) {
   // ─── Header ─────────────────────────────
   const totalDeps = scanResult.allDeps.length + scanResult.devDeps.length;
   const overallScore = calculateOverallScore(scanResult, healthResults, sizeResult, alternatives);
+
+  // Safety Score label
+  const safetyLabel = repoSafetyScore !== undefined
+    ? (repoSafetyScore >= 90 ? 'Excellent' : repoSafetyScore >= 70 ? 'Good' : repoSafetyScore >= 50 ? 'Fair' : 'Needs Work')
+    : null;
 
   output.push('');
   output.push(boxHeader([
@@ -169,8 +174,10 @@ export function renderReport(results, options = {}) {
     '',
     `   ${chalk.gray('Overall Score:')}  ${chalk.bold(String(overallScore))}/100  ${scoreEmoji(overallScore)}`,
     `   ${progressBar(overallScore, 30)}`,
+    safetyLabel ? `   ${chalk.gray('Repo Safety Score:')} ${chalk.bold(String(repoSafetyScore))}/100 ${chalk.gray('(' + safetyLabel + ')')}` : '',
     '',
   ].filter(Boolean)));
+
 
   // ─── Unused Dependencies ─────────────────────────────
   if (showUnused) {
@@ -321,6 +328,8 @@ export function renderReport(results, options = {}) {
     output.push(`  ${chalk.green('All good!')} No actions needed.`);
   }
   output.push('');
+  output.push(chalk.gray('  🥗 Secured by PkgDiet · npx pkgdiet setup to enable AI guardrails · pkgdiet.dev'));
+
   return output.join('\n');
 }
 
