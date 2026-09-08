@@ -55,3 +55,4 @@ The repo page calculates FinOps metrics from `CheckRun.detailsJson` over a confi
 - **Blocked:** Dependencies blocked by policy
 - **Warned:** Dependencies flagged with warnings  
 - **Est. CI cost saved:** Approximated from `costEstimate.monthlyCiCost100Builds` in the evaluation payload
+

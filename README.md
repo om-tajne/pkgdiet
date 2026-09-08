@@ -2,9 +2,7 @@
   <h1>🥗 PkgDiet</h1>
   <p><strong>A local-first dependency gate for AI coding agents and Node.js developers.</strong></p>
   
-  [![npm version](https://img.shields.io/npm/v/pkgdiet.svg)](https://www.npmjs.com/package/pkgdiet) [![npm downloads](https://img.shields.io/npm/dm/pkgdiet.svg)](https://www.npmjs.com/package/pkgdiet) [![CI](https://github.com/om-tajne/pkgdiet/actions/workflows/ci.yml/badge.svg)](https://github.com/om-tajne/pkgdiet/actions) [![License](https://img.shields.io/github/license/om-tajne/pkgdiet.svg)](LICENSE) [![Node.js](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](https://nodejs.org/) [![MCP](https://img.shields.io/badge/MCP-compatible-5A45FF.svg)](https://modelcontextprotocol.io/)
-
-  [![Glama MCP Server](https://glama.ai/mcp/servers/om-tajne/pkgdiet/badge)](https://glama.ai/mcp/servers/om-tajne/pkgdiet)
+  [![npm version](https://img.shields.io/npm/v/pkgdiet.svg)](https://www.npmjs.com/package/pkgdiet) [![npm downloads](https://img.shields.io/npm/dm/pkgdiet.svg)](https://www.npmjs.com/package/pkgdiet) [![CI](https://github.com/om-tajne/pkgdiet/actions/workflows/ci.yml/badge.svg)](https://github.com/om-tajne/pkgdiet/actions) [![License](https://img.shields.io/github/license/om-tajne/pkgdiet.svg)](LICENSE) [![Node.js](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](https://nodejs.org/) [![MCP](https://img.shields.io/badge/MCP-compatible-5A45FF.svg)](https://modelcontextprotocol.io/) [![Glama MCP Server](https://glama.ai/mcp/servers/om-tajne/pkgdiet/badge)](https://glama.ai/mcp/servers/om-tajne/pkgdiet)
 
   <p>> 🏆 **AAA-rated on Glama** — PkgDiet provides schema-first MCP tools for dependency checks, policy awareness, and safer package alternatives. [View the MCP score](https://glama.ai/mcp/servers/om-tajne/pkgdiet/score).</p>
 
@@ -102,3 +100,4 @@ If PkgDiet doesn't fit your needs, check out these excellent alternatives on Gla
 - [mcp-shipcheck](https://glama.ai/mcp/servers/mcp-tool-shop-org/shipcheck) by mcp-tool-shop-org
 - [pkg-intel-mcp](https://glama.ai/mcp/servers/JanMaa/pkg-intel-mcp) by JanMaa
 - [DepHealth MCP](https://glama.ai/mcp/servers/hasarahman/dephealth-mcp) by hasarahman
+
