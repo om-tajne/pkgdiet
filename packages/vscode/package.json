@@ -1,5 +1,5 @@
 {
-  "name": "pkgdiet",
+  "name": "pkgdiet-vscode",
   "displayName": "PkgDiet",
   "description": "Dependency health, policy, and alternatives for package.json.",
   "version": "2.0.0",
