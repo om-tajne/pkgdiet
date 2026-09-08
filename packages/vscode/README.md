@@ -9,3 +9,4 @@ This is the official Visual Studio Code extension for **PkgDiet**—a local-firs
 
 ### Architecture
 This extension runs 100% locally on your machine and uses the exact same @pkgdiet/core evaluation engine that powers the PkgDiet CLI and MCP Server. No SaaS accounts or cloud dashboards are required.
+
