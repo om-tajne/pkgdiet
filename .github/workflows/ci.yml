@@ -21,5 +21,5 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
     - run: npm install
-    # We will just verify it builds and runs the help command as a basic test for now
-    - run: node ./bin/cli.js --help
+    - run: npm run build
+    - run: node packages/cli/dist/cli.js --help
