@@ -20,8 +20,8 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
+    - name: Remove tsc problem matcher
+      run: echo "::remove-matcher owner=tsc::"
     - run: npm install
-    - run: npm run build --workspace=@pkgdiet/core
-    - run: npm run build --workspace=@pkgdiet/mcp
-    - run: npm run build --workspace=pkgdiet
+    - run: npx tsc -b packages/core packages/mcp packages/cli
     - run: node packages/cli/dist/cli.js --help
