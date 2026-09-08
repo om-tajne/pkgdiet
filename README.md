@@ -2,13 +2,13 @@
   <h1>🥗 PkgDiet</h1>
   <p><strong>A local-first dependency gate for AI coding agents and Node.js developers.</strong></p>
   
-  [![npm version](https://img.shields.io/npm/v/pkgdiet.svg)](https://www.npmjs.com/package/pkgdiet) [![npm downloads](https://img.shields.io/npm/dm/pkgdiet.svg)](https://www.npmjs.com/package/pkgdiet) [![CI](https://github.com/om-tajne/pkgdiet/actions/workflows/ci.yml/badge.svg)](https://github.com/om-tajne/pkgdiet/actions) [![License](https://img.shields.io/github/license/om-tajne/pkgdiet.svg)](LICENSE) [![Node.js](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](https://nodejs.org/) [![MCP Compatible](https://img.shields.io/badge/MCP-compatible-5A45FF.svg)](https://modelcontextprotocol.io/)
+  [![npm version](https://img.shields.io/npm/v/pkgdiet.svg)](https://www.npmjs.com/package/pkgdiet) [![npm downloads](https://img.shields.io/npm/dm/pkgdiet.svg)](https://www.npmjs.com/package/pkgdiet) [![CI](https://github.com/om-tajne/pkgdiet/actions/workflows/ci.yml/badge.svg)](https://github.com/om-tajne/pkgdiet/actions) [![License](https://img.shields.io/github/license/om-tajne/pkgdiet.svg)](LICENSE) [![Node.js](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](https://nodejs.org/) [![MCP](https://img.shields.io/badge/MCP-compatible-5A45FF.svg)](https://modelcontextprotocol.io/)
 
-  [![Glama MCP server](https://glama.ai/mcp/servers/om-tajne/pkgdiet/badge)](https://glama.ai/mcp/servers/om-tajne/pkgdiet)
+  [![Glama MCP Server](https://glama.ai/mcp/servers/om-tajne/pkgdiet/badge)](https://glama.ai/mcp/servers/om-tajne/pkgdiet)
 
-  <p>> 🏆 **AAA-rated on Glama** — PkgDiet provides schema-first MCP tools for dependency checks, policy awareness, and safer package alternatives. [View the MCP score](https://glama.ai/mcp/servers/om-tajne/pkgdiet/score).
+  <p>> 🏆 **AAA-rated on Glama** — PkgDiet provides schema-first MCP tools for dependency checks, policy awareness, and safer package alternatives. [View the MCP score](https://glama.ai/mcp/servers/om-tajne/pkgdiet/score).</p>
 
-Check npm packages before you recommend or install them. Apply local policy, identify deprecated or unnecessarily heavy dependencies, and get safer alternatives—without an account or hosted service.</p>
+Check npm packages before you recommend or install them. Apply local policy, identify deprecated or unnecessarily heavy dependencies, and get safer alternatives—without an account or hosted service.
 </div>
 
 ---
@@ -22,7 +22,7 @@ Get started in under a minute. `pkgdiet setup` creates a local policy and, if yo
 npx pkgdiet setup
 
 # Check a package manually at any time
-npx pkgdiet check moment
+npx -y pkgdiet@2.0.0 check moment
 ```
 
 ```text
@@ -52,15 +52,16 @@ npx pkgdiet check moment
 
 ### Distribution Channels
 
-| Channel | Status | How users install it |
+| Surface | Status | Install |
 |---|---|---|
 | **npm CLI** | Available | `npx -y pkgdiet@2.0.0 setup` |
-| **MCP server** | Available | `npx -y pkgdiet@2.0.0 mcp` |
-| **AI-agent setup** | Available | `npx -y pkgdiet@2.0.0 agent-setup --detect` |
-| **GitHub Action** | Available | `uses: om-tajne/pkgdiet@v2` |
-| **VS Code extension**| Available once listed | Visual Studio Marketplace / VSIX |
-| **GitHub App** | Not released | Planned / quarantined |
-| **Hosted dashboard** | Not released | Planned / quarantined |
+| **Generic stdio MCP** | Available | `npx -y pkgdiet@2.0.0 mcp` |
+| **Cursor** | Supported after E2E verification | `pkgdiet agent-setup --agent cursor` |
+| **Claude Code** | Supported after E2E verification | `pkgdiet agent-setup --agent claude-code` |
+| **Windsurf** | Supported after E2E verification | `pkgdiet agent-setup --agent windsurf` |
+| **GitHub Action** | Available after real CI test | `uses: om-tajne/pkgdiet@v2` |
+| **VS Code extension** | Beta | Marketplace or VSIX |
+| **GitHub App/dashboard**| Not released | Not required |
 
 **Limitation:** PkgDiet provides policy and risk signals. It is not a substitute for vulnerability scanning, code review, package testing, or an organization’s broader supply-chain security program.
 
@@ -82,6 +83,9 @@ See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
 ## 🔬 Experimental Features
 
 The `apps/` directory in this repository contains highly experimental prototypes for a future Enterprise control plane (Dashboard, Webhooks, Postgres). **No hosted PkgDiet service exists.** These are internal playgrounds and are not supported for production use.
+
+
+
 
 
 
