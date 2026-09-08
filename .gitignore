@@ -16,3 +16,4 @@ test-drift/
 tmp-app*.log
 *.vsix
 
+*.tsbuildinfo
