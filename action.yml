@@ -1,16 +1,41 @@
-name: 'PkgDiet Dependency Gate'
-description: 'Local-first dependency gate. Intercepts deprecated, bloated, or dangerous npm dependencies in your pull requests.'
-branding:
-  icon: 'shield'
-  color: 'green'
+name: PkgDiet Dependency Gate
+description: Evaluate newly introduced npm dependencies against PkgDiet policy.
 inputs:
+  base:
+    description: Base Git reference or SHA to compare against
+    required: true
   environment:
-    description: 'The PkgDiet policy environment to use (e.g., ci, strict)'
+    description: PkgDiet environment policy overlay
     required: false
-    default: 'ci'
+    default: ci
+  fail-on:
+    description: Override policy failure behavior: BLOCK, WARN, or NONE
+    required: false
+    default: ""
+  dry-run:
+    description: Print results without failing the workflow
+    required: false
+    default: "false"
+  version:
+    description: PkgDiet CLI version to run
+    required: false
+    default: "2.0.0"
+  working-directory:
+    description: Project directory containing the lockfile and policy
+    required: false
+    default: "."
 runs:
-  using: "composite"
+  using: composite
   steps:
-    - name: Run PkgDiet CI Gate
+    - name: Run PkgDiet
       shell: bash
-      run: npx -y pkgdiet@2.0.0 ci --env ${{ inputs.environment }}
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        args=(ci --env "${{ inputs.environment }}" --base "${{ inputs.base }}")
+        if [ -n "${{ inputs.fail-on }}" ]; then
+          args+=(--fail-on "${{ inputs.fail-on }}")
+        fi
+        if [ "${{ inputs.dry-run }}" = "true" ]; then
+          args+=(--dry-run)
+        fi
+        npx -y "pkgdiet@${{ inputs.version }}" "${args[@]}"

@@ -7,53 +7,53 @@ This document defines the internal architecture, package boundaries, data contra
 PkgDiet is built as a modular npm workspace. The architecture explicitly separates the evaluation engine from the interfaces that consume it.
 
 `	ext
-@pkgdiet/core (The Brain)
+@pkgdiet/core
     ↓
-@pkgdiet/mcp  (The Agent Interface)      → AI coding agents
+@pkgdiet/mcp       → AI coding agents
     ↓
-pkgdiet CLI   (The Developer Interface)  → developers, shell agents, CI
+pkgdiet CLI        → developers, shell agents, CI
 `
 
-This ensures we support multiple interfaces without duplicating the evaluation engine:
-
-`	ext
-Cursor / Claude / Windsurf / Cline
-              ↓
-       @pkgdiet/mcp
-              ↓
-       @pkgdiet/core
-              ↓
-CLI JSON fallback / CI / future adapters
-`
+- @pkgdiet/core owns **policy, health data, evaluation, cache, security signals, and alternatives**.
+- @pkgdiet/mcp owns **MCP transport, input validation, output normalization, and protocol safety**.
+- pkgdiet owns **terminal UX, files/configuration, prompts, CI orchestration, and agent setup**.
 
 ## 2. Package Boundary Rules
 
-To maintain a healthy monorepo as the codebase grows, these strict boundary rules must be followed:
-
-### @pkgdiet/core must not
-- Import Commander, Inquirer, or terminal formatting libraries.
-- Read agent-specific configuration files.
-- Depend on MCP transport code.
+### @pkgdiet/core must not:
+- Depend on Commander, Inquirer, VS Code APIs, or MCP SDK.
+- Read/write Cursor, Claude, Cline, or editor config.
 - Call process.exit().
-- Print to stdout.
-- Assume GitHub Actions.
-- Require a network request to evaluate a cached or injected package record.
+- Emit user-facing terminal logs.
+- Assume GitHub Actions exists.
+- Be coupled to a specific UI.
 
-### @pkgdiet/mcp must not
-- Reimplement health scoring.
-- Reimplement policy merging.
-- Read/write .cursor / CLAUDE.md files.
-- Call process.exit() after connecting.
-- Write non-protocol output to stdout.
+### @pkgdiet/mcp must:
+- Validate tool arguments.
+- Call core only.
+- Reserve stdout for MCP messages.
+- Return stable tool errors/results.
+- Never implement scoring or policy rules.
 
-### pkgdiet CLI may
-- Read project config.
-- Ask interactive questions.
-- Write agent config/rule files.
-- Run git operations.
-- Render tables and reports.
-- Choose process exit codes.
-- Invoke @pkgdiet/core and @pkgdiet/mcp.
+### pkgdiet CLI may:
+- Read/write project policy and agent configuration.
+- Render terminal output.
+- Prompt users.
+- Run git commands.
+- Decide exit codes.
+- Start the MCP process.
+- Generate CI artifacts.
+
+### packages/vscode must:
+- Render editor UX and invoke core through a narrow adapter.
+- Never duplicate policy/scoring logic.
+- Never change dependency files automatically without explicit user confirmation.
+
+### ction.yml must:
+- Remain a thin wrapper around the published CLI.
+- Avoid duplicating core logic.
+- Pin/accept a PkgDiet CLI version.
+- Document Node/runtime and fetch-depth requirements.
 
 ## 3. The Core Data Contract
 
@@ -70,9 +70,11 @@ export type RecommendedAction =
 
 export interface AlternativeRecommendation {
   name: string;
+  compatibility?: "high" | "medium" | "low" | "unknown";
+  reason?: string;
   size?: number;
   healthScore?: number;
-  note?: string;
+  migrationNotes?: string[];
 }
 
 export interface DependencyEvaluation {
@@ -85,6 +87,7 @@ export interface DependencyEvaluation {
   verdict: Verdict;
   healthScore: number | null;
   reasons: string[];
+  flags: string[];
 
   recommendation: {
     action: RecommendedAction;
@@ -114,23 +117,20 @@ export interface DependencyEvaluation {
   };
 
   alternatives: AlternativeRecommendation[];
-  flags: string[];
 }
 `
 
 ## 4. MCP Design and Transport Safety
 
-packages/mcp/src/index.ts is the MCP server entry point. It registers the server transport and tool definitions, which may be organized into dedicated modules as the tool surface grows.
-
 ### Schema Quality
-The MCP tools use explicit Zod/JSON Schema contracts designed to improve tool discoverability, validation, and quality evaluations such as Glama’s.
+The MCP tools use explicit Zod schemas, bounded inputs, structured errors, and stable result contracts designed for reliable MCP-client discovery and quality evaluation.
 
 ### Transport Safety
-The MCP process reserves stdout strictly for protocol messages. Non-protocol diagnostics are suppressed or routed safely so they cannot corrupt the stdio JSON-RPC stream.
+PkgDiet reserves stdout for MCP JSON-RPC messages. Non-protocol diagnostics are suppressed by default or routed to stderr, so normal logs cannot corrupt MCP responses.
 
 ## 5. CI Architecture and Edge Cases
 
-The CI gate runs entirely within the customer’s CI runner and requires no PkgDiet-hosted backend. It may query configured package registries for fresh metadata unless results are available in the local cache.
+The CI gate runs entirely within the customer’s CI runner and requires no PkgDiet-hosted backend.
 
 The CI implementation explicitly handles these edge cases:
 1. **No supported lockfile changed** → report no new dependencies; exit 0.
@@ -141,10 +141,8 @@ The CI implementation explicitly handles these edge cases:
 6. **Malformed or unsupported lockfile** → fail clearly in enforcing mode; report only in dry-run mode if policy allows.
 
 *Notes:*
+- The CLI returns a nonzero exit code according to the active ailOn policy (not always 1).
 - pkgdiet ci --dry-run must always exit 0.
-- ailOn determines whether warnings cause a nonzero exit.
-- CI respects --env ci.
-- GitHub Actions output avoids ANSI-only content when writing Markdown artifacts.
 
 ## 6. Test Layers
 
@@ -155,32 +153,10 @@ Given the multiple boundaries, the project requires layered testing:
 | **Core policy** | Unit | Deprecated package → BLOCK under default policy |
 | **Core security** | Unit | Missing corp-* package → BLOCK when prefix is configured |
 | **Health/cache** | Unit + mocked HTTP | TTL expires correctly |
-| **Lockfile parsers** | Fixtures | npm, pnpm, Yarn scoped packages and transitive dependencies |
+| **Lockfile parsers** | Fixtures | npm, pnpm, Yarn scoped packages |
 | **MCP schemas** | Contract | Empty package name → structured error |
 | **MCP transport** | Integration | initialize → 	ools/list → 	ools/call |
 | **CLI** | Integration | check moment, check --json, ci --dry-run |
-| **Agent setup** | Filesystem fixture | Existing MCP config is merged, backed up, and remains valid |
+| **Agent setup** | Filesystem fixture | Existing MCP config is merged correctly |
 | **Clean npm install**| End-to-end | 
 px -y pkgdiet@2.0.0 check moment in an empty directory |
-
-## 7. Future Ecosystem Architecture
-
-To prepare for non-npm ecosystems (like Python/PyPI) without rewriting the core engine, the internal architecture will eventually shift to support ecosystem adapters:
-
-`	ext
-@pkgdiet/core
-├── policy/
-├── evaluation/
-├── alternatives/
-└── ecosystems/
-    ├── npm/
-    │   ├── registry.ts
-    │   ├── health.ts
-    │   └── lockfiles/
-    └── pypi/             # future
-        ├── registry.ts
-        ├── health.ts
-        └── lockfiles/
-`
-
-In 2.0.0, the cosystem parameter defaults to "npm" to preserve compatibility while establishing the correct foundation for future growth.
