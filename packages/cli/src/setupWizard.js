@@ -1,66 +1,76 @@
 import fs from 'fs';
 import path from 'path';
-import prompts from 'prompts';
 
-export async function runSetupWizard(options = {}) {
-  console.log('\n🥗 Welcome to PkgDiet Setup!\n');
+export async function runSetupWizard() {
+  const prompts = (await import('prompts')).default;
 
-  const response = await prompts([
+  console.log('\n✅ Welcome to PkgDiet Setup Wizard\n');
+
+  const questions = [
     {
       type: 'select',
       name: 'orgType',
-      message: 'Are you configuring PkgDiet for an individual, team, or enterprise?',
+      message: 'How will you use PkgDiet?',
       choices: [
-        { title: 'Individual', value: 'individual', description: 'Simple defaults, no strict CI gates' },
-        { title: 'Team / Enterprise', value: 'team', description: 'Stricter checks in CI, environment overrides' }
+        { title: 'Individual Developer (CLI + Agent Guardrails)', value: 'individual' },
+        { title: 'Team / Enterprise (PR Gates + Central Policy)', value: 'team' }
       ]
     },
     {
       type: 'multiselect',
       name: 'agents',
-      message: 'Do you use any AI coding agents? (Space to select, Enter to confirm)',
+      message: 'Which AI agents do you use? (We will auto-configure MCP)',
       choices: [
         { title: 'Cursor', value: 'cursor' },
         { title: 'Windsurf', value: 'windsurf' },
-        { title: 'VS Code + Copilot', value: 'copilot' }
-      ],
-      hint: '- Space to select. Return to submit'
+        { title: 'Cline', value: 'cline' },
+        { title: 'GitHub Copilot', value: 'copilot' },
+        { title: 'Claude Desktop', value: 'claude-code' }
+      ]
     },
     {
-      type: 'confirm',
-      name: 'blockDeprecated',
-      message: 'Do you want to explicitly BLOCK any packages marked as deprecated on npm?',
-      initial: true
+      type: 'select',
+      name: 'strictness',
+      message: 'How strict should PkgDiet be about blocking bad packages?',
+      choices: [
+        { title: 'Strict (Block <60 health, block all deprecated)', value: 'strict' },
+        { title: 'Balanced (Block <40 health, warn on deprecated)', value: 'balanced' },
+        { title: 'Lenient (Warn only, never block)', value: 'lenient' }
+      ]
     }
-  ], {
-    onCancel: () => {
-      console.log('\nSetup cancelled.');
-      process.exit(0);
-    }
-  });
+  ];
 
-  // Generate Policy
+  const response = await prompts(questions);
+  if (!response.orgType) {
+    console.log('Setup aborted.');
+    return;
+  }
+
   const policy = {
+    policyVersion: 1,
     minHealthScore: 40,
     warnHealthScore: 60,
-    blockDeprecated: response.blockDeprecated,
-    securityMode: 'fail-open',
+    blockDeprecated: true,
+    securityMode: 'fail-closed',
     internalNamePrefixes: [],
+    environments: {},
     blockedPackages: [],
-    telemetry: true,
-    policyVersion: 1
+    telemetry: true
   };
 
+  if (response.strictness === 'strict') {
+    policy.minHealthScore = 60;
+    policy.warnHealthScore = 80;
+  } else if (response.strictness === 'lenient') {
+    policy.minHealthScore = 0;
+    policy.warnHealthScore = 40;
+    policy.blockDeprecated = false;
+  }
+
   if (response.orgType === 'team') {
-    policy.environments = {
-      ci: {
-        minHealthScore: 50,
-        failOn: 'BLOCK'
-      },
-      dev: {
-        minHealthScore: 30,
-        failOn: 'WARN'
-      }
+    policy.environments.ci = {
+      minHealthScore: policy.minHealthScore + 10,
+      failOn: response.strictness === 'lenient' ? 'WARN' : 'BLOCK'
     };
   }
 
@@ -69,24 +79,22 @@ export async function runSetupWizard(options = {}) {
   
   console.log('\n✅ PkgDiet is configured for your workflow.');
   if (response.orgType === 'team') {
-    console.log('   - CI policy: minHealthScore 50, failOn BLOCK');
+    console.log(`   - CI policy: minHealthScore ${policy.environments.ci.minHealthScore}, failOn ${policy.environments.ci.failOn}`);
   } else {
-    console.log('   - Default policy: minHealthScore 40');
+    console.log(`   - Default policy: minHealthScore ${policy.minHealthScore}`);
   }
-  console.log(   - Deprecated packages: );
+  console.log(`   - Deprecated packages: ${policy.blockDeprecated ? 'Blocked' : 'Allowed'}`);
 
-  // Setup Agents
   if (response.agents && response.agents.length > 0) {
     const { setupAgents } = await import('./agentSetup.js');
     await setupAgents(response.agents, process.cwd());
-    console.log(   - AI agents:  enabled);
+    console.log(`   - AI agents: ${response.agents.join(', ')} enabled`);
   } else {
     console.log('   - AI agents: None configured');
   }
 
   console.log('\nNext steps:');
-  console.log('  - Run 
-px pkgdiet check <package> to evaluate deps manually.');
+  console.log('  - Run `npx pkgdiet check <package>` to evaluate deps manually.');
   if (response.orgType === 'team') {
     console.log('  - Install the PkgDiet GitHub App at: https://github.com/apps/pkgdiet');
   }
