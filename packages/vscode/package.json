@@ -1,34 +1,74 @@
 {
-  "name": "pkgdiet-vscode",
+  "name": "pkgdiet",
   "displayName": "PkgDiet",
-  "description": "Local-first dependency gate. Hovers over package.json to show npm package health, sizes, and policy warnings.",
+  "description": "Dependency health, policy, and alternatives for package.json.",
   "version": "2.0.0",
   "publisher": "om-tajne",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/om-tajne/pkgdiet.git"
+  },
   "engines": {
     "vscode": "^1.90.0"
   },
   "categories": [
     "Linters",
-    "Security",
-    "Other"
+    "Other",
+    "Extension Packs"
   ],
-  "activationEvents": [
-    "onLanguage:json"
+  "keywords": [
+    "npm",
+    "dependencies",
+    "security",
+    "mcp",
+    "ai",
+    "package.json",
+    "supply chain"
   ],
   "main": "./dist/extension.js",
+  "activationEvents": [
+    "onLanguage:json",
+    "onCommand:pkgdiet.checkDependency",
+    "workspaceContains:package.json"
+  ],
   "contributes": {
     "commands": [
       {
-        "command": "pkgdiet.audit",
-        "title": "PkgDiet: Audit Project Dependencies"
+        "command": "pkgdiet.checkDependency",
+        "title": "PkgDiet: Check Dependency"
+      },
+      {
+        "command": "pkgdiet.auditProject",
+        "title": "PkgDiet: Audit Project"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "PkgDiet",
+      "properties": {
+        "pkgdiet.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable PkgDiet dependency diagnostics."
+        },
+        "pkgdiet.checkOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Check modified dependencies after saving package.json."
+        },
+        "pkgdiet.networkChecks": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow PkgDiet to query npm registry metadata."
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
     "watch": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --watch",
-    "build": "tsc -b"
+    "build": "npm run compile"
   },
   "dependencies": {
     "@pkgdiet/core": "^2.0.0"
