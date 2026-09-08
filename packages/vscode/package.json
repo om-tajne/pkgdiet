@@ -3,6 +3,7 @@
   "displayName": "PkgDiet",
   "description": "Dependency health, policy, and alternatives for package.json.",
   "version": "2.0.0",
+  "private": true,
   "publisher": "om-tajne",
   "license": "MIT",
   "repository": {
