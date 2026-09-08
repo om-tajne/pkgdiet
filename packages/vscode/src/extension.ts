@@ -2,7 +2,11 @@
 import * as vscode from 'vscode';
 import { checkPackage } from '@pkgdiet/core/dist/checker.js';
 import { loadPolicy } from '@pkgdiet/core/dist/policy.js';
+import { injectAlternatives } from '@pkgdiet/core/dist/alternatives.js';
 import path from 'path';
+// Bundle alternatives statically via esbuild
+import alternativesData from '@pkgdiet/core/data/alternatives.json';
+injectAlternatives(alternativesData);
 
 export function activate(context: vscode.ExtensionContext) {
     const hoverProvider = vscode.languages.registerHoverProvider({ language: 'json', pattern: '**/package.json' }, {
@@ -49,3 +53,5 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(hoverProvider);
 }
 export function deactivate() {}
+
+
