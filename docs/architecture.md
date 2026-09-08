@@ -123,7 +123,7 @@ export interface DependencyEvaluation {
 ## 4. MCP Design and Transport Safety
 
 ### Schema Quality
-The MCP tools use explicit Zod schemas, bounded inputs, structured errors, and stable result contracts designed for reliable MCP-client discovery and quality evaluation.
+The MCP tools use explicit Zod schemas, bounded inputs, structured errors, and stable result contracts. The precision of these schemas—enforcing specific string enums and array limits—is exactly why Glama awarded it an AAA rating.
 
 ### Transport Safety
 PkgDiet reserves stdout for MCP JSON-RPC messages. Non-protocol diagnostics are suppressed by default or routed to stderr, so normal logs cannot corrupt MCP responses.
@@ -160,3 +160,4 @@ Given the multiple boundaries, the project requires layered testing:
 | **Agent setup** | Filesystem fixture | Existing MCP config is merged correctly |
 | **Clean npm install**| End-to-end | 
 px -y pkgdiet@2.0.0 check moment in an empty directory |
+
