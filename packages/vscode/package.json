@@ -7,7 +7,11 @@
   "engines": {
     "vscode": "^1.90.0"
   },
-  "categories": ["Linters", "Security", "Other"],
+  "categories": [
+    "Linters",
+    "Security",
+    "Other"
+  ],
   "activationEvents": [
     "onLanguage:json"
   ],
@@ -22,8 +26,8 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -b",
-    "watch": "tsc -b -w",
+    "compile": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
+    "watch": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --watch",
     "build": "tsc -b"
   },
   "dependencies": {
@@ -31,6 +35,7 @@
   },
   "devDependencies": {
     "@types/vscode": "^1.90.0",
+    "esbuild": "^0.28.2",
     "typescript": "^5.0.0"
   }
 }
