@@ -281,7 +281,7 @@ export function renderReport(results, options = {}) {
         output.push(`  ${chalk.green('All good!')} No actions needed.`);
     }
     output.push('');
-    output.push(chalk.gray('  🥗 Secured by PkgDiet · npx pkgdiet setup to enable AI guardrails · pkgdiet.dev'));
+    output.push(chalk.gray('  🥗 Secured by PkgDiet · npx pkgdiet setup to enable AI guardrails · github.com/om-tajne/pkgdiet'));
     return output.join('\n');
 }
 /**

@@ -133,7 +133,7 @@ export async function setupAgents(agents, cwd, options = {}) {
     else if (agent === 'claude-desktop') {
       const isWin = process.platform === 'win32';
       const isMac = process.platform === 'darwin';
-      const homedir = require('os').homedir();
+      const homedir = (await import('os')).default.homedir();
       let configPath = '';
       if (isWin) {
         configPath = path.join(process.env.APPDATA || path.join(homedir, 'AppData', 'Roaming'), 'Claude', 'claude_desktop_config.json');
@@ -166,3 +166,4 @@ export async function setupAgents(agents, cwd, options = {}) {
     }
   }
 }
+
