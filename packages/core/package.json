@@ -29,7 +29,23 @@
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9"
+  },
+  "description": "A local-first dependency gate and MCP server for checking npm package health and alternatives.",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "model context protocol",
+    "dependencies",
+    "security",
+    "npm",
+    "health"
+  ],
+  "homepage": "https://github.com/om-tajne/pkgdiet#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/om-tajne/pkgdiet.git"
+  },
+  "bugs": {
+    "url": "https://github.com/om-tajne/pkgdiet/issues"
   }
 }
-
-
