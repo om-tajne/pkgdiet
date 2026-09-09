@@ -6,7 +6,9 @@
 
   <p>> 🏆 **AAA-rated on Glama** — PkgDiet provides schema-first MCP tools for dependency checks, policy awareness, and safer package alternatives. [View the MCP score](https://glama.ai/mcp/servers/om-tajne/pkgdiet/score).</p>
 
-Check npm packages before you recommend or install them. Apply local policy, identify deprecated or unnecessarily heavy dependencies, and get safer alternatives—without an account or hosted service.
+Check npm packages before you recommend or install them. Apply local policy, identify deprecated or unnecessarily heavy dependencies, and get safer alternatives-without an account or hosted service.
+
+> **📖 Deep Dive:** Read the definitive [Architecture Masterclass (ARCHITECTURE.md)](docs/ARCHITECTURE.md) to see exactly how PkgDiet intercepts AI agents, scores packages, and enforces CI/CD gates.
 </div>
 
 ---
