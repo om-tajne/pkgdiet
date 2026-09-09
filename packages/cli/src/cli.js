@@ -6,7 +6,8 @@
  */
 
 import { Command } from 'commander';
-import { run } from '@pkgdiet/core';
+import { run } from '@pkgdiet/core/dist/index.js';
+import { renderReport, renderPackageCheck, renderError, renderJson } from './reporter.js';
 import chalk from 'chalk';
 
 
@@ -714,6 +715,9 @@ if (
 }
 
 program.parse();
+
+
+
 
 
 

@@ -1,4 +1,11 @@
 /**
+ * Inject an alternatives database.
+ * Used by the VS Code extension to bundle the JSON at build time.
+ *
+ * @param {Record<string, any>} db
+ */
+export function injectAlternatives(db: Record<string, any>): void;
+/**
  * Get a single package's alternative entry.
  * Returns a standardised shape with a `replacements` string[] shortcut.
  *

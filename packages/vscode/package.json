@@ -36,33 +36,56 @@
   "contributes": {
     "commands": [
       {
-        "command": "pkgdiet.checkDependency",
-        "title": "PkgDiet: Check Dependency"
+        "title": "PkgDiet: Check Dependency",
+        "category": "PkgDiet",
+        "command": "pkgdiet.checkDependency"
       },
       {
-        "command": "pkgdiet.auditProject",
-        "title": "PkgDiet: Audit Project"
+        "title": "PkgDiet: Audit Project",
+        "category": "PkgDiet",
+        "command": "pkgdiet.auditProject"
+      },
+      {
+        "title": "PkgDiet: Open Policy File",
+        "category": "PkgDiet",
+        "command": "pkgdiet.openPolicy"
       }
     ],
     "configuration": {
-      "title": "PkgDiet",
       "properties": {
-        "pkgdiet.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable PkgDiet dependency diagnostics."
-        },
         "pkgdiet.checkOnSave": {
           "type": "boolean",
+          "default": true,
+          "description": "Automatically check modified dependencies after saving package.json."
+        },
+        "pkgdiet.environment": {
+          "type": "string",
+          "default": "dev",
+          "enum": [
+            "ci",
+            "dev",
+            "prod",
+            "staging"
+          ],
+          "description": "Policy environment to apply for dependency checks."
+        },
+        "pkgdiet.verbose": {
+          "type": "boolean",
           "default": false,
-          "description": "Check modified dependencies after saving package.json."
+          "description": "Show detailed diagnostic information in the Output panel."
         },
         "pkgdiet.networkChecks": {
           "type": "boolean",
           "default": true,
-          "description": "Allow PkgDiet to query npm registry metadata."
+          "description": "Allow PkgDiet to query npm registry metadata for health scores and size estimates."
+        },
+        "pkgdiet.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable PkgDiet dependency diagnostics in package.json."
         }
-      }
+      },
+      "title": "PkgDiet"
     }
   },
   "scripts": {

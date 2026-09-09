@@ -1,29 +1,55 @@
-name: PkgDiet Dependency Gate
-description: Evaluate newly introduced npm dependencies against PkgDiet policy.
+name: 'PkgDiet CI Gate'
+description: |
+  Enforce dependency safety policy in CI/CD pipelines.
+  Blocks PRs with deprecated, unhealthy, or policy-violating dependencies.
+  AI agents follow the same rules locally via MCP.
+
 inputs:
   base:
-    description: Base Git reference or SHA to compare against
+    description: |
+      The Git commit SHA or ref to compare against.
+      Typically 'HEAD~1' for PRs or the main branch ref.
+      Required for dependency diff analysis.
     required: true
+
   environment:
-    description: PkgDiet environment policy overlay
+    description: |
+      The policy environment to apply.
+      Common values: 'ci', 'dev', 'prod', 'staging'.
+      Defaults to 'ci' for strictest enforcement.
     required: false
-    default: ci
+    default: 'ci'
+
   fail-on:
-    description: Override policy failure behavior: BLOCK, WARN, or NONE
+    description: |
+      Override the default failure threshold.
+      Values: 'BLOCK' (default) or 'WARN'.
+      Set to 'WARN' to fail PRs even on warnings.
     required: false
-    default: ""
+    default: 'BLOCK'
+
   dry-run:
-    description: Print results without failing the workflow
+    description: |
+      Print results without failing the workflow.
+      Useful for testing policy changes or gradual rollout.
+      Values: 'true' or 'false'.
     required: false
-    default: "false"
-  version:
-    description: PkgDiet CLI version to run
-    required: false
-    default: "2.0.0"
+    default: 'false'
+
   working-directory:
-    description: Project directory containing the lockfile and policy
+    description: |
+      The subdirectory containing package.json and lockfiles.
+      Use for monorepos or nested projects.
     required: false
-    default: "."
+    default: '.'
+
+  version:
+    description: |
+      PkgDiet version to use (e.g., '2.0.0' or 'latest').
+      Defaults to the latest stable release.
+    required: false
+    default: 'latest'
+
 runs:
   using: composite
   steps:
@@ -32,7 +58,7 @@ runs:
       working-directory: ${{ inputs.working-directory }}
       run: |
         args=(ci --env "${{ inputs.environment }}" --base "${{ inputs.base }}")
-        if [ -n "${{ inputs.fail-on }}" ]; then
+        if [ "${{ inputs.fail-on }}" != "BLOCK" ]; then
           args+=(--fail-on "${{ inputs.fail-on }}")
         fi
         if [ "${{ inputs.dry-run }}" = "true" ]; then

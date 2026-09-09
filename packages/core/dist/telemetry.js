@@ -17,8 +17,10 @@ export function showFirstRunNoticeIfNeeded(projectPath, policy) {
         return;
     const metricsPath = getMetricsPath(projectPath);
     if (!existsSync(metricsPath) && !hasShownFirstRunNotice) {
-        console.log('\n[PkgDiet] Notice: PkgDiet collects anonymous local usage metrics to show you this tool\'s impact.');
-        console.log('          Disable this by setting PKGDIET_TELEMETRY_DISABLED=1 or "telemetry": false in your config.\n');
+        if (process.env.PKGDIET_MCP_MODE !== '1') {
+            console.error('\n[PkgDiet] Notice: PkgDiet collects anonymous local usage metrics to show you this tool\'s impact.');
+            console.error('          Disable this by setting PKGDIET_TELEMETRY_DISABLED=1 or "telemetry": false in your config.\n');
+        }
         hasShownFirstRunNotice = true;
         // Initialize the file
         saveMetrics(projectPath, {

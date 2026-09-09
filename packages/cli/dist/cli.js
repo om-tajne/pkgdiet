@@ -5,6 +5,7 @@
  */
 import { Command } from 'commander';
 import { run } from '@pkgdiet/core';
+import chalk from 'chalk';
 const program = new Command();
 program
     .name('pkgdiet')
@@ -50,50 +51,86 @@ program
 });
 // ─── check ────────────────────────────────────────────────────────────────────
 program
-    .command('check <package>')
-    .description('Instantly check a single package for health, size, and policy compliance')
+    .command('check <packages...>')
+    .description('Instantly check one or more packages for health, size, and policy compliance')
     .option('-p, --path <path>', 'Path to project policy (default: .)', '.')
     .option('--json', 'Output machine-readable JSON')
     .option('--env <name>', 'Apply environment policy overlay (e.g. ci, dev, prod)')
-    .action(async (pkgName, options) => {
+    .action(async (packages, options) => {
     const { checkPackage } = await import('@pkgdiet/core/dist/checker.js');
     const { loadPolicy, applyEnvironment } = await import('@pkgdiet/core/dist/policy.js');
     let policy = loadPolicy(options.path);
     if (options.env)
         policy = applyEnvironment(policy, options.env);
-    const result = await checkPackage(pkgName, options.path, { policy });
-    if (options.json) {
-        console.log(JSON.stringify(result, null, 2));
+    const isBatch = packages.length > 1;
+    if (isBatch) {
+        // ─── Batch mode: compact table ────────────────────────────
+        const results = await Promise.all(packages.map(pkgName => checkPackage(pkgName, options.path, { policy })));
+        if (options.json) {
+            console.log(JSON.stringify(results, null, 2));
+        }
+        else {
+            const col = (s, w) => String(s).padEnd(w).slice(0, w);
+            console.log('');
+            console.log(chalk.bold(`  ${'Package'.padEnd(28)} ${'Score'.padEnd(8)} ${'Verdict'.padEnd(10)} Notes`));
+            console.log(chalk.gray(`  ${'─'.repeat(70)}`));
+            for (const r of results) {
+                const icon = r.verdict === 'BLOCK' ? '🔴' : r.verdict === 'WARN' ? '🟡' : '🟢';
+                const cert = r.certified ? ' ✨' : '';
+                const altNames = (r.alternatives || [])
+                    .map(a => typeof a === 'string' ? a : (a.replacement || a.name))
+                    .filter(Boolean).slice(0, 2).join(', ');
+                const note = altNames ? `→ ${altNames}` : (r.reasons[0] || '');
+                console.log(`  ${icon} ${col(r.name + cert, 26)} ${col(r.healthScore !== null ? r.healthScore + '/100' : 'N/A', 8)} ${col(r.verdict, 10)} ${chalk.gray(note.slice(0, 48))}`);
+            }
+            console.log('');
+            console.log(chalk.gray('  🥗 Secured by PkgDiet · npx pkgdiet setup · github.com/om-tajne/pkgdiet'));
+            console.log('');
+        }
+        const hasBlock = results.some(r => r.verdict === 'BLOCK');
+        if (hasBlock)
+            process.exit(1);
     }
     else {
-        const icon = result.verdict === 'BLOCK' ? '🔴' : result.verdict === 'WARN' ? '🟡' : '🟢';
-        console.log(`\n${icon} ${pkgName}`);
-        console.log(`  Health:      ${result.healthScore !== null ? result.healthScore + '/100' : 'N/A'}`);
-        console.log(`  Verdict:     ${result.verdict}`);
-        console.log(`  Reasons:     ${result.reasons.join('; ')}`);
-        console.log(`  Added Size:  ${result.costEstimate?.addedSizeMB ?? '?'}MB`);
-        console.log(`  Cost Impact: $${result.costEstimate?.monthlyCiCost100Builds?.toFixed(3) ?? '?'}/mo CI`);
-        if (result.alternatives && result.alternatives.length > 0) {
-            const alts = result.alternatives
-                .map(a => typeof a === 'string' ? a : (a.replacement || a.name))
-                .filter(Boolean)
-                .join(', ');
-            console.log(`  Alternatives: ${alts}`);
+        // ─── Single mode: detailed output ─────────────────────────
+        const pkgName = packages[0];
+        const result = await checkPackage(pkgName, options.path, { policy });
+        if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
         }
-        // 💡 Fix suggestions
-        const fixSuggestion = buildFixSuggestion(pkgName, result);
-        if (fixSuggestion)
-            console.log(`  💡 Fix: ${fixSuggestion}`);
-        console.log('');
+        else {
+            const icon = result.verdict === 'BLOCK' ? '🔴' : result.verdict === 'WARN' ? '🟡' : '🟢';
+            const certBadge = result.certified ? ' ✨ PkgDiet Certified' : '';
+            console.log(`\n${icon} ${pkgName}${chalk.green(certBadge)}`);
+            console.log(`  Health:      ${result.healthScore !== null ? result.healthScore + '/100' : 'N/A'}`);
+            console.log(`  Verdict:     ${result.verdict}`);
+            console.log(`  Reasons:     ${result.reasons.join('; ')}`);
+            console.log(`  Added Size:  ${result.costEstimate?.addedSizeMB ?? '?'}MB`);
+            console.log(`  Cost Impact: $${result.costEstimate?.monthlyCiCost100Builds?.toFixed(3) ?? '?'}/mo CI`);
+            if (result.alternatives && result.alternatives.length > 0) {
+                const alts = result.alternatives
+                    .map(a => typeof a === 'string' ? a : (a.replacement || a.name))
+                    .filter(Boolean)
+                    .join(', ');
+                console.log(`  Alternatives: ${alts}`);
+            }
+            const fixSuggestion = buildFixSuggestion(pkgName, result);
+            if (fixSuggestion)
+                console.log(`  💡 Fix: ${fixSuggestion}`);
+            console.log('');
+            console.log(chalk.gray('  🥗 Secured by PkgDiet · npx pkgdiet setup · github.com/om-tajne/pkgdiet'));
+            console.log('');
+        }
+        if (result.verdict === 'BLOCK')
+            process.exit(1);
     }
-    if (result.verdict === 'BLOCK')
-        process.exit(1);
 });
 // ─── mcp ──────────────────────────────────────────────────────────────────────
 program
     .command('mcp [args...]')
     .description('Start the MCP JSON-RPC Server over stdio')
     .action(async () => {
+    process.env.PKGDIET_MCP_MODE = '1';
     const { startMcpServer } = await import('@pkgdiet/mcp');
     await startMcpServer();
 });
@@ -154,6 +191,50 @@ program
         process.exit(1);
     }
 });
+// ─── alternatives ─────────────────────────────────────────────────────────────
+const altsCmd = program
+    .command('alternatives')
+    .description('Browse the PkgDiet alternatives dataset');
+altsCmd
+    .command('list')
+    .description('List all available package alternatives')
+    .option('--category <type>', 'Filter by category (bloat, deprecated, unnecessary, security)')
+    .action(async (options) => {
+    const { getAllAlternatives } = await import('@pkgdiet/core/dist/alternatives.js');
+    const db = getAllAlternatives();
+    const entries = Object.entries(db).filter(([, v]) => !options.category || v.category === options.category);
+    console.log(`\n🥗 PkgDiet Alternatives (${entries.length} packages)\n`);
+    const col = (s, w) => String(s).padEnd(w).slice(0, w);
+    console.log(chalk.bold(`  ${'Package'.padEnd(24)} ${'→ Alternatives'.padEnd(28)} Category`));
+    console.log(chalk.gray(`  ${'─'.repeat(70)}`));
+    for (const [pkg, data] of entries.sort(([a], [b]) => a.localeCompare(b))) {
+        const alts = (data.alternatives || []).map(a => a.name).slice(0, 2).join(', ');
+        console.log(`  ${col(pkg, 24)} ${col(alts, 28)} ${chalk.gray(data.category || 'optimization')}`);
+    }
+    console.log('');
+    console.log(chalk.gray('  🥗 Secured by PkgDiet · github.com/om-tajne/pkgdiet'));
+    console.log('');
+});
+altsCmd
+    .command('search <package>')
+    .description('Find alternatives for a specific package')
+    .action(async (pkgName) => {
+    const { getAlternatives } = await import('@pkgdiet/core/dist/alternatives.js');
+    const result = getAlternatives(pkgName);
+    if (!result) {
+        console.log(`\n❌ No alternatives found for "${pkgName}" in the dataset.`);
+        console.log(`   💡 Consider contributing at: https://github.com/om-tajne/pkgdiet\n`);
+        return;
+    }
+    console.log(`\n💡 Alternatives for ${chalk.bold(pkgName)}\n`);
+    console.log(`  Reason: ${result.reason}`);
+    console.log(`  Category: ${result.category}\n`);
+    for (const alt of result.details) {
+        console.log(`  → ${chalk.green(alt.name)}${alt.note ? chalk.gray(' — ' + alt.note) : ''}`);
+    }
+    console.log(`\n  Quick switch: ${chalk.cyan(`npm uninstall ${pkgName} && npm install ${result.replacements[0]}`)}`);
+    console.log('');
+});
 // ─── drift ────────────────────────────────────────────────────────────────────
 program
     .command('drift')
@@ -173,32 +254,120 @@ program
         process.exit(1);
     }
 });
+// ─── setup & agent-setup ────────────────────────────────────────────────────────
+program
+    .command('setup')
+    .description('Interactive setup wizard to configure PkgDiet policies and AI agents')
+    .action(async () => {
+    process.env.PKGDIET_MCP_MODE = '1';
+    const { runSetupWizard } = await import('./setupWizard.js');
+    await runSetupWizard();
+});
+program
+    .command('agent-setup')
+    .description('Configure PkgDiet for AI coding agents (Cursor, Windsurf, Cline, Copilot, etc.)')
+    .option('-a, --agent <agents...>', 'Agents to configure (cursor, claude-code, claude-desktop, cline, windsurf, copilot, antigravity)')
+    .option('--detect', 'Detect and configure agents used in this project')
+    .option('--all', 'Configure all supported agents')
+    .option('--dry-run', 'Show what would be modified without making changes')
+    .option('--remove', 'Remove PkgDiet configuration from agents')
+    .action(async (options) => {
+    const { setupAgents, SUPPORTED_AGENTS } = await import('./agentSetup.js');
+    let agents = [];
+    if (options.all || options.detect) {
+        agents = SUPPORTED_AGENTS;
+    }
+    else if (options.agent && options.agent.length > 0) {
+        agents = options.agent;
+    }
+    else {
+        const prompts = (await import('prompts')).default;
+        const response = await prompts({
+            type: 'multiselect',
+            name: 'agents',
+            message: 'Select AI agents to configure:',
+            choices: SUPPORTED_AGENTS.map(a => ({ title: a, value: a }))
+        });
+        agents = response.agents || [];
+    }
+    if (agents.length === 0) {
+        console.log('No agents selected. Exiting.');
+        return;
+    }
+    await setupAgents(agents, process.cwd(), {
+        dryRun: options.dryRun,
+        detect: options.detect,
+        remove: options.remove
+    });
+});
 // ─── init ─────────────────────────────────────────────────────────────────────
 program
     .command('init')
     .description('Initialize PkgDiet policy and CI actions')
     .option('-f, --force', 'Overwrite existing config and workflow files')
+    .option('-i, --interactive', 'Run interactive setup wizard to generate custom config')
+    .option('-t, --template <name>', 'Policy template: strict, balanced, or lenient', 'balanced')
     .action(async (options) => {
     const fs = await import('fs');
     const path = await import('path');
-    if (options.force || !fs.existsSync('.pkgdietrc.json')) {
-        fs.writeFileSync('.pkgdietrc.json', JSON.stringify({
-            minHealthScore: 40,
-            warnHealthScore: 60,
-            securityMode: 'fail-open',
-            internalNamePrefixes: [],
-            environments: {
-                ci: { minHealthScore: 50, failOn: 'BLOCK' },
-                dev: { minHealthScore: 30, failOn: 'WARN' }
-            },
-            blockedPackages: [],
-            telemetry: true,
-            policyVersion: 1,
-        }, null, 2));
-        console.log('✅ Created .pkgdietrc.json');
+    if (options.interactive) {
+        const { runSetupWizard } = await import('./setupWizard.js');
+        await runSetupWizard();
     }
     else {
-        console.log('⏭️  .pkgdietrc.json already exists, skipping. Use --force to overwrite.');
+        if (options.force || !fs.existsSync('.pkgdietrc.json')) {
+            // Template presets
+            const templates = {
+                strict: {
+                    minHealthScore: 60,
+                    warnHealthScore: 80,
+                    blockDeprecated: true,
+                    securityMode: 'fail-closed',
+                    internalNamePrefixes: [],
+                    environments: {
+                        ci: { minHealthScore: 70, failOn: 'BLOCK' },
+                        dev: { minHealthScore: 40, failOn: 'WARN' }
+                    },
+                    blockedPackages: [],
+                    telemetry: true,
+                    policyVersion: 1,
+                },
+                balanced: {
+                    minHealthScore: 40,
+                    warnHealthScore: 60,
+                    blockDeprecated: true,
+                    securityMode: 'fail-open',
+                    internalNamePrefixes: [],
+                    environments: {
+                        ci: { minHealthScore: 50, failOn: 'BLOCK' },
+                        dev: { minHealthScore: 30, failOn: 'WARN' }
+                    },
+                    blockedPackages: [],
+                    telemetry: true,
+                    policyVersion: 1,
+                },
+                lenient: {
+                    minHealthScore: 20,
+                    warnHealthScore: 40,
+                    blockDeprecated: false,
+                    securityMode: 'fail-open',
+                    internalNamePrefixes: [],
+                    environments: {},
+                    blockedPackages: [],
+                    telemetry: true,
+                    policyVersion: 1,
+                },
+            };
+            const chosen = templates[options.template] || templates.balanced;
+            if (!templates[options.template]) {
+                console.log(`⚠️  Unknown template "${options.template}". Using "balanced".`);
+            }
+            fs.writeFileSync('.pkgdietrc.json', JSON.stringify(chosen, null, 2));
+            console.log(`✅ Created .pkgdietrc.json (template: ${options.template || 'balanced'})`);
+        }
+        else {
+            console.log('⏭️  .pkgdietrc.json already exists, skipping. Use --force to overwrite.');
+        }
     }
     const githubDir = '.github/workflows';
     if (!fs.existsSync(githubDir)) {
@@ -323,6 +492,7 @@ program
     .command('mcp-install')
     .description('Automatically configure PkgDiet as an MCP server for Claude Desktop')
     .action(async () => {
+    process.env.PKGDIET_MCP_MODE = '1';
     const fs = await import('fs');
     const path = await import('path');
     const os = await import('os');
@@ -470,7 +640,7 @@ function buildFixSuggestion(pkgName, result) {
 // ─── Default: audit if no command given ───────────────────────────────────────
 const knownCommands = [
     'audit', 'check', 'mcp', 'drift', 'init', 'mcp-install',
-    'ci', 'policy-check', 'cache',
+    'ci', 'policy-check', 'cache', 'alternatives', 'setup', 'agent-setup',
 ];
 if (process.argv.length === 2 ||
     (process.argv.length > 2 && !knownCommands.includes(process.argv[2]))) {
