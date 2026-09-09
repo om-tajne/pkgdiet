@@ -120,55 +120,61 @@ export async function startMcpServer() {
             };
         }
     });
-    server.tool("suggest_alternative", "Return ranked npm package alternatives for a package that is deprecated, too large, unhealthy, or disallowed by the active PkgDiet policy. Call this only after check_dependency returns WARN or BLOCK, or when the user explicitly asks for replacement options. Do not assume alternatives are drop-in replacements; review compatibility and migrationNotes before proposing one.", {
-        packageName: z.string().min(1).describe("The npm package to replace, for example 'moment' or 'request'."),
-        reason: z.enum(["deprecated", "size", "health", "security", "policy", "all"]).default("all").describe("Why an alternative is needed. Use 'all' when unknown."),
-        runtime: z.enum(["node", "browser", "edge", "universal"]).optional().describe("Target runtime, used to avoid unsuitable recommendations."),
-        maxResults: z.number().int().min(1).max(5).default(3).describe("Maximum number of ranked recommendations to return.")
+    server.tool("suggest_alternative", "Use this read-only tool after check_dependency returns WARN or BLOCK, or when a developer asks for a replacement for an npm package. It returns up to maxResults curated candidate packages with reasons, compatibility notes, category, and size guidance. It does not install packages, edit files, or guarantee security; verify each candidate with check_dependency before recommending or installing it.", {
+        packageName: z.string().min(1).max(214).regex(/^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/).describe("The npm package to replace, such as 'moment', 'request', or '@org/package'."),
+        reason: z.enum(["deprecated", "security", "health", "size", "policy", "compatibility", "all"]).default("all").describe("Primary reason for replacement. Use 'all' when the reason is unknown or when ranking should consider every available signal."),
+        maxResults: z.number().int().min(1).max(5).default(3).describe("Maximum number of candidates to return. Use 3 for normal requests; use 1 when selecting a single preferred candidate."),
+        runtime: z.enum(["node", "browser", "edge", "universal"]).default("node").describe("Runtime where the replacement will be used. This helps avoid candidates that do not support the target environment."),
+        includeMigrationNotes: z.boolean().default(true).describe("Include API compatibility and migration guidance for each candidate.")
     }, async (args) => {
         try {
             if (!args.packageName) {
                 return {
                     isError: true,
-                    content: [{ type: "text", text: JSON.stringify({ code: "INVALID_INPUT", message: "packageName must not be empty" }) }],
+                    content: [{ type: "text", text: JSON.stringify({ error: { code: "INVALID_PACKAGE_NAME", message: "packageName must be a valid npm package name." } }, null, 2) }],
                 };
             }
             const altData = getAlternatives(args.packageName);
-            if (!altData) {
+            if (!altData || !altData.details || altData.details.length === 0) {
                 return {
                     content: [
                         {
                             type: "text",
                             text: JSON.stringify({
                                 packageName: args.packageName,
-                                verdict: "WARN",
-                                recommendedAction: "PROCEED",
+                                reason: args.reason,
+                                runtime: args.runtime,
                                 recommendations: [],
-                                limitations: ["No known alternatives for this package in the PkgDiet dataset."]
+                                count: 0,
+                                message: "No curated alternative was found. Use check_dependency on vetted candidates before installation."
                             }, null, 2),
                         }
                     ]
                 };
             }
             const limit = args.maxResults || 3;
-            const recommendations = (altData.details || []).slice(0, limit).map((a, index) => ({
-                name: a.name || a.replacement,
-                rank: index + 1,
-                reason: altData.reason || "Lighter or more modern alternative.",
-                compatibility: "medium",
-                healthScore: a.healthScore || 90,
-                estimatedSizeBytes: a.size || 204800,
-                migrationNotes: a.note ? [a.note] : ["Review API changes before migrating.", "API may not be a 1-to-1 drop-in."]
-            }));
+            const recommendations = altData.details.slice(0, limit).map((a, index) => {
+                const rec = {
+                    name: a.name || a.replacement,
+                    rank: index + 1,
+                    reason: altData.reason || "Lighter or more modern alternative.",
+                    compatibility: a.compatibility || "Mostly compatible; verify plugin usage.",
+                    sizeGuidance: "curated estimate; verify with check_dependency.",
+                    confidence: "curated",
+                    nextStep: `Call check_dependency for ${a.name || a.replacement} before installation.`
+                };
+                if (args.includeMigrationNotes) {
+                    rec.migration = a.note || "Review API changes before migrating.";
+                }
+                return rec;
+            });
             const result = {
                 packageName: args.packageName,
-                verdict: "BLOCK", // Generic mapped assumption that if asking for alt, it's blocked or warned heavily.
-                recommendedAction: "REPLACE",
+                reason: args.reason,
+                runtime: args.runtime,
                 recommendations,
-                limitations: [
-                    "PkgDiet recommendations are guidance, not a guarantee of API compatibility.",
-                    "Test the replacement in your application before removing the original package."
-                ]
+                count: recommendations.length,
+                message: "Recommendations are candidates, not installation instructions."
             };
             return {
                 content: [
@@ -185,7 +191,7 @@ export async function startMcpServer() {
                 content: [
                     {
                         type: "text",
-                        text: JSON.stringify({ code: "SUGGEST_FAILED", message: err instanceof Error ? err.message : String(err) }, null, 2),
+                        text: JSON.stringify({ error: { code: "SUGGEST_FAILED", message: err instanceof Error ? err.message : String(err) } }, null, 2),
                     },
                 ],
             };
