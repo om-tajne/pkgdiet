@@ -13,15 +13,15 @@ export async function startMcpServer() {
 
   server.tool(
     "check_dependency",
-    "Call check_dependency before adding, installing, or recommending any npm package. If the verdict is BLOCK, do not install the package. If it is WARN, review the alternatives and explain the trade-off to the user.",
+    "Evaluate a single npm package against the active PkgDiet policy to determine if it is safe, lightweight, and healthy to install. Use this read-only tool before proposing or installing any package. It returns a structured verdict (ALLOW, WARN, BLOCK), health score, cost impact, and security signals. It does not install packages, edit files, or modify the project. Always evaluate a package with this tool before recommending it.",
     {
-      packageName: z.string().min(1, "packageName must not be empty").describe("npm package name, e.g. 'moment' or '@org/pkg'"),
-      environment: z.string().optional().describe("Optional environment overlay to apply, e.g. 'ci' or 'dev'"),
+      packageName: z.string().min(1).max(214).regex(/^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/).describe("The exact npm package name to evaluate, such as 'lodash', 'moment', or '@types/node'."),
+      environment: z.enum(["dev", "prod", "ci", "test"]).default("dev").describe("The environment context to apply specific policy overrides. Defaults to 'dev'."),
       context: z.object({
-        runtime: z.enum(["node", "browser", "edge", "universal"]).optional(),
-        packageManager: z.enum(["npm", "pnpm", "yarn"]).optional(),
-        intent: z.enum(["recommend", "install", "replace", "audit"]).optional()
-      }).optional().describe("Context indicating how the dependency will be used.")
+        runtime: z.enum(["node", "browser", "edge", "universal"]).default("node").describe("The JavaScript runtime where the package will execute."),
+        packageManager: z.enum(["npm", "pnpm", "yarn"]).default("npm").describe("The package manager being used for installation."),
+        intent: z.enum(["recommend", "install", "replace", "audit"]).default("install").describe("The action the agent intends to take with this package.")
+      }).optional().describe("Detailed context indicating how the dependency will be used.")
     },
     async (args) => {
       if (!args.packageName) {
@@ -100,10 +100,10 @@ export async function startMcpServer() {
 
   server.tool(
     "check_dependencies",
-    "Batch check multiple npm packages at once before proposing or installing a group of packages.",
+    "Evaluate multiple npm packages in a single batch request against the active PkgDiet policy. Use this read-only tool before scaffolding a new project or proposing multiple packages at once. It returns a summary of verdicts, health scores, and blocking reasons for each package. It does not install packages, modify lockfiles, or alter the workspace. Always call this before bulk installations.",
     {
-      packageNames: z.array(z.string().min(1)).min(1).describe("List of npm package names to check"),
-      environment: z.string().optional().describe("Optional environment overlay, e.g. 'ci' or 'dev'")
+      packageNames: z.array(z.string().min(1).max(214).regex(/^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/)).min(1).max(50).describe("Array of valid npm package names to evaluate simultaneously. Limit 50 per request to avoid rate limits."),
+      environment: z.enum(["dev", "prod", "ci", "test"]).default("dev").describe("The target environment to apply specific policy overrides. Defaults to 'dev'.")
     },
     async (args) => {
       try {
@@ -228,9 +228,9 @@ export async function startMcpServer() {
 
   server.tool(
     "get_policy",
-    "Retrieve the active PkgDiet policy for the current workspace. Use this to understand the constraints and environment settings before installing packages.",
+    "Retrieve the active PkgDiet dependency policy constraints for the current workspace. Use this read-only tool when interpreting a WARN or BLOCK verdict, or to understand the project's health and security rules before scaffolding. It returns the exact rule thresholds (e.g., minHealthScore) and blocked packages. It does not modify the policy or any project files.",
     {
-      environment: z.string().optional().describe("The environment to retrieve policy for, e.g. 'ci', 'dev'")
+      environment: z.enum(["dev", "prod", "ci", "test"]).default("dev").describe("The target environment to retrieve the policy for. This resolves any environment-specific overrides (like stricter rules for 'ci').")
     },
     async (args) => {
       try {
