@@ -1,9 +1,38 @@
+/**
+ * PkgDiet — Policy Engine Types
+ *
+ * These types describe the policy layer system used by the GitHub App.
+ * The runtime policy evaluation is performed by policy.js (the authoritative source).
+ *
+ * Supported ignoreRules formats (both are tested in policy.js isIgnored()):
+ *   { "ignoreRules": ["moment"] }
+ *   { "ignoreRules": [{ "package": "moment", "reason": "approved legacy dep" }] }
+ */
+
+/**
+ * A single ignore rule entry.
+ * String form: the package name to ignore.
+ * Object form: package name plus optional human-readable reason.
+ */
+export type IgnoreRule =
+  | string
+  | {
+      package: string;
+      /** Optional note explaining why this rule exists. */
+      reason?: string;
+    };
+
 export interface Policy {
   minHealthScore: number;
   maxPackageSizeBytes: number;
   blockedPackages: string[];
   allowedPackages: string[];
-  ignoreRules: Record<string, string[]>;
+  /**
+   * Rules that allow a package to bypass WARN/BLOCK verdicts.
+   * Matches policy.js runtime: Array<string | { package: string }>.
+   * Optional so Partial<Policy> layers do not need to specify it.
+   */
+  ignoreRules?: IgnoreRule[];
   telemetry: boolean;
 }
 
@@ -16,10 +45,10 @@ export interface PolicyLayer {
 
 export const DEFAULT_POLICY: Policy = {
   minHealthScore: 40,
-  maxPackageSizeBytes: 5_000_000,
+  maxPackageSizeBytes: 15_728_640, // 15 MB — matches policy.js DEFAULT_POLICY
   blockedPackages: [],
   allowedPackages: [],
-  ignoreRules: {},
+  ignoreRules: [],
   telemetry: true,
 };
 
@@ -54,7 +83,7 @@ export function evaluatePackageWithPolicy(
 
   // We are delegating the actual evaluation to the existing checker engine's rules.
   // The checker.js logic will use this effectivePolicy object to enforce thresholds.
-  
+
   return {
     policy: effectivePolicy,
     // (Other properties will be attached by the checker engine)

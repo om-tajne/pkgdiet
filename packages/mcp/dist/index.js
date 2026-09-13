@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { checkPackage } from "@pkgdiet/core/dist/checker.js";
 import { getAlternatives } from "@pkgdiet/core/dist/alternatives.js";
-import { loadPolicy, applyEnvironment } from "@pkgdiet/core/dist/policy.js";
+import { loadPolicy, applyEnvironment, validatePolicy } from "@pkgdiet/core/dist/policy.js";
 export async function startMcpServer() {
     const server = new McpServer({
         name: "pkgdiet",
@@ -204,6 +204,7 @@ export async function startMcpServer() {
             const rawPolicy = loadPolicy(process.cwd());
             const env = args.environment || "dev";
             const effectivePolicy = applyEnvironment(rawPolicy, env);
+            const { errors, warnings } = validatePolicy(effectivePolicy);
             const result = {
                 source: rawPolicy.policyVersion ? "local" : "defaults",
                 policyVersion: rawPolicy.policyVersion || 1,
@@ -216,9 +217,9 @@ export async function startMcpServer() {
                     blockDeprecated: effectivePolicy.blockDeprecated
                 },
                 validation: {
-                    valid: true,
-                    errors: [],
-                    warnings: []
+                    valid: errors.length === 0,
+                    errors,
+                    warnings
                 }
             };
             return {

@@ -32,7 +32,7 @@ export function checkPackage(packageSpec: any, projectPath?: string, options?: {
     efficiencyFlag?: undefined;
 } | {
     name: any;
-    verdict: "BLOCK" | "WARN" | "ALLOW";
+    verdict: "ALLOW" | "BLOCK" | "WARN";
     reasons: string[];
     healthScore: any;
     costEstimate: {

@@ -2,7 +2,7 @@ import { fetchPackageHealth } from './health.js';
 import { loadPolicy, evaluatePolicy } from './policy.js';
 import { estimateCostImpact } from './cost.js';
 import { recordCheckMetric } from './telemetry.js';
-import { findAlternatives } from './alternatives.js';
+import { findAlternatives } from './alternatives-core.js';
 import { isScopeMappedInNpmrc } from './npmrc.js';
 
 /**

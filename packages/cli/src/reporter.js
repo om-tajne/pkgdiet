@@ -35,14 +35,23 @@ export function renderReport(results) {
   console.log(`\n🥗 PkgDiet v${PKG_VERSION}`);
   console.log(`   Put your node_modules on a diet...\n`);
 
-  // Summary Card
-  const { projectName, directDeps, filesScanned, nodeModulesSize, unusedDeps, unhealthyDeps, sizeIssues } = results;
-  
-  const overallScore = Math.max(0, 100 - (unusedDeps.length * 5) - (unhealthyDeps.length * 10) - (sizeIssues.length * 5));
-  const safetyScore = Math.max(0, 100 - (unhealthyDeps.filter(d => d.healthScore < 40).length * 15));
-  
+  // Support both new stable field names from run() and old names for backward compat
+  const projectName     = results.projectName;
+  const directDeps      = results.directDeps;
+  const filesScanned    = results.filesScanned;
+  const nodeModulesSize = results.sizeResults?.totalNodeModules ?? results.nodeModulesSize ?? 0;
+  const unusedDeps      = results.unusedDependencies ?? results.unusedDeps ?? [];
+  const unhealthyDeps   = results.unhealthyDependencies ?? results.unhealthyDeps ?? [];
+  const sizeIssues      = results.sizeIssues ?? [];
+
+  // Use pre-computed scores when available; fall back to inline computation
+  const overallScore  = results.overallScore
+    ?? Math.max(0, 100 - (unusedDeps.length * 5) - (unhealthyDeps.length * 10) - (sizeIssues.length * 5));
+  const safetyScore   = results.repoSafetyScore
+    ?? Math.max(0, 100 - (unhealthyDeps.filter(d => d.healthScore < 40).length * 15));
+
   const overallEmoji = overallScore >= 80 ? '✅' : overallScore >= 50 ? '🟡' : '🔴';
-  
+
   console.log(`   Project: ${projectName}`);
   console.log(`   Dependencies: ${directDeps} direct ${BOX.vertical} ${formatNumber(filesScanned)} files scanned`);
   console.log(`   node_modules: ${formatBytes(nodeModulesSize)}`);
