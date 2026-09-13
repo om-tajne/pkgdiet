@@ -1,5 +1,22 @@
 import { PrismaClient } from "@prisma/client";
 
+/**
+ * Warning logger for dashboard server-side operations.
+ *
+ * - Writes to stderr (console.warn), never stdout, so it cannot pollute
+ *   Next.js rendering output, structured logging pipelines, or API responses.
+ * - Only emits when PKGDIET_VERBOSE=1 is set; silent in production by default.
+ * - Never includes raw database record contents, connection strings, or row data.
+ *
+ * @param {string} message - Human-readable warning (no sensitive values)
+ * @param {unknown} [cause]  - Optional error cause (message only, not full object)
+ */
+function logDashboardWarning(message: string, cause?: unknown): void {
+  if (process.env.PKGDIET_VERBOSE !== "1") return;
+  const causeText = cause instanceof Error ? cause.message : "";
+  console.warn(`[PkgDiet] ${message}${causeText ? ": " + causeText : ""}`);
+}
+
 // Shared singleton Prisma client for dashboard
 // Points to the same dev.db as the GitHub App (configured via DATABASE_URL in .env.local)
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
@@ -77,7 +94,7 @@ export async function getFinOpsMetrics(repoId: number, days = 7) {
 
   for (const run of runs) {
     try {
-      const details: any[] = JSON.parse(run.detailsJson);
+      const details = parseDetailsJson(run.detailsJson);
       for (const d of details) {
         const verdict = d.evalResult?.verdict;
         if (verdict === "BLOCK") {
@@ -93,8 +110,8 @@ export async function getFinOpsMetrics(repoId: number, days = 7) {
           allowCount++;
         }
       }
-    } catch {
-      // skip malformed rows
+    } catch (err) {
+      logDashboardWarning("Skipped malformed check run record", err);
     }
   }
 
@@ -107,4 +124,28 @@ export async function getFinOpsMetrics(repoId: number, days = 7) {
     totalCostSaved: Math.round(totalCostSaved * 100) / 100,
     totalSizeMB: Math.round(totalSizeMB * 100) / 100,
   };
+}
+
+export type DependencyResult = {
+  evalResult?: {
+    verdict?: string;
+    costEstimate?: { monthlyCiCost100Builds?: number; addedSizeMB?: number };
+  };
+};
+
+export function parseDetailsJson(jsonString: string): DependencyResult[] {
+  if (!jsonString) return [];
+  
+  const parsed: unknown = JSON.parse(jsonString);
+
+  const rawResults = Array.isArray(parsed)
+    ? parsed
+    : Array.isArray((parsed as any)?.results)
+      ? (parsed as any).results
+      : [];
+
+  return rawResults.filter(
+    (r: unknown): r is DependencyResult =>
+      r !== null && typeof r === 'object' && 'evalResult' in (r as object)
+  );
 }

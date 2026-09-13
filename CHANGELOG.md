@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-09-14
+
+### Breaking changes
+
+- **`@pkgdiet/core` — `run()` result shape**
+
+  The following v1 field names are no longer returned by `run()`:
+
+  | Removed (v1) | Replacement (v2) |
+  |---|---|
+  | `unusedDeps` | `unusedDependencies` |
+  | `unhealthyDeps` | `unhealthyDependencies` |
+  | `nodeModulesSize` | `sizeResults.totalNodeModules` |
+
+  Consumers using the old field names must migrate to the v2 contract documented in `packages/core/README.md`.
+
+- **`@pkgdiet/core` — package exports**
+
+  The `"./dist/*.js"` wildcard export is removed. Only named subpath exports are available.
+
+- **`@pkgdiet/core` — alternatives module split**
+
+  `alternatives.js` is now a thin ESM loader wrapper. Bundling environments (VS Code, webpack) must import from `@pkgdiet/core/dist/alternatives-extension.js` and call `injectAlternatives(data)` before any lookup.
+
+### New features
+
+- MCP `get_policy` tool now calls real `validatePolicy()`.
+- `run()` normalizers guard against shape drift in underlying modules.
+- Graceful degradation: a single failed registry lookup no longer crashes a full audit.
+- VS Code extension eliminates the CJS/ESM `import.meta` warning at the architectural root.
+- `policyEngine.ts` `IgnoreRule` named union type: `string | { package: string; reason?: string }`.
+
+### Fixes
+
+- `run()` fully rewritten with correct call signatures derived from inspected module exports.
+- CLI `audit` action no longer discards the `run()` return value.
+- MCP `suggest_alternative` bounds `maxResults` to `[1, 5]` via Zod schema.
+
+### Tests added
+
+- 11 reporter/CLI render path tests.
+- 6 `run()` contract tests enforcing the stable public shape.
+- 2 MCP test cases covering all 4 tools, invalid arguments, schema bounds, and stdout hygiene.
+
+---
+
 ## [1.2.0] - 2026-09-01
 
 ### Added

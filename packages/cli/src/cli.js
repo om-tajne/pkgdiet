@@ -38,18 +38,17 @@ program
         console.error('\n  ❌ --yes can only be used with --fix');
         process.exit(1);
       }
-      await run({
+      const result = await run({
         path: options.path,
-        unused: options.unused || false,
-        health: options.health || false,
-        size: options.size || false,
-        alternatives: options.alternatives || false,
-        json: options.json || false,
-        fix: options.fix || false,
-        yes: options.yes || false,
         noCache: !options.cache,
         prod: options.prod || options.excludeDev || false,
       });
+
+      if (options.json) {
+        renderJson(result);
+      } else {
+        renderReport(result);
+      }
     } catch (err) {
       console.error(`\n  ❌ Unexpected error: ${err.message}`);
       process.exit(1);
@@ -65,6 +64,7 @@ program
   .option('--json', 'Output machine-readable JSON')
   .option('--env <name>', 'Apply environment policy overlay (e.g. ci, dev, prod)')
   .action(async (packages, options) => {
+    await import('@pkgdiet/core/dist/alternatives.js'); // Ensure dataset is loaded
     const { checkPackage } = await import('@pkgdiet/core/dist/checker.js');
     const { loadPolicy, applyEnvironment } = await import('@pkgdiet/core/dist/policy.js');
 

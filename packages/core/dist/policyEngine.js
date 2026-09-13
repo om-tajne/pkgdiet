@@ -1,9 +1,19 @@
+/**
+ * PkgDiet — Policy Engine Types
+ *
+ * These types describe the policy layer system used by the GitHub App.
+ * The runtime policy evaluation is performed by policy.js (the authoritative source).
+ *
+ * Supported ignoreRules formats (both are tested in policy.js isIgnored()):
+ *   { "ignoreRules": ["moment"] }
+ *   { "ignoreRules": [{ "package": "moment", "reason": "approved legacy dep" }] }
+ */
 export const DEFAULT_POLICY = {
     minHealthScore: 40,
-    maxPackageSizeBytes: 5_000_000,
+    maxPackageSizeBytes: 15_728_640, // 15 MB — matches policy.js DEFAULT_POLICY
     blockedPackages: [],
     allowedPackages: [],
-    ignoreRules: {},
+    ignoreRules: [],
     telemetry: true,
 };
 export function mergePolicies(layers) {

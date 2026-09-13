@@ -4,7 +4,7 @@
   "private": "true",
   "scripts": {
     "dev": "next dev -p 3001",
-    "build": "next build",
+    "build": "npm run db:generate && next build",
     "start": "next start -p 3001",
     "db:generate": "prisma generate --schema=../github-app/prisma/schema.prisma"
   },

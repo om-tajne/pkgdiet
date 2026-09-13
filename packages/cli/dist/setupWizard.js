@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 export async function runSetupWizard() {
     const prompts = (await import('prompts')).default;
-    console.log('\n🥗 Welcome to PkgDiet Setup Wizard\n');
+    console.log('\n✅ Welcome to PkgDiet Setup Wizard\n');
     const questions = [
         {
             type: 'select',

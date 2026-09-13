@@ -13,7 +13,16 @@
       "import": "./dist/alternatives.js"
     },
     "./data/alternatives.json": "./data/alternatives.json",
-    "./dist/*.js": "./dist/*.js"
+    "./dist/index.js":                    "./dist/index.js",
+    "./dist/checker.js":                  "./dist/checker.js",
+    "./dist/alternatives.js":             "./dist/alternatives.js",
+    "./dist/alternatives-extension.js":   "./dist/alternatives-extension.js",
+    "./dist/policy.js":                   "./dist/policy.js",
+    "./dist/lockfile/index.js":           "./dist/lockfile/index.js",
+    "./dist/ci-gate.js":                  "./dist/ci-gate.js",
+    "./dist/drift.js":                    "./dist/drift.js",
+    "./dist/cache.js":                    "./dist/cache.js",
+    "./dist/utils.js":                    "./dist/utils.js"
   },
   "files": [
     "dist",

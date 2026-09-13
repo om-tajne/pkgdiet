@@ -1,11 +1,9 @@
-# Experimental Infrastructure (`apps/`)
+# Experimental Components
 
-The `apps/` directory contains prototypes for a future Enterprise PkgDiet control plane (GitHub App, Dashboard, Postgres schema). 
+The following components within the `pkgdiet` monorepo are **experimental prototypes** and are not considered part of the v2.0.0 supported release surface. They are included for testing and preview purposes only.
 
-**Important Disclaimers for Phase 1:**
-- **No hosted PkgDiet service exists.** There is no SaaS backend.
-- **No GitHub App is currently publicly installable.** The code in `apps/github-app` is a local prototype.
-- **The dashboard is a local prototype** and not a supported product.
-- **No production availability**, security, backup, or support guarantee exists for these components.
+## `apps/dashboard`
+An experimental Next.js dashboard prototype intended for visualizing organizational dependency health. It is not currently ready for production deployment.
 
-Please focus entirely on the local CLI, MCP Server, and GitHub Actions capabilities in the `packages/` directory for your day-to-day workflow.
+## `apps/github-app`
+An experimental Node.js/Hono GitHub App prototype designed to automate PR reviews and comments. At this time, it is not recommended for production repositories. Use the supported CLI `pkgdiet ci` command via standard CI runners instead.

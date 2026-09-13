@@ -9,11 +9,11 @@ qa-output.json
 qa-final.json
 package-lock.json
 .pkgdiet-metrics.json
-.pkgdiet-metrics.json
 test-diff.js
 test-drift/
-.pkgdiet-cache.json
 tmp-app*.log
 *.vsix
-
 *.tsbuildinfo
+audit.json
+audit.log
+esbuild-help.txt
