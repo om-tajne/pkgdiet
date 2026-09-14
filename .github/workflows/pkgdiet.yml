@@ -1,0 +1,30 @@
+# PkgDiet Dependency Safety Gate
+# Checks every new npm package added in a PR for health, safety, and policy compliance.
+name: PkgDiet
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'yarn.lock'
+      - 'pnpm-lock.yaml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  dependency-check:
+    name: Dependency Safety Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: om-tajne/pkgdiet@v2
+        with:
+          base: ${{ github.event.pull_request.base.sha }}
+          environment: ci
+          fail-on: BLOCK

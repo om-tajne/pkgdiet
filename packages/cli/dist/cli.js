@@ -336,190 +336,32 @@ program
 // ─── init ─────────────────────────────────────────────────────────────────────
 program
     .command('init')
-    .description('Initialize PkgDiet policy and CI actions')
-    .option('-f, --force', 'Overwrite existing config and workflow files')
-    .option('-i, --interactive', 'Run interactive setup wizard to generate custom config')
-    .option('-t, --template <name>', 'Policy template: strict, balanced, or lenient', 'balanced')
+    .description('Set up PkgDiet in this project — creates policy, CI workflow, and all AI agent configs in one command')
+    .option('--no-ci', 'Skip GitHub Actions CI workflow creation')
+    .option('--no-agents', 'Skip AI agent MCP config files (Cursor, Windsurf, Cline, Copilot, Claude)')
+    .option('--no-policy', 'Skip .pkgdietrc.json policy file creation')
+    .addHelpText('after', `
+What npx pkgdiet init creates:
+  .pkgdietrc.json                  — dependency policy rules
+  .github/workflows/pkgdiet.yml    — GitHub Actions CI gate (uses om-tajne/pkgdiet@v2)
+  .cursor/mcp.json                 — Cursor MCP server config
+  .cursorrules                     — Cursor AI safety rules
+  .windsurfrules                   — Windsurf AI safety rules
+  cline_mcp_settings.json          — Cline MCP server config
+  .github/mcp.json                 — GitHub Copilot MCP config
+  CLAUDE.md                        — Claude Code safety rules
+  Claude Desktop config            — Global MCP config (platform-aware)
+
+All operations are non-destructive: existing files are never overwritten.`)
     .action(async (options) => {
-    const fs = await import('fs');
-    const path = await import('path');
-    if (options.interactive) {
-        const { runSetupWizard } = await import('./setupWizard.js');
-        await runSetupWizard();
-    }
-    else {
-        if (options.force || !fs.existsSync('.pkgdietrc.json')) {
-            // Template presets
-            const templates = {
-                strict: {
-                    minHealthScore: 60,
-                    warnHealthScore: 80,
-                    blockDeprecated: true,
-                    securityMode: 'fail-closed',
-                    internalNamePrefixes: [],
-                    environments: {
-                        ci: { minHealthScore: 70, failOn: 'BLOCK' },
-                        dev: { minHealthScore: 40, failOn: 'WARN' }
-                    },
-                    blockedPackages: [],
-                    telemetry: true,
-                    policyVersion: 1,
-                },
-                balanced: {
-                    minHealthScore: 40,
-                    warnHealthScore: 60,
-                    blockDeprecated: true,
-                    securityMode: 'fail-open',
-                    internalNamePrefixes: [],
-                    environments: {
-                        ci: { minHealthScore: 50, failOn: 'BLOCK' },
-                        dev: { minHealthScore: 30, failOn: 'WARN' }
-                    },
-                    blockedPackages: [],
-                    telemetry: true,
-                    policyVersion: 1,
-                },
-                lenient: {
-                    minHealthScore: 20,
-                    warnHealthScore: 40,
-                    blockDeprecated: false,
-                    securityMode: 'fail-open',
-                    internalNamePrefixes: [],
-                    environments: {},
-                    blockedPackages: [],
-                    telemetry: true,
-                    policyVersion: 1,
-                },
-            };
-            const chosen = templates[options.template] || templates.balanced;
-            if (!templates[options.template]) {
-                console.log(`⚠️  Unknown template "${options.template}". Using "balanced".`);
-            }
-            fs.writeFileSync('.pkgdietrc.json', JSON.stringify(chosen, null, 2));
-            console.log(`✅ Created .pkgdietrc.json (template: ${options.template || 'balanced'})`);
-        }
-        else {
-            console.log('⏭️  .pkgdietrc.json already exists, skipping. Use --force to overwrite.');
-        }
-    }
-    const githubDir = '.github/workflows';
-    if (!fs.existsSync(githubDir)) {
-        fs.mkdirSync(githubDir, { recursive: true });
-    }
-    const driftPath = path.join(githubDir, 'pkgdiet-drift.yml');
-    if (options.force || !fs.existsSync(driftPath)) {
-        const driftYml = `name: PkgDiet Weekly Drift Scan
-on:
-  schedule:
-    - cron: '0 0 * * 1' # Every Monday at 00:00
-jobs:
-  drift-scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: npm install -g pkgdiet
-      - run: pkgdiet drift
-`;
-        fs.writeFileSync(driftPath, driftYml);
-        console.log('✅ Created .github/workflows/pkgdiet-drift.yml');
-    }
-    else {
-        console.log('⏭️  .github/workflows/pkgdiet-drift.yml already exists, skipping. Use --force to overwrite.');
-    }
-    const gatePath = path.join(githubDir, 'pkgdiet-gate.yml');
-    const hasNpm = fs.existsSync('package-lock.json');
-    const hasPnpm = fs.existsSync('pnpm-lock.yaml');
-    const hasYarn = fs.existsSync('yarn.lock');
-    if (!hasNpm && (hasPnpm || hasYarn)) {
-        console.log('⚠️  CI PR gate currently requires npm (package-lock.json).');
-        console.log('   Skipping PR gate generation. MCP, CLI, and Drift scanning are fully installed.');
-    }
-    else if (options.force || !fs.existsSync(gatePath)) {
-        const gateYml = `name: PkgDiet PR Gate
-on: [pull_request]
-jobs:
-  pkgdiet:
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Need history for git diff
-      - run: npm install -g pkgdiet
-
-      # Run CI gate against the PR base branch
-      - run: pkgdiet ci --env ci --base \${{ github.event.pull_request.base.sha }}
-
-      # Post PR Comment
-      - uses: actions/github-script@v7
-        if: always()
-        with:
-          script: |
-            const fs = require('fs');
-            if (fs.existsSync('pkgdiet-pr-comment.md')) {
-              const body = fs.readFileSync('pkgdiet-pr-comment.md', 'utf8');
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: body
-              });
-            }
-`;
-        fs.writeFileSync(gatePath, gateYml);
-        console.log('✅ Created .github/workflows/pkgdiet-gate.yml');
-    }
-    else {
-        console.log('⏭️  .github/workflows/pkgdiet-gate.yml already exists, skipping. Use --force to overwrite.');
-    }
-    const aiRuleContent = `You are working in a codebase protected by PkgDiet.
-
-CRITICAL RULE:
-Before you add or modify any dependencies (via npm install), you MUST verify the health and size of the package using PkgDiet.
-
-To do this, run:
-npx pkgdiet@latest check <package_name>
-
-If the tool returns a WARN or BLOCK verdict (e.g. low health score, unmaintained, or bloated), you MUST search for a lighter, modern alternative and propose it to the user instead. Never install deprecated or bloated packages blindly.`;
-    ['.cursorrules', '.windsurfrules'].forEach(ruleFile => {
-        const rulePath = path.join(process.cwd(), ruleFile);
-        if (!fs.existsSync(rulePath) || options.force) {
-            fs.writeFileSync(rulePath, aiRuleContent);
-            console.log(`✅ ${options.force ? 'Overwrote' : 'Created'} ${ruleFile}`);
-        }
-        else {
-            const existing = fs.readFileSync(rulePath, 'utf8');
-            if (!existing.includes('PkgDiet')) {
-                fs.appendFileSync(rulePath, '\n\n' + aiRuleContent);
-                console.log(`✅ Appended PkgDiet policy to existing ${ruleFile}`);
-            }
-            else {
-                console.log(`⏭️  ${ruleFile} already contains PkgDiet policy, skipping.`);
-            }
-        }
+    const { runInit } = await import('./init.js');
+    await runInit(process.cwd(), {
+        ci: options.ci !== false,
+        agents: options.agents !== false,
+        policy: options.policy !== false
     });
-    const cursorDir = path.join(process.cwd(), '.cursor');
-    if (!fs.existsSync(cursorDir)) {
-        fs.mkdirSync(cursorDir, { recursive: true });
-    }
-    const cursorMcpPath = path.join(cursorDir, 'mcp.json');
-    if (!fs.existsSync(cursorMcpPath) || options.force) {
-        const cursorMcpConfig = {
-            mcpServers: {
-                pkgdiet: {
-                    command: 'npx',
-                    args: ['-y', 'pkgdiet@latest', 'mcp']
-                }
-            }
-        };
-        fs.writeFileSync(cursorMcpPath, JSON.stringify(cursorMcpConfig, null, 2));
-        console.log(`✅ ${options.force ? 'Overwrote' : 'Created'} .cursor/mcp.json`);
-    }
-    else {
-        console.log('⏭️  .cursor/mcp.json already exists, skipping. Use --force to overwrite.');
-    }
 });
+// ─── mcp-install ──────────────────────────────────────────────────────────────
 // ─── mcp-install ──────────────────────────────────────────────────────────────
 program
     .command('mcp-install')
