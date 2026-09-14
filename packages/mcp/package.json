@@ -21,15 +21,27 @@
     "@pkgdiet/core": "^2.0.0",
     "zod": "^3.24.0"
   },
-  "description": "A local-first dependency gate and MCP server for checking npm package health and alternatives.",
+  "description": "Official MCP server for PkgDiet — gives AI agents ALLOW/WARN/BLOCK verdicts for npm packages before installation.",
+  "license": "MIT",
+  "author": "om-tajne",
   "keywords": [
     "mcp",
     "mcp-server",
-    "model context protocol",
-    "dependencies",
-    "security",
+    "model-context-protocol",
+    "ai-agent",
+    "llm-tool",
     "npm",
-    "health"
+    "dependencies",
+    "dependency-check",
+    "security",
+    "supply-chain",
+    "cursor",
+    "claude",
+    "copilot",
+    "windsurf",
+    "cline",
+    "package-health",
+    "alternatives"
   ],
   "homepage": "https://github.com/om-tajne/pkgdiet#readme",
   "repository": {
