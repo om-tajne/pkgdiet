@@ -26,7 +26,10 @@ const DEFAULT_POLICY = {
 };
 
 const CI_WORKFLOW = `# PkgDiet Dependency Safety Gate
-# Checks every new npm package added in a PR for health, safety, and policy compliance.
+# Reports health, safety, and size of every new npm package added in a PR.
+# Running in dry-run mode (report-only) by default — never blocks CI.
+# To enforce: change dry-run to 'false' once you're happy with the results.
+
 name: PkgDiet
 
 on:
@@ -54,7 +57,7 @@ jobs:
         with:
           base: \${{ github.event.pull_request.base.sha }}
           environment: ci
-          fail-on: BLOCK
+          dry-run: 'true'   # Report-only. Change to 'false' to enforce.
 `;
 
 function ensureDir(dir) {
