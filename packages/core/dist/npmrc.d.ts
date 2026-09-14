@@ -1,1 +1,1 @@
-export function isScopeMappedInNpmrc(packageName: any, projectPath?: string): boolean;
+export declare function isScopeMappedInNpmrc(packageName: any, projectPath?: string): boolean;

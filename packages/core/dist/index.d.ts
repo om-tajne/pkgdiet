@@ -1,4 +1,17 @@
 /**
+ * PkgDiet — Core Audit Entry Point
+ *
+ * Public shape returned by run():
+ * {
+ *   projectName, directDeps, filesScanned,
+ *   usedDependencies, unusedDependencies,
+ *   healthResults, unhealthyDependencies,
+ *   sizeResults, sizeIssues,
+ *   overallScore, repoSafetyScore
+ * }
+ */
+import './alternatives.js';
+/**
  * Run a full dependency audit for a project.
  *
  * Edge-cases handled:
@@ -18,7 +31,7 @@
  * @param {boolean} [options.noCache]  Skip local registry cache
  * @returns {Promise<AuditResult>}
  */
-export function run(options?: {
+export declare function run(options?: {
     path?: string;
     prod?: boolean;
     noCache?: boolean;

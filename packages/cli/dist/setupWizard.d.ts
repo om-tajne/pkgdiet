@@ -1,1 +1,1 @@
-export function runSetupWizard(): Promise<void>;
+export declare function runSetupWizard(): Promise<void>;

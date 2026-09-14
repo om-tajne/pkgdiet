@@ -1,4 +1,4 @@
-export function checkPackage(packageSpec: any, projectPath?: string, options?: {}): Promise<{
+export declare function checkPackage(packageSpec: any, projectPath?: string, options?: {}): Promise<{
     name: any;
     verdict: string;
     reasons: string[];
@@ -15,6 +15,7 @@ export function checkPackage(packageSpec: any, projectPath?: string, options?: {
     hasProvenance: boolean;
     integrityCheck: string;
 } | {
+    efficiencyFlag?: undefined;
     name: any;
     verdict: string;
     reasons: string[];
@@ -29,7 +30,6 @@ export function checkPackage(packageSpec: any, projectPath?: string, options?: {
     flags: any[];
     hasProvenance: boolean;
     integrityCheck: string;
-    efficiencyFlag?: undefined;
 } | {
     name: any;
     verdict: "ALLOW" | "BLOCK" | "WARN";
@@ -41,7 +41,7 @@ export function checkPackage(packageSpec: any, projectPath?: string, options?: {
         serverlessColdStartClass: string;
         addedSizeMB: number;
     };
-    alternatives: any;
+    alternatives: any[];
     flags: any;
     efficiencyFlag: boolean;
     hasProvenance: boolean;

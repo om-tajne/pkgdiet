@@ -1,2 +1,2 @@
-export function setupAgents(agents: any, cwd: any, options?: {}): Promise<void>;
-export const SUPPORTED_AGENTS: string[];
+export declare const SUPPORTED_AGENTS: string[];
+export declare function setupAgents(agents: any, cwd: any, options?: {}): Promise<void>;

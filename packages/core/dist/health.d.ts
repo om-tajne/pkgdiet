@@ -1,7 +1,11 @@
 /**
+ * PkgDiet — Health Analyzer Module
+ * Scores package health based on npm registry metadata.
+ */
+/**
  * Fetch health data for a single package from npm registry.
  */
-export function fetchPackageHealth(packageName: any, projectPath: any, useCache: any): Promise<any>;
+export declare function fetchPackageHealth(packageName: any, projectPath: any, useCache: any): Promise<any>;
 /**
  * Analyze health of all specified packages.
  *
@@ -10,4 +14,4 @@ export function fetchPackageHealth(packageName: any, projectPath: any, useCache:
  * @param {object} options - { useCache: boolean }
  * @returns {object[]} Array of health results
  */
-export function analyzeHealth(packageNames: string[], projectPath: string, options?: object): object[];
+export declare function analyzeHealth(packageNames: string[], projectPath: string, options?: object): object[];

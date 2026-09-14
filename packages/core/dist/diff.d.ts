@@ -1,1 +1,1 @@
-export function getAddedDependenciesFromGit(baseRef?: string): any[];
+export declare function getAddedDependenciesFromGit(baseRef?: string): any[];

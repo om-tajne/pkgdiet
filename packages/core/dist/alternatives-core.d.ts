@@ -1,15 +1,14 @@
-export function injectAlternatives(db: any): void;
-export function setLoader(fn: any): void;
-export function getAlternatives(packageName: any): {
+/**
+ * PkgDiet - Alternatives Engine (Core Logic)
+ * Contains the pure in-memory lookup functions without any fs or ESM path logic.
+ */
+export declare function injectAlternatives(db: any): void;
+export declare function setLoader(fn: any): void;
+export declare function getAlternatives(packageName: any): {
     replacements: any;
     reason: any;
     category: any;
     details: any;
 };
-export function findAlternatives(packageNames: any): {
-    current: any;
-    reason: any;
-    alternatives: any;
-    category: any;
-}[];
-export function getAllAlternatives(): any;
+export declare function findAlternatives(packageNames: any): any[];
+export declare function getAllAlternatives(): any;
