@@ -1,0 +1,22 @@
+{
+  "policyVersion": 2,
+  "minHealthScore": 70,
+  "warnHealthScore": 80,
+  "failOn": "BLOCK",
+  "securityMode": "standard",
+  "blockedPackages": [],
+  "internalNamePrefixes": [],
+  "ignoreRules": [],
+  "environments": {
+    "ci": {
+      "minHealthScore": 80,
+      "failOn": "BLOCK",
+      "securityMode": "strict"
+    },
+    "dev": {
+      "minHealthScore": 60,
+      "failOn": "BLOCK",
+      "securityMode": "standard"
+    }
+  }
+}
