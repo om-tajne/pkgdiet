@@ -361,7 +361,31 @@ All operations are non-destructive: existing files are never overwritten.`)
         policy: options.policy !== false
     });
 });
-// ─── mcp-install ──────────────────────────────────────────────────────────────
+// ─── pr ───────────────────────────────────────────────────────────────────────
+program
+    .command('pr')
+    .description('Generate a reviewer-ready pull request for adding PkgDiet to any GitHub repo')
+    .option('--type <type>', 'PR type: ci (GitHub Actions), mcp (agent config), or all', 'all')
+    .option('--agent <agent>', 'Agent for MCP PR: cursor, claude, copilot, windsurf, cline, all', 'all')
+    .option('--repo <name>', 'Target repo name (defaults to current project name)')
+    .option('--json', 'Output as JSON for scripting')
+    .addHelpText('after', `
+Generates ready-to-submit PR title, description, and file contents.
+The generated workflow always runs in dry-run (report-only) mode — 
+never blocks CI, so reviewers have zero reason to reject it.
+
+Examples:
+  npx pkgdiet pr                    Generate PR for CI + MCP
+  npx pkgdiet pr --type ci          CI workflow PR only
+  npx pkgdiet pr --type mcp         MCP agent config PR only
+  npx pkgdiet pr --type ci --json   Machine-readable output
+
+Known target repos to contribute to:
+  antigravity, langchain, llamaindex, vercel-ai, cline, continue`)
+    .action(async (options) => {
+    const { runPr } = await import('./pr.js');
+    await runPr(process.cwd(), options);
+});
 // ─── mcp-install ──────────────────────────────────────────────────────────────
 program
     .command('mcp-install')
@@ -515,7 +539,7 @@ function buildFixSuggestion(pkgName, result) {
 // ─── Default: audit if no command given ───────────────────────────────────────
 const knownCommands = [
     'audit', 'check', 'mcp', 'drift', 'init', 'mcp-install',
-    'ci', 'policy-check', 'cache', 'alternatives', 'setup', 'agent-setup',
+    'ci', 'policy-check', 'cache', 'alternatives', 'setup', 'agent-setup', 'pr',
 ];
 // Override Commander's bare error messages with helpful, example-rich output
 program.configureOutput({
