@@ -39,15 +39,26 @@
   "devDependencies": {
     "@types/js-yaml": "^4.0.9"
   },
-  "description": "A local-first dependency gate and MCP server for checking npm package health and alternatives.",
+  "description": "Headless dependency policy engine for PkgDiet — health scores, policy evaluation, alternatives lookup, lockfile parsing.",
+  "license": "MIT",
+  "author": "om-tajne",
   "keywords": [
     "mcp",
     "mcp-server",
-    "model context protocol",
-    "dependencies",
-    "security",
+    "model-context-protocol",
     "npm",
-    "health"
+    "dependencies",
+    "dependency-check",
+    "security",
+    "supply-chain",
+    "ai-agent",
+    "llm-tool",
+    "langchain",
+    "cursor",
+    "claude",
+    "copilot",
+    "health-score",
+    "alternatives"
   ],
   "homepage": "https://github.com/om-tajne/pkgdiet#readme",
   "repository": {
