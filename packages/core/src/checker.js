@@ -112,6 +112,11 @@ export async function checkPackage(packageSpec, projectPath = process.cwd(), opt
     packageName = packageSpec.substring(0, atIndex);
   }
 
+  // Normalize to lowercase — npm package names are always lowercase.
+  // AI agents sometimes pass PascalCase names derived from natural language
+  // (e.g. "Moment", "React") which would otherwise produce false hallucination warnings.
+  packageName = packageName.trim().toLowerCase();
+
   // Warn (not block) if the name matches an internal prefix but we haven't fetched yet
   const warnOnInternalPrefix =
     matchesInternalPrefix(packageName, policy.internalNamePrefixes);

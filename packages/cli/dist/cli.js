@@ -63,10 +63,26 @@ program
     let policy = loadPolicy(options.path);
     if (options.env)
         policy = applyEnvironment(policy, options.env);
-    const isBatch = packages.length > 1;
+    // Normalize: split any single string containing spaces or commas into multiple
+    // package names (common when AI agents build arguments from natural language).
+    // Also lowercase everything — npm names are case-insensitive but always stored lowercase.
+    const normalizedPackages = packages
+        .flatMap(p => p.split(/[\s,]+/))
+        .map(p => p.trim().toLowerCase())
+        .filter(Boolean);
+    if (normalizedPackages.length === 0) {
+        process.stderr.write('Error: at least one package name is required.\n\n' +
+            'Usage: pkgdiet check <package> [packages...]\n\n' +
+            'Examples:\n' +
+            '  npx pkgdiet check moment\n' +
+            '  npx pkgdiet check moment react lodash\n' +
+            '  npx pkgdiet check "@types/node"\n');
+        process.exit(1);
+    }
+    const isBatch = normalizedPackages.length > 1;
     if (isBatch) {
         // ─── Batch mode: compact table ────────────────────────────
-        const results = await Promise.all(packages.map(pkgName => checkPackage(pkgName, options.path, { policy })));
+        const results = await Promise.all(normalizedPackages.map(pkgName => checkPackage(pkgName, options.path, { policy })));
         if (options.json) {
             console.log(JSON.stringify(results, null, 2));
         }
@@ -94,7 +110,7 @@ program
     }
     else {
         // ─── Single mode: detailed output ─────────────────────────
-        const pkgName = packages[0];
+        const pkgName = normalizedPackages[0];
         const result = await checkPackage(pkgName, options.path, { policy });
         if (options.json) {
             console.log(JSON.stringify(result, null, 2));
@@ -129,7 +145,15 @@ program
 // ─── mcp ──────────────────────────────────────────────────────────────────────
 program
     .command('mcp [args...]')
-    .description('Start the MCP JSON-RPC Server over stdio')
+    .description('Start the MCP JSON-RPC server over stdio (for Claude, Cursor, Windsurf, Copilot, etc.)')
+    .addHelpText('after', `
+Tip: Run this once manually to warm the npm cache before connecting your agent:
+  $ npx pkgdiet@2.0.0 mcp
+
+Then add to your agent config (e.g. .cursor/mcp.json or claude_desktop_config.json):
+  { "pkgdiet": { "command": "npx", "args": ["-y", "pkgdiet@2.0.0", "mcp"] } }
+
+Or run: npx pkgdiet agent-setup --all   to configure all agents automatically.`)
     .action(async () => {
     process.env.PKGDIET_MCP_MODE = '1';
     const { startMcpServer } = await import('@pkgdiet/mcp');
@@ -259,6 +283,14 @@ program
 program
     .command('setup')
     .description('Interactive setup wizard to configure PkgDiet policies and AI agents')
+    .addHelpText('after', `
+To configure AI coding agents directly (non-interactive):
+  $ npx pkgdiet agent-setup --all                          Configure ALL supported agents
+  $ npx pkgdiet agent-setup --detect                       Auto-detect agents in this project
+  $ npx pkgdiet agent-setup --agent cursor                 Configure only Cursor
+  $ npx pkgdiet agent-setup --agent claude-desktop windsurf
+
+Supported agents: cursor, claude-code, claude-desktop, windsurf, cline, copilot, antigravity`)
     .action(async () => {
     process.env.PKGDIET_MCP_MODE = '1';
     const { runSetupWizard } = await import('./setupWizard.js');
@@ -643,6 +675,26 @@ const knownCommands = [
     'audit', 'check', 'mcp', 'drift', 'init', 'mcp-install',
     'ci', 'policy-check', 'cache', 'alternatives', 'setup', 'agent-setup',
 ];
+// Override Commander's bare error messages with helpful, example-rich output
+program.configureOutput({
+    writeErr: (str) => {
+        if (str.includes("missing required argument 'packages'")) {
+            process.stderr.write('\nError: At least one package name is required.\n\n' +
+                'Usage:\n' +
+                '  npx pkgdiet check <package> [packages...]\n\n' +
+                'Examples:\n' +
+                '  npx pkgdiet check moment\n' +
+                '  npx pkgdiet check moment react lodash\n' +
+                '  npx pkgdiet check "@types/node"\n' +
+                '  npx pkgdiet check moment --json\n\n' +
+                'For a full project audit, run:\n' +
+                '  npx pkgdiet audit\n\n');
+        }
+        else {
+            process.stderr.write(str);
+        }
+    }
+});
 if (process.argv.length === 2 ||
     (process.argv.length > 2 && !knownCommands.includes(process.argv[2]))) {
     process.argv.splice(2, 0, 'audit');
