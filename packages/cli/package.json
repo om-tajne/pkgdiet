@@ -15,9 +15,9 @@
   "dependencies": {
     "@pkgdiet/core": "^2.0.0",
     "@pkgdiet/mcp": "^2.0.0",
-    "chalk": "^5.4.1",
-    "commander": "^13.1.0",
-    "ora": "^8.2.0",
+    "chalk": "^6.0.0",
+    "commander": "^14.0.3",
+    "ora": "^9.4.1",
     "prompts": "^2.4.2"
   },
   "description": "Check any npm package in 2 seconds — ALLOW/WARN/BLOCK verdict, health score, size, cost, alternatives. MCP server for AI agents.",

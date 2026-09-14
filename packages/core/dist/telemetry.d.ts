@@ -1,12 +1,12 @@
-export function isTelemetryEnabled(policy: any): boolean;
-export function showFirstRunNoticeIfNeeded(projectPath: any, policy: any): void;
-export function recordCheckMetric(projectPath: any, policy: any, { durationMs, verdict, wasOverridden, hasAlternatives }: {
+export declare function isTelemetryEnabled(policy: any): boolean;
+export declare function showFirstRunNoticeIfNeeded(projectPath: any, policy: any): void;
+export declare function recordCheckMetric(projectPath: any, policy: any, { durationMs, verdict, wasOverridden, hasAlternatives }: {
     durationMs: any;
+    hasAlternatives: any;
     verdict: any;
     wasOverridden: any;
-    hasAlternatives: any;
 }): void;
-export function getMetricsSummary(projectPath: any): {
+export declare function getMetricsSummary(projectPath: any): {
     totalChecks: any;
     verdicts: any;
     latency: {

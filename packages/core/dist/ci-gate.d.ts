@@ -7,7 +7,7 @@
  * @param {string|null} envName  - Optional environment overlay (e.g. 'ci', 'dev')
  * @returns {{ markdown: string, hasBlocks: boolean, hasWarns: boolean, results: object[] }}
  */
-export function runCiGate(packageNames: string[], projectPath?: string, policyModified?: boolean, envName?: string | null): {
+export declare function runCiGate(packageNames: string[], projectPath?: string, policyModified?: boolean, envName?: string | null): {
     markdown: string;
     hasBlocks: boolean;
     hasWarns: boolean;

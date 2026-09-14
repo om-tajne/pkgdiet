@@ -17,9 +17,9 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.1",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@pkgdiet/core": "^2.0.0",
-    "zod": "^3.24.0"
+    "zod": "^4.6.5"
   },
   "description": "Official MCP server for PkgDiet — gives AI agents ALLOW/WARN/BLOCK verdicts for npm packages before installation.",
   "license": "MIT",
