@@ -1,8 +1,57 @@
+name: pkgdiet
+description: >
+  npm dependency safety gate for AI agents.
+  Returns ALLOW/WARN/BLOCK verdict, health score, size impact, cost estimate,
+  and curated alternatives for any npm package.
+  Works with Claude, Cursor, Copilot, Windsurf, Cline, and any MCP client.
+version: 2.0.0
+author: om-tajne
+license: MIT
+homepage: https://github.com/om-tajne/pkgdiet
+categories:
+  - developer-tools
+  - security
+  - npm
+tags:
+  - npm
+  - dependencies
+  - security
+  - supply-chain
+  - ai-agent
+  - mcp-server
+  - cursor
+  - claude
+  - copilot
+
 startCommand:
   type: stdio
   config:
     command: npx
     args:
       - "-y"
-      - "pkgdiet@latest"
+      - "pkgdiet@2.0.0"
       - "mcp"
+
+tools:
+  - name: check_dependency
+    description: >
+      Check a single npm package for health, safety, and size.
+      Returns ALLOW/WARN/BLOCK verdict with health score and curated alternatives.
+
+  - name: check_dependencies
+    description: >
+      Batch-check multiple npm packages in one call.
+      Returns individual verdicts plus a summary with counts.
+
+  - name: suggest_alternative
+    description: >
+      Get curated lighter or safer replacements for a deprecated or bloated package.
+
+  - name: get_policy
+    description: >
+      Return the active dependency policy and its validation status.
+      Agents should call this to understand what rules they are operating under.
+
+quickstart:
+  oneCommand: "npx pkgdiet agent-setup --all"
+  description: "Configure all AI agents (Claude, Cursor, Windsurf, Cline, Copilot) in one command"
