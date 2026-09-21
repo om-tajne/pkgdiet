@@ -5,6 +5,8 @@ qa-*/
 temp-express/
 *.tgz
 .env
+.env.local
+.env*.local
 qa-output.json
 qa-final.json
 # package-lock.json must be committed for npm ci to work in CI
@@ -18,3 +20,25 @@ tmp-app*.log
 audit.json
 audit.log
 esbuild-help.txt
+
+# SQLite databases — never commit real data
+*.db
+*.sqlite
+*.sqlite3
+
+# Local MCP config — contains absolute local filesystem paths
+.cursor/mcp.json
+.gemini/antigravity/mcp/
+
+# Experimental app compiled output — not part of supported release
+apps/github-app/dist/
+apps/dashboard/.next/
+apps/dashboard/out/
+
+# Prisma generated client inside apps
+apps/*/prisma/generated/
+
+# Editor and OS
+.DS_Store
+Thumbs.db
+*.swp

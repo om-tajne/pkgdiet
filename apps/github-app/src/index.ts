@@ -46,12 +46,14 @@ const prisma = new PrismaClient();
 // ──────────────────────────────────────────────────────────────
 // GitHub App / Webhooks
 // ──────────────────────────────────────────────────────────────
+if (!process.env.GITHUB_APP_PRIVATE_KEY) throw new Error('GITHUB_APP_PRIVATE_KEY env var is required');
+if (!process.env.GITHUB_WEBHOOK_SECRET)  throw new Error('GITHUB_WEBHOOK_SECRET env var is required');
+
 const app = new App({
   appId: process.env.GITHUB_APP_ID || "1",
-  privateKey: process.env.GITHUB_APP_PRIVATE_KEY ||
-    "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----\n",
+  privateKey: process.env.GITHUB_APP_PRIVATE_KEY,
   webhooks: {
-    secret: process.env.GITHUB_WEBHOOK_SECRET || "test-secret",
+    secret: process.env.GITHUB_WEBHOOK_SECRET,
   },
 });
 
