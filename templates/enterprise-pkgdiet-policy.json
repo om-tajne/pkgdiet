@@ -1,0 +1,33 @@
+{
+  "$schema": "https://raw.githubusercontent.com/om-tajne/pkgdiet/main/packages/core/schema.json",
+  "policyVersion": 1,
+  "telemetry": false,
+  "minHealthScore": 50,
+  "warnHealthScore": 75,
+  "blockDeprecated": true,
+  "blockInstallScripts": true,
+  "maxPackageSizeBytes": 10485760,
+  "failOn": "BLOCK",
+  "securityMode": "fail-closed",
+  "internalNamePrefixes": [
+    "@corp-internal/",
+    "@mycompany/"
+  ],
+  "blockedPackages": [
+    "request",
+    "moment"
+  ],
+  "allowedPackages": [
+    "@corp-internal/core-ui"
+  ],
+  "ignoreRules": [],
+  "environments": {
+    "ci": {
+      "minHealthScore": 60,
+      "failOn": "BLOCK"
+    },
+    "dev": {
+      "failOn": "WARN"
+    }
+  }
+}
