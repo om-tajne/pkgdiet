@@ -7,7 +7,8 @@ temp-express/
 .env
 qa-output.json
 qa-final.json
-package-lock.json
+# package-lock.json must be committed for npm ci to work in CI
+# packages/*/package-lock.json
 .pkgdiet-metrics.json
 test-diff.js
 test-drift/
