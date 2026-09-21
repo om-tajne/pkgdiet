@@ -2,7 +2,20 @@
 
 PkgDiet gives organizations a single, transparent dependency-policy layer that can be enabled across supported AI clients and enforced independently in CI.
 
-It does **not** silently modify AI clients, install background services, or intercept npm commands automatically. Administrators and developers must explicitly enable it.
+PkgDiet is ready for **enterprise adoption pilots** with transparent opt-in deployment, pinned versions, local policy, and CI enforcement. It does **not** silently modify AI clients, install background services, or intercept npm commands automatically. 
+
+## Administrator Rollout Checklist
+- [ ] Client version is recorded and verified against PkgDiet documentation.
+- [ ] PkgDiet package version is explicitly pinned (e.g., `@2.0.0`).
+- [ ] Local MCP server launches successfully.
+- [ ] `tools/list` returns the expected four tools.
+- [ ] `check_dependency` returns a valid result.
+- [ ] Network/privacy behavior is reviewed and approved.
+- [ ] CI workflow is enabled.
+- [ ] Branch protection requires the PkgDiet CI check to pass.
+- [ ] Policy exceptions have an identified owner.
+- [ ] Developers know how to remove the integration.
+- [ ] Logs do not contain tokens, source files, or private policy content.
 
 PkgDiet can be deployed at three levels:
 
@@ -10,7 +23,6 @@ PkgDiet can be deployed at three levels:
 This is the only path that makes PkgDiet available across all developers at a company without individual setup.
 * Add PkgDiet to the organization's managed MCP allowlist or MDM payload.
 * Deploy global/user MCP settings for company-standard AI agents.
-* Pin the approved PkgDiet version.
 * Enforce the PkgDiet GitHub Action as a required status check on organization repositories.
 * Define approval and exception rules using a centralized `.pkgdietrc.json`.
 
@@ -32,6 +44,14 @@ Even if a company does not enable PkgDiet in its AI agents, the GitHub Action ca
 
 See [templates/org-pkgdiet-workflow.yml](../templates/org-pkgdiet-workflow.yml) for a reusable organizational workflow.
 
+## Policy Management
+A local `.pkgdietrc.json` defines your rules. For company adoption, you must establish:
+* **Who owns the file?** (e.g., Security or Platform team).
+* **How are exceptions approved?** (e.g., PR approvals requiring Security team review).
+* **How are changes reviewed?** (e.g., `CODEOWNERS` protection on `.pkgdietrc.json`).
+
+See [templates/enterprise-pkgdiet-policy.json](../templates/enterprise-pkgdiet-policy.json) for a strict starting point.
+
 ## Client-Specific Integration Guides
 
 * [Codex](CODEX.md)
@@ -39,7 +59,3 @@ See [templates/org-pkgdiet-workflow.yml](../templates/org-pkgdiet-workflow.yml) 
 * [Antigravity](ANTIGRAVITY.md)
 * [Cursor](CURSOR.md)
 * [GitHub Copilot](COPILOT.md)
-
-## Templates
-* [Enterprise Policy Template](../templates/enterprise-pkgdiet-policy.json)
-* [Reusable CI Workflow](../templates/org-pkgdiet-workflow.yml)

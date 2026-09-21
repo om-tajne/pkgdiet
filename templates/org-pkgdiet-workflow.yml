@@ -1,60 +1,40 @@
-name: PkgDiet Organization Enforcement
+name: PkgDiet Organization Gate
 
 # This is a reusable workflow template for Enterprise adoption.
-# It can be called from individual repository workflows to enforce
-# a central dependency policy across the organization.
+# It enforces a central dependency policy across the organization.
+# 
+# Organization Requirements:
+# 1. This workflow produces outputs and fails the check. It does NOT post PR comments natively.
+# 2. Branch protection must be configured separately in your repository settings to require this job.
 
 on:
-  workflow_call:
-    inputs:
-      node-version:
-        required: false
-        type: string
-        default: '20'
-      fail-on:
-        required: false
-        type: string
-        default: 'BLOCK'
-        description: 'Failure threshold: BLOCK or WARN'
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
 
 jobs:
-  dependency-policy:
+  pkgdiet:
     name: Enforce Dependency Policy
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        # Use a pinned SHA for strict supply-chain controls instead of a mutable v4 tag
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           # fetch-depth: 0 is strictly required to allow lockfile diffing against the base branch
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
-          node-version: ${{ inputs.node-version }}
+          node-version: '20'
 
       - name: Run PkgDiet CI Gate
-        id: pkgdiet
-        uses: om-tajne/pkgdiet@v2
+        uses: om-tajne/pkgdiet@v2 # Note: For stricter enterprise controls, pin this to a full SHA
         with:
-          # Base branch defaults to the PR target or HEAD~1
-          base: ${{ github.event.pull_request.base.sha || 'HEAD~1' }}
+          base: 'HEAD~1'
           environment: 'ci'
-          fail-on: ${{ inputs.fail-on }}
+          fail-on: 'BLOCK'
           version: '2.0.0'
-
-      # Optional: Post PR comment on failure
-      - name: Post PR Comment
-        if: failure() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '🚨 **PkgDiet CI Gate Failed**\nOne or more dependencies added in this PR violate the organization security policy. Please review the workflow logs.'
-            })
