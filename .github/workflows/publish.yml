@@ -110,7 +110,7 @@ jobs:
         #   GitHub user/org:    om-tajne
         #   Repository:         pkgdiet
         #   Workflow filename:  publish.yml   ← filename only, not the full path
-        run: npm publish --workspace=packages/core --access public
+        run: npm publish --workspace=packages/core --access public --provenance
 
   # ── Publish @pkgdiet/mcp (after core lands in registry) ──────────────────
   publish-mcp:
@@ -135,7 +135,7 @@ jobs:
         run: npx tsc -b packages/core packages/mcp
 
       - name: Publish @pkgdiet/mcp
-        run: npm publish --workspace=packages/mcp --access public
+        run: npm publish --workspace=packages/mcp --access public --provenance
 
   # ── Publish pkgdiet CLI (after mcp lands in registry) ────────────────────
   publish-cli:
@@ -160,4 +160,4 @@ jobs:
         run: npx tsc -b packages/core packages/mcp packages/cli
 
       - name: Publish pkgdiet
-        run: npm publish --workspace=packages/cli --access public
+        run: npm publish --workspace=packages/cli --access public --provenance
