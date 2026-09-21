@@ -52,6 +52,28 @@ A local `.pkgdietrc.json` defines your rules. For company adoption, you must est
 
 See [templates/enterprise-pkgdiet-policy.json](../templates/enterprise-pkgdiet-policy.json) for a strict starting point.
 
+## Pilot Acceptance Criteria
+A pilot is successful when:
+- The organization can configure PkgDiet without manually editing every repository.
+- At least one supported MCP client completes a real tool call.
+- The GitHub Action runs successfully on a pull request.
+- The policy is version-controlled and reviewed.
+- Developers understand WARN versus BLOCK.
+- No source code or private policy data is sent to a PkgDiet-hosted service.
+- Registry/network behavior is approved by the security team.
+- Exceptions have an owner and review process.
+- The team can remove PkgDiet cleanly.
+
+## Handling a Disputed Result
+Enterprise users need a clear escalation path when PkgDiet flags a necessary dependency:
+1. Review the package metadata and policy reason.
+2. Confirm whether the result came from cache or a fresh registry lookup.
+3. Re-run with `--no-cache` where appropriate.
+4. Check the active environment overlay.
+5. Record a temporary, reviewed exception in `.pkgdietrc.json` using `ignoreRules` if necessary.
+6. Add the exception owner and expiration date in your internal tracking system.
+7. Revisit the exception during dependency review.
+
 ## Client-Specific Integration Guides
 
 * [Codex](CODEX.md)
