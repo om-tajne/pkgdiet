@@ -1,30 +1,142 @@
-# CI/CD Integration
+# PkgDiet CI Guide
 
-The `pkgdiet ci` command evaluates newly added dependencies in pull requests or branches, acting as an enforcement backstop against policy violations.
+GitHub Action, CLI CI command, and exit codes.
 
-## Usage
+---
+
+## GitHub Action (reusable)
+
+```yaml
+name: PkgDiet Dependency Gate
+on:
+  pull_request:
+    branches: [main, master, develop]
+    paths:
+      - package.json
+      - package-lock.json
+      - yarn.lock
+      - pnpm-lock.yaml
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+        with:
+          fetch-depth: 0
+
+      - uses: om-tajne/pkgdiet@v2
+        with:
+          base: ${{ github.event.pull_request.base.sha }}
+          environment: ci
+          fail-on: BLOCK
+```
+
+### Action inputs
+
+| Input | Default | Description |
+|---|---|---|
+| `base` | `HEAD~1` | Git ref to compare against |
+| `environment` | `ci` | Policy environment overlay |
+| `fail-on` | `BLOCK` | Failure threshold: `BLOCK` or `WARN` |
+| `dry-run` | `false` | Print results without failing |
+| `working-directory` | `.` | Subdirectory containing `package.json` |
+| `version` | `2.0.0` | PkgDiet version to use |
+| `node-version` | `20` | Node.js version |
+
+### Action outputs
+
+| Output | Description |
+|---|---|
+| `verdict` | `PASS` or `FAIL` |
+| `summary` | Human-readable results summary |
+
+---
+
+## CLI CI command
 
 ```bash
 npx -y pkgdiet@2.0.0 ci --base HEAD~1 --env ci
 ```
 
-## Supported Lockfiles
+### Options
 
-`pkgdiet ci` relies on parsing lockfiles to determine which dependencies were added. Support is based on the lockfile format and version.
-
-| Package Manager | Lockfile Name | Status |
+| Flag | Default | Description |
 |---|---|---|
-| npm (v1, v2) | `package-lock.json` | Supported |
-| npm (v3) | `package-lock.json` | Supported |
-| Yarn (v1) | `yarn.lock` | Supported |
+| `--base <ref>` | `HEAD~1` | Git ref to diff against |
+| `--env <name>` | (none) | Policy environment overlay |
+| `--fail-on WARN` | (BLOCK) | Also fail on WARN verdicts |
+| `--dry-run` | (false) | Print results without exiting non-zero |
+| `--json` | (false) | Machine-readable JSON output to stdout |
 
-> *Note: Support for Yarn Berry (v2+), pnpm, and Bun is experimental or planned.*
+### Exit codes
 
-## Exit Codes
+| Result | Exit code |
+|---|---:|
+| All evaluated packages ALLOW | `0` |
+| One or more BLOCK (or WARN with `--fail-on WARN`) | `1` |
+| Invalid input or runtime error | non-zero |
 
-*   `0`: No newly added dependencies, or all added dependencies pass the policy evaluation (verdicts are `ALLOW` or `WARN` when `failOn` is not configured for warnings).
-*   `1`: Policy violations detected (one or more packages received a `BLOCK` verdict, or `WARN` if configured to fail on warnings).
+---
 
-## Base References
+## Standalone workflow (without reusable action)
 
-The `--base` flag requires a valid Git reference (e.g., `main`, `HEAD~1`, `origin/main`). Ensure your CI environment fetches sufficient git history to perform the comparison.
+```yaml
+name: PkgDiet Dependency Gate
+on:
+  pull_request:
+    branches: [main]
+    paths: [package.json, package-lock.json, yarn.lock, pnpm-lock.yaml]
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: 20
+
+      - name: Run PkgDiet CI gate
+        run: npx -y pkgdiet@2.0.0 ci --base HEAD~1 --env ci
+```
+
+---
+
+## Policy modification warning
+
+If `.pkgdietrc.json` is modified in the same PR that adds packages, PkgDiet appends a warning to the CI output:
+
+> 🔴 CRITICAL WARNING: The `.pkgdietrc.json` policy file was modified in this PR. Ensure the author did not maliciously weaken security thresholds to bypass this gate.
+
+Review policy changes independently of dependency changes when possible.
+
+---
+
+## Environment variables in CI
+
+| Variable | Purpose |
+|---|---|
+| `PKGDIET_NO_NETWORK=1` | Disable all registry calls (use cache only) |
+| `PKGDIET_CONCURRENCY=5` | Reduce concurrency in resource-limited CI |
+| `PKGDIET_FETCH_TIMEOUT_MS=15000` | Increase timeout for slow CI networks |
+| `PKGDIET_LOG_FORMAT=json` | Structured JSON logging |
+
+---
+
+## JSON output in CI
+
+```bash
+npx pkgdiet@2.0.0 ci --base HEAD~1 --env ci --json > ci-results.json 2>ci-diagnostics.log
+```
+
+JSON goes to stdout. Human-readable diagnostics go to stderr.

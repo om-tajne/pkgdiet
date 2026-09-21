@@ -6,73 +6,99 @@ import { getCached, batchSetCached } from './cache.js';
 import { timeSince } from './utils.js';
 const NPM_REGISTRY = 'https://registry.npmjs.org';
 const NPM_DOWNLOADS = 'https://api.npmjs.org/downloads/point';
-// Sprint 7: configurable via PKGDIET_CONCURRENCY env var (default: 15)
-const MAX_CONCURRENT = Number(process.env.PKGDIET_CONCURRENCY || '15');
+// Configurable via env var (default: 10)
+const MAX_CONCURRENT = Number(process.env.PKGDIET_CONCURRENCY || '10');
+// Maximum packages per analyzeHealth call — split into batches above this
+const BATCH_LIMIT = 200;
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
+const FETCH_TIMEOUT_MS = Number(process.env.PKGDIET_FETCH_TIMEOUT_MS || '10000');
+// ── Network helpers ───────────────────────────────────────────────────────────
+/**
+ * Fetch a URL with an explicit AbortController timeout.
+ * Returns { data, status } where data is the parsed JSON or null.
+ * Distinguishes: timeout, 404, 429, 5xx, bad-JSON, and success.
+ *
+ * @returns {{ data: object|null, status: 'ok'|'not_found'|'rate_limited'|'server_error'|'timeout'|'network_error'|'invalid_json' }}
+ */
+async function fetchWithTimeout(url, timeoutMs = FETCH_TIMEOUT_MS) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(url, {
+            headers: { Accept: 'application/json' },
+            signal: controller.signal,
+        });
+        clearTimeout(timer);
+        if (response.status === 404)
+            return { data: null, status: 'not_found' };
+        if (response.status === 429)
+            return { data: null, status: 'rate_limited' };
+        if (response.status >= 500)
+            return { data: null, status: 'server_error' };
+        if (!response.ok)
+            return { data: null, status: 'network_error' };
+        let data;
+        try {
+            data = await response.json();
+        }
+        catch {
+            return { data: null, status: 'invalid_json' };
+        }
+        return { data, status: 'ok' };
+    }
+    catch (err) {
+        clearTimeout(timer);
+        if (err.name === 'AbortError')
+            return { data: null, status: 'timeout' };
+        return { data: null, status: 'network_error' };
+    }
+}
 /**
  * Fetch with retry and exponential backoff.
+ * Retries on rate-limit (429) and server errors (5xx) only.
+ * Timeouts, 404s, and network errors are not retried.
+ *
+ * @returns {{ data: object|null, status: string }}
  */
 async function fetchWithRetry(url, retries = MAX_RETRIES) {
     for (let attempt = 0; attempt <= retries; attempt++) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s per attempt
-        try {
-            const response = await fetch(url, {
-                headers: { 'Accept': 'application/json' },
-                signal: controller.signal,
-            });
-            clearTimeout(timeoutId);
-            if (response.status === 429 || response.status >= 500) {
-                if (attempt < retries) {
-                    const delay = RETRY_DELAY_MS * Math.pow(2, attempt);
-                    await new Promise(r => setTimeout(r, delay));
-                    continue;
-                }
-            }
-            if (!response.ok) {
-                if (response.status === 404)
-                    return { _notFound: true };
-                return null;
-            }
-            return await response.json();
+        const result = await fetchWithTimeout(url);
+        // Retry on transient errors only
+        if ((result.status === 'rate_limited' || result.status === 'server_error') && attempt < retries) {
+            const delay = RETRY_DELAY_MS * Math.pow(2, attempt);
+            await new Promise(r => setTimeout(r, delay));
+            continue;
         }
-        catch (err) {
-            clearTimeout(timeoutId);
-            // Don't retry on timeout/abort — the network isn't coming back,
-            // retrying only makes the user wait longer before the graceful skip
-            if (err.name === 'AbortError') {
-                return null;
-            }
-            if (attempt < retries) {
-                const delay = RETRY_DELAY_MS * Math.pow(2, attempt);
-                await new Promise(r => setTimeout(r, delay));
-                continue;
-            }
-            return null; // network error → graceful skip
-        }
+        return result;
     }
-    return null;
+    return { data: null, status: 'network_error' };
 }
+// ── Concurrency pool ──────────────────────────────────────────────────────────
 /**
- * Run async tasks with concurrency limit.
+ * Run async tasks with a bounded concurrency limit.
+ * Consumes an iterator — never buffers all pending Promises at once.
+ * Results preserve input order. One failed task does not cancel others.
+ *
+ * @param {Array<() => Promise<T>>} tasks
+ * @param {number} limit
+ * @returns {Promise<T[]>}
  */
 async function withConcurrency(tasks, limit) {
-    const results = [];
+    const results = new Array(tasks.length);
     const executing = new Set();
-    for (const task of tasks) {
-        const p = task().then(result => {
-            executing.delete(p);
-            return result;
-        });
+    for (let i = 0; i < tasks.length; i++) {
+        const idx = i;
+        const p = tasks[idx]().then(result => { executing.delete(p); results[idx] = result; return result; }, err => { executing.delete(p); results[idx] = { _error: err }; });
         executing.add(p);
-        results.push(p);
         if (executing.size >= limit) {
             await Promise.race(executing);
         }
     }
-    return Promise.all(results);
+    await Promise.all(executing);
+    return results;
 }
+// ── Per-package health fetch ──────────────────────────────────────────────────
 /**
  * Fetch health data for a single package from npm registry.
  */
@@ -84,23 +110,13 @@ export async function fetchPackageHealth(packageName, projectPath, useCache) {
             return { ...cached, fromCache: true };
         }
     }
-    // Fetch registry metadata
     const encodedName = encodeURIComponent(packageName).replace('%40', '@');
-    const [registryData, downloadsData] = await Promise.all([
+    const [registryResult, downloadsResult] = await Promise.all([
         fetchWithRetry(`${NPM_REGISTRY}/${encodedName}`),
         fetchWithRetry(`${NPM_DOWNLOADS}/last-month/${encodedName}`),
     ]);
-    if (!registryData) {
-        return {
-            name: packageName,
-            score: null,
-            flags: ['skipped'],
-            reason: 'Could not fetch registry data (private registry or network error)',
-            skipped: true,
-            notFound: false,
-        };
-    }
-    if (registryData._notFound) {
+    // ── Not found ───────────────────────────────────────────────────────────────
+    if (registryResult.status === 'not_found') {
         return {
             name: packageName,
             score: null,
@@ -110,35 +126,54 @@ export async function fetchPackageHealth(packageName, projectPath, useCache) {
             notFound: true,
         };
     }
+    // ── Timeout — fail-open by default ─────────────────────────────────────────
+    if (registryResult.status === 'timeout') {
+        return {
+            name: packageName,
+            score: null,
+            flags: ['skipped'],
+            reason: 'Registry request timed out — network may be slow',
+            skipped: true,
+            notFound: false,
+            timedOut: true,
+        };
+    }
+    // ── Any other non-ok status ─────────────────────────────────────────────────
+    if (!registryResult.data) {
+        return {
+            name: packageName,
+            score: null,
+            flags: ['skipped'],
+            reason: `Registry unavailable (status: ${registryResult.status})`,
+            skipped: true,
+            notFound: false,
+        };
+    }
+    const registryData = registryResult.data;
     // Extract metadata
     const lastPublish = registryData.time?.modified || null;
     const maintainers = registryData.maintainers || [];
     const latestVersion = registryData['dist-tags']?.latest;
     const latestMeta = latestVersion ? registryData.versions?.[latestVersion] : null;
-    const monthlyDownloads = downloadsData?.downloads || 0;
+    const monthlyDownloads = downloadsResult.data?.downloads || 0;
     const deprecated = registryData.versions?.[latestVersion]?.deprecated || null;
-    // Extract install scripts for security checks
+    // Install scripts
     const installScripts = [];
-    if (latestMeta && latestMeta.scripts) {
+    if (latestMeta?.scripts) {
         for (const scriptName of ['preinstall', 'install', 'postinstall']) {
-            if (latestMeta.scripts[scriptName]) {
+            if (latestMeta.scripts[scriptName])
                 installScripts.push(scriptName);
-            }
         }
     }
-    // Check for TypeScript types
-    let hasTypes = false;
-    if (latestMeta) {
-        hasTypes = !!(latestMeta.types || latestMeta.typings);
-    }
-    // If not bundled, check if @types/* package exists
+    // TypeScript types
+    let hasTypes = !!(latestMeta?.types || latestMeta?.typings);
     let hasExternalTypes = false;
     if (!hasTypes && !packageName.startsWith('@types/')) {
         const typesName = `@types/${packageName.replace('@', '').replace('/', '__')}`;
-        const typesData = await fetchWithRetry(`${NPM_REGISTRY}/${encodeURIComponent(typesName).replace('%40', '@')}`);
-        hasExternalTypes = typesData !== null && !typesData._notFound;
+        const typesResult = await fetchWithTimeout(`${NPM_REGISTRY}/${encodeURIComponent(typesName).replace('%40', '@')}`);
+        hasExternalTypes = typesResult.status === 'ok' && typesResult.data !== null;
     }
-    // Calculate scores for each factor
+    // ── Scoring ─────────────────────────────────────────────────────────────────
     const scores = {};
     // 1. Last publish date (35%)
     if (lastPublish) {
@@ -182,25 +217,22 @@ export async function fetchPackageHealth(packageName, projectPath, useCache) {
         scores.types = 70;
     else
         scores.types = 0;
-    // Weighted total
     let totalScore = Math.round(scores.lastPublish * 0.35 +
         scores.downloads * 0.25 +
         scores.maintainers * 0.20 +
         scores.types * 0.20);
-    // Hard cap score for explicitly deprecated packages
-    if (deprecated) {
+    // Hard cap for deprecated packages
+    if (deprecated)
         totalScore = Math.min(totalScore, 15);
-    }
-    // Generate flags
+    // ── Flags ───────────────────────────────────────────────────────────────────
     const flags = [];
     if (deprecated) {
         flags.push({ type: 'critical', label: `Deprecated: ${deprecated}` });
     }
     if (lastPublish) {
         const { years } = timeSince(lastPublish);
-        if (years >= 2) {
+        if (years >= 2)
             flags.push({ type: 'critical', label: `Unmaintained (${years}yr)` });
-        }
     }
     if (maintainers.length === 1) {
         flags.push({ type: 'warning', label: 'Single maintainer' });
@@ -211,7 +243,6 @@ export async function fetchPackageHealth(packageName, projectPath, useCache) {
     if (installScripts.length > 0) {
         flags.push({ type: 'warning', label: `Install scripts (${installScripts.join(', ')})` });
     }
-    // Size and Cost info
     const unpackedSize = latestMeta?.dist?.unpackedSize || 0;
     const dependencyCount = Object.keys(latestMeta?.dependencies || {}).length;
     const result = {
@@ -232,16 +263,28 @@ export async function fetchPackageHealth(packageName, projectPath, useCache) {
     };
     return result;
 }
+// ── Batch health analysis ─────────────────────────────────────────────────────
 /**
  * Analyze health of all specified packages.
+ * Automatically splits into batches of BATCH_LIMIT to avoid heap pressure.
  *
- * @param {string[]} packageNames - List of package names to analyze
- * @param {string} projectPath - Project root path (for caching)
- * @param {object} options - { useCache: boolean }
- * @returns {object[]} Array of health results
+ * @param {string[]} packageNames
+ * @param {string}   projectPath
+ * @param {object}   options — { useCache, onProgress }
+ * @returns {object[]}
  */
 export async function analyzeHealth(packageNames, projectPath, options = {}) {
     const { useCache = true, onProgress } = options;
+    // Split into batches if needed
+    if (packageNames.length > BATCH_LIMIT) {
+        const allResults = [];
+        for (let i = 0; i < packageNames.length; i += BATCH_LIMIT) {
+            const batch = packageNames.slice(i, i + BATCH_LIMIT);
+            const batchResults = await analyzeHealth(batch, projectPath, options);
+            allResults.push(...batchResults);
+        }
+        return allResults;
+    }
     const total = packageNames.length;
     let completed = 0;
     const tasks = packageNames.map(name => async () => {
@@ -254,10 +297,10 @@ export async function analyzeHealth(packageNames, projectPath, options = {}) {
         return result;
     });
     const results = await withConcurrency(tasks, MAX_CONCURRENT);
-    // Batch save to cache
+    // Batch save to cache (skip entries that errored)
     if (useCache) {
         const cacheEntries = results
-            .filter(r => !r.skipped && !r.fromCache)
+            .filter(r => r && !r.skipped && !r.fromCache && !r._error)
             .map(r => ({ packageName: r.name, key: 'health', data: r }));
         if (cacheEntries.length > 0) {
             batchSetCached(projectPath, cacheEntries);

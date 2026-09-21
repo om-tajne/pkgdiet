@@ -1,93 +1,119 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to the supported packages are documented here.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
-## [2.0.0] - 2026-09-14
+---
+
+## [Unreleased]
+
+_No changes yet._
+
+---
+
+## [2.0.0] — 2026-09-21
+
+### Packages
+
+This release covers the supported npm packages:
+- `@pkgdiet/core@2.0.0`
+- `@pkgdiet/mcp@2.0.0`
+- `pkgdiet@2.0.0`
+
+The GitHub App, Dashboard, and Docker deployment are **experimental** and are not part of this release.
+
+---
 
 ### Breaking changes
 
-- **`@pkgdiet/core` — `run()` result shape**
+**`@pkgdiet/core` — Result field renames**
 
-  The following v1 field names are no longer returned by `run()`:
+The following fields in the `run()` result object have been renamed. Old names no longer exist:
 
-  | Removed (v1) | Replacement (v2) |
-  |---|---|
-  | `unusedDeps` | `unusedDependencies` |
-  | `unhealthyDeps` | `unhealthyDependencies` |
-  | `nodeModulesSize` | `sizeResults.totalNodeModules` |
+| v1 field | v2 field |
+|---|---|
+| `unusedDeps` | `unusedDependencies` |
+| `unhealthyDeps` | `unhealthyDependencies` |
+| `nodeModulesSize` | `sizeResults.totalNodeModules` |
 
-  Consumers using the old field names must migrate to the v2 contract documented in `packages/core/README.md`.
+**`@pkgdiet/mcp` — Batch size limit**
 
-- **`@pkgdiet/core` — package exports**
-
-  The `"./dist/*.js"` wildcard export is removed. Only named subpath exports are available.
-
-- **`@pkgdiet/core` — alternatives module split**
-
-  `alternatives.js` is now a thin ESM loader wrapper. Bundling environments (VS Code, webpack) must import from `@pkgdiet/core/dist/alternatives-extension.js` and call `injectAlternatives(data)` before any lookup.
-
-### New features
-
-- MCP `get_policy` tool now calls real `validatePolicy()`.
-- `run()` normalizers guard against shape drift in underlying modules.
-- Graceful degradation: a single failed registry lookup no longer crashes a full audit.
-- VS Code extension eliminates the CJS/ESM `import.meta` warning at the architectural root.
-- `policyEngine.ts` `IgnoreRule` named union type: `string | { package: string; reason?: string }`.
-
-### Fixes
-
-- `run()` fully rewritten with correct call signatures derived from inspected module exports.
-- CLI `audit` action no longer discards the `run()` return value.
-- MCP `suggest_alternative` bounds `maxResults` to `[1, 5]` via Zod schema.
-
-### Tests added
-
-- 11 reporter/CLI render path tests.
-- 6 `run()` contract tests enforcing the stable public shape.
-- 2 MCP test cases covering all 4 tools, invalid arguments, schema bounds, and stdout hygiene.
+`check_dependencies` now enforces a hard limit of 50 packages per request. Requests exceeding this limit return a structured `BATCH_LIMIT_EXCEEDED` error instead of being processed.
 
 ---
 
-## [1.2.0] - 2026-09-01
-
 ### Added
-- **Dependency Risk & Cost Gate**: Shifted from post-hoc audits to proactive governance.
-- **`pkgdiet check <package>`**: Instant (sub-2s) pre-install evaluation of health, cost (CI minutes + $), and size against your team's policy.
-- **MCP Server for AI Agents**: `pkgdiet mcp` allows Copilot, Cursor, and Claude to instantly vet dependencies and receive lighter alternatives mid-task over JSON-RPC.
-- **CI PR Gate**: `pkgdiet ci` parses `package-lock.json` diffs to detect new direct or transitive dependencies, evaluates them, and comments on PRs.
-- **Drift Scanning**: `pkgdiet drift` catches silent degradation in already-installed dependencies (e.g. newly deprecated or abandoned).
-- **Policy Engine**: `pkgdiet init` generates a `.pkgdietrc.json` to define `minHealthScore`, size limits, and `ignoreRules` escape hatches.
-- **Telemetry**: Opt-out, local-only metric tracking (`.pkgdiet-metrics.json`) for latencies, bypasses, and verdicts to measure governance success.
 
-### Changed
-- **Monorepo Support**: Removed the artificial single-package block on `pkgdiet audit` and other commands. Workspaces are now naturally scanned.
+**`@pkgdiet/core`**
+- `validation.js` — `assertPackageName(value)` and `partitionPackageNames(names[])` for input validation at every entrypoint.
+- Atomic cache writes using per-process temp file + `renameSync`. Corrupt cache entries are quarantined rather than crashing.
+- LRU eviction: when cache exceeds 5 000 entries, 500 oldest are removed.
+- `fetchWithTimeout(url, ms)` — typed network failure states: `ok | not_found | rate_limited | server_error | timeout | network_error | invalid_json`.
+- `withConcurrency(tasks, limit)` — iterative bounded worker pool. No `Promise.all` over unbounded task lists.
+- `analyzeHealth` auto-splits batches >200 packages into sequential sub-batches.
+- `ci-gate.js` — all packages evaluated in parallel with bounded concurrency; per-package 10 s timeout with WARN fallback.
+- New environment variables: `PKGDIET_FETCH_TIMEOUT_MS`, `PKGDIET_NO_NETWORK`.
+
+**`@pkgdiet/mcp`**
+- Per-process token bucket rate limiter (30 tool calls/minute).
+- 15-second wall-clock timeout per tool via `Promise.race`.
+- `check_dependencies` uses `withConcurrency(10)` — not `Promise.all`.
+- `assertPackageName` called at every tool boundary before any network call.
+- `partitionPackageNames` used in batch tool — invalid names become `validationWarnings`; valid names are still evaluated.
+- Structured error codes: `RATE_LIMIT_EXCEEDED`, `TOOL_TIMEOUT`, `INVALID_INPUT`, `BATCH_LIMIT_EXCEEDED`.
+- Rate limiter scope documented as per-process.
+
+**`pkgdiet` CLI**
+- `assertPackageName` validation at the `check` command boundary — exits 1 with a clear error message on invalid package names.
+- `agent-setup` MCP args pinned to `pkgdiet@2.0.0` — not `@latest`.
+
+**CI / Publishing**
+- `.github/workflows/ci.yml` — actions pinned to full SHAs; `permissions: contents: read`; `npm ci`; three test suites; CLI smoke test.
+- `.github/workflows/publish.yml` — npm Trusted Publishing (OIDC, no `NPM_TOKEN`); concurrency guard (`cancel-in-progress: false`); version-check step asserting tag matches all three `package.json` versions; sequential core → mcp → cli publish.
+
+**Documentation**
+- `docs/POLICY.md` — canonical `.pkgdietrc.json` schema reference.
+- `docs/MCP.md` — tool parameters, response schemas, error codes, per-client setup.
+- `docs/CI.md` — GitHub Action, CLI options, exit codes.
+- `docs/ARCHITECTURE.md` — technical walkthrough.
+- `docs/VSCODE.md` — VS Code extension settings and limitations.
+- `docs/INTEGRATIONS.md` — tested client support matrix.
+- `CONTRIBUTING.md` — contributor setup and guidelines.
+- `SECURITY.md` — GitHub Security Advisories private reporting link.
+
+**Tests**
+- `packages/core/tests/policy.unit.test.js` — 21 deterministic offline tests covering all `validatePolicy`, `evaluatePolicy`, and `applyEnvironment` paths.
+- `packages/core/tests/checker.unit.test.js` — 18 deterministic offline tests covering validation, threshold logic, fail-open/closed, normalization.
+- **Total: 45 tests, all offline.**
 
 ---
 
-## [1.1.0] - 2026-08-17
-- **Detection Accuracy**: Fixed a nested glob ignore pattern bug (`**/node_modules/**`) where internal JS files inside `node_modules` were previously traversed, eliminating potential false-negative "used" dependency classifications.
-- **Deprecation Cleanliness**: Upgraded `glob` dependency to resolve upstream npm deprecation warnings.
+### Fixed
 
-### Added
-- **`--prod` (alias `--exclude-dev`)**: Flag to opt-out of devDependencies analysis when auditing production bundles. (Default remains scanning all declared dependencies).
-- **Live Progress Indicator**: Interactive real-time spinner (`Checking health (X/Y): <package>...`) during health checks without breaking the final ASCII summary layout.
-
-### Changed
-- **Concurrency**: Increased parallel health check workers (`MAX_CONCURRENT`) from 5 to 15, accelerating remote registry analysis by up to 3x (verified against 478 live packages with 0 rate-limits).
+- Cache file corruption under concurrent MCP agent calls (atomic writes).
+- Sequential for-loop in CI gate causing slow PR checks on large dependency sets.
+- `check_dependencies` holding all network Promises in memory simultaneously (`Promise.all` removed).
+- MCP tools having no timeout — requests to slow npm registry could block indefinitely.
+- `pkgdiet@latest` in agent-setup generated config — replaced with pinned version.
 
 ---
 
-## [1.0.0] - 2026-08-17
+### Security
 
-### Added
-- Initial public release of PkgDiet 🥗
-- AST-based unused dependency detection (ESM, CJS, TS, JSX)
-- Dependency health scoring (maintenance, download trends, single maintainer / bus factor risk)
-- Package install size analysis
-- Lighter, modern alternative recommendations
-- Interactive `--fix` mode with preview and dry-run safety
-- JSON output (`--json`) for CI/CD integration
-- 24-hour local response caching
+- Package names are validated at every entrypoint (CLI, MCP, VS Code) before any network call.
+- SECURITY.md now uses GitHub private vulnerability reporting — no invented email address.
+- CI actions pinned to full commit SHAs.
+- Publishing uses OIDC Trusted Publishing — no long-lived `NPM_TOKEN` secret required.
+
+---
+
+## [1.x]
+
+End of life. Upgrade to v2.0.0.
+
+---
+
+[Unreleased]: https://github.com/om-tajne/pkgdiet/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/om-tajne/pkgdiet/releases/tag/v2.0.0

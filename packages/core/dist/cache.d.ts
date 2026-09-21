@@ -1,6 +1,11 @@
 /**
  * PkgDiet — Cache Manager
  * Local file cache to avoid hammering npm registry on every run.
+ *
+ * Atomic writes: write to a unique temp file then rename — safe for concurrent
+ * processes on any OS that supports atomic rename (Linux, macOS, Windows NTFS).
+ * Corrupt cache: rename to .corrupt.<timestamp> and start fresh — never print
+ * cache contents in error messages.
  */
 /**
  * Get a cached entry if it exists and is not expired.
@@ -19,7 +24,7 @@ export declare function batchSetCached(projectPath: any, entries: any): void;
  */
 export declare function clearCache(projectPath: any): void;
 /**
- * Sprint 7: Prune cache entries older than `olderThanMs` milliseconds.
+ * Prune cache entries older than `olderThanMs` milliseconds.
  * @param {string} projectPath
  * @param {number} olderThanMs
  * @returns {number} number of entries removed
