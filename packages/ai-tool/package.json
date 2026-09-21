@@ -33,6 +33,7 @@
     "mcp", "ai-agent", "langchain", "vercel-ai", "openai", "anthropic",
     "tool", "npm", "dependency-check", "supply-chain", "pkgdiet"
   ],
+  "private": true,
   "license": "MIT",
   "author": "om-tajne",
   "homepage": "https://github.com/om-tajne/pkgdiet#readme",

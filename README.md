@@ -21,28 +21,52 @@ PkgDiet is local-first and opt-in. MCP provides guidance to compatible AI client
 
 ---
 
-## Start in 30 seconds
-
-Requirements: Node.js 20+.
+## Commands
 
 ```bash
-# Preview and confirm project setup (creates .pkgdietrc.json and optional integration files)
+# Full project audit (default)
+npx -y pkgdiet@2.0.0 audit
+
+# Check one or more packages before installing them
+npx -y pkgdiet@2.0.0 check moment request lodash
+
+# CI gate — evaluate newly added packages in a PR (lockfile-diff-based, not full audit)
+npx -y pkgdiet@2.0.0 ci --base HEAD~1 --env ci
+
+# Start the MCP server for AI agent integration
+npx -y pkgdiet@2.0.0 mcp
+
+# Interactive setup wizard
 npx -y pkgdiet@2.0.0 setup
 
-# Check a package before installing it
-npx -y pkgdiet@2.0.0 check moment
+# All-in-one setup: creates policy, CI workflow, and agent configs
+npx -y pkgdiet@2.0.0 init
 
-# Start the local MCP server (for AI agent integration)
-npx -y pkgdiet@2.0.0 mcp
+# Configure MCP for supported AI agents non-interactively
+npx -y pkgdiet@2.0.0 agent-setup --detect
+
+# Browse all curated alternatives
+npx -y pkgdiet@2.0.0 alternatives list
+
+# Find alternatives for a specific package
+npx -y pkgdiet@2.0.0 alternatives search request
+
+# Detect health drift in installed dependencies
+npx -y pkgdiet@2.0.0 drift
+
+# Validate your .pkgdietrc.json policy file
+npx -y pkgdiet@2.0.0 policy-check
+
+# Generate a reviewer-ready PR to add PkgDiet to any repo
+npx -y pkgdiet@2.0.0 pr
+
+# Automatically configure Claude Desktop MCP
+npx -y pkgdiet@2.0.0 mcp-install
 ```
 
-For a CI dependency gate:
-
-```bash
-npx -y pkgdiet@2.0.0 ci --base HEAD~1 --env ci
-```
-
-> `pkgdiet setup` previews the exact files it will create or modify and asks for confirmation before writing anything. It does not silently modify global AI configuration.
+> **Setup vs Init:** `setup` is the interactive wizard that prompts you for policy and agent selections. `init` is the non-interactive, all-in-one setup command. Both commands preview the exact files they will create or update and ask for confirmation before writing.
+> 
+> **CI command:** `pkgdiet ci` compares the current lockfile with a base Git ref and evaluates newly added dependencies. It does not replace `pkgdiet audit` (which checks all dependencies).
 
 ---
 

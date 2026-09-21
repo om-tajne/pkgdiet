@@ -32,32 +32,44 @@ npx -y pkgdiet@2.0.0 setup
 ## Commands
 
 ```bash
-# Check a package before installing it
-npx -y pkgdiet@2.0.0 check moment
-
-# Check multiple packages
-npx -y pkgdiet@2.0.0 check moment request lodash
-
-# Full project audit
+# Full project audit (default)
 npx -y pkgdiet@2.0.0 audit
 
-# Browse curated alternatives
-npx -y pkgdiet@2.0.0 alternatives search request
+# Check one or more packages before installing them
+npx -y pkgdiet@2.0.0 check moment request lodash
 
-# Validate your policy file
-npx -y pkgdiet@2.0.0 policy-check
-
-# Detect health drift in installed dependencies
-npx -y pkgdiet@2.0.0 drift
-
-# CI gate — evaluate new packages added in a PR
+# CI gate — evaluate newly added packages in a PR (lockfile-diff-based, not full audit)
 npx -y pkgdiet@2.0.0 ci --base HEAD~1 --env ci
 
 # Start the MCP server for AI agent integration
 npx -y pkgdiet@2.0.0 mcp
 
-# Configure MCP for supported AI agents in the current project
+# Interactive setup wizard
+npx -y pkgdiet@2.0.0 setup
+
+# All-in-one setup: creates policy, CI workflow, and agent configs
+npx -y pkgdiet@2.0.0 init
+
+# Configure MCP for supported AI agents non-interactively
 npx -y pkgdiet@2.0.0 agent-setup --detect
+
+# Browse all curated alternatives
+npx -y pkgdiet@2.0.0 alternatives list
+
+# Find alternatives for a specific package
+npx -y pkgdiet@2.0.0 alternatives search request
+
+# Detect health drift in installed dependencies
+npx -y pkgdiet@2.0.0 drift
+
+# Validate your .pkgdietrc.json policy file
+npx -y pkgdiet@2.0.0 policy-check
+
+# Generate a reviewer-ready PR to add PkgDiet to any repo
+npx -y pkgdiet@2.0.0 pr
+
+# Automatically configure Claude Desktop MCP
+npx -y pkgdiet@2.0.0 mcp-install
 ```
 
 ---
@@ -112,9 +124,13 @@ JSON is written to **stdout**. Human-readable diagnostics are written to **stder
 
 ---
 
-## Setup confirmation
+## Setup vs Init
 
-`pkgdiet setup` previews the exact files it will create or update and asks for confirmation before writing. It does not silently modify global AI configuration or shell profiles.
+`setup` is the interactive wizard that prompts you for policy and agent selections. 
+
+`init` is the non-interactive, all-in-one setup command for configuring policy, a GitHub Actions CI workflow, and detected agent configurations in one shot.
+
+Both commands preview the exact files they will create or update and ask for confirmation before writing. They do not silently modify global AI configuration or shell profiles.
 
 ---
 
@@ -123,6 +139,8 @@ JSON is written to **stdout**. Human-readable diagnostics are written to **stder
 ```bash
 npx -y pkgdiet@2.0.0 ci --base HEAD~1 --env ci
 ```
+
+`pkgdiet ci` compares the current lockfile with a base Git ref and evaluates newly added dependencies. It is lockfile-diff-based and does not replace `pkgdiet audit` (which checks all dependencies).
 
 `ci` reads `failOn` from your `.pkgdietrc.json` (default: `BLOCK`). Options: `BLOCK`, `WARN`, `NONE`.
 

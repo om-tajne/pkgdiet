@@ -4,6 +4,14 @@ MCP tools and client setup for local dependency-policy checks.
 
 ---
 
+## Working directory
+
+The MCP server evaluates packages from the directory in which the server process is launched. **The v2.0.0 tool schemas do not accept a `projectPath` argument.** All tools use `process.cwd()`.
+
+To check packages for a specific project, launch the server from that project's root, or use the CLI instead.
+
+---
+
 ## What the MCP server provides
 
 The PkgDiet MCP server exposes four read-only tools over stdio. Compatible AI clients can call these tools before recommending or installing npm packages.
@@ -45,8 +53,39 @@ Evaluate a single npm package against the active project policy.
 | `recommendation.action` | `"proceed"` \| `"review"` \| `"replace"` \| `"block"` |
 | `recommendation.primaryAlternative` | Top curated alternative name, or `null` |
 | `alternatives` | Array of curated replacement names |
-| `addedSizeBytes` | Estimated unpacked size |
-| `costImpactPerMonthUsd` | Estimated CI cost impact |
+| `addedSizeBytes` | Estimated unpacked size in bytes (scenario-based estimate) |
+| `costImpactPerMonthUsd` | Estimated CI cost impact in USD (scenario-based estimate) |
+
+> **Field name note:** The CLI (`pkgdiet check`) and the MCP tool use different field names. The MCP response uses `addedSizeBytes` and `costImpactPerMonthUsd`. Do not assume they match CLI output.
+>
+> **`hasProvenance: false`** means provenance was not evaluated in v2.0.0. It does not mean the package lacks npm provenance attestation.
+>
+> **`integrityCheck: "missing"`** means verification was not performed, not that verification failed.
+
+**Full example response:**
+
+```json
+{
+  "schemaVersion": 2,
+  "packageName": "moment",
+  "verdict": "WARN",
+  "healthScore": 100,
+  "reasons": ["Efficiency Flag: Better alternatives exist for moment."],
+  "recommendation": {
+    "action": "replace",
+    "primaryAlternative": "dayjs"
+  },
+  "security": {
+    "registryVerified": true,
+    "hasProvenance": false,
+    "integrityCheck": "missing"
+  },
+  "policy": { "source": "local", "policyVersion": 1, "environment": "dev" },
+  "addedSizeBytes": 4351066,
+  "costImpactPerMonthUsd": 0.032,
+  "alternatives": ["dayjs", "date-fns"]
+}
+```
 
 ---
 
