@@ -105,14 +105,11 @@ jobs:
         run: npx tsc -b packages/core
 
       - name: Publish @pkgdiet/core
-        # Trusted Publishing: OIDC short-lived token exchange — no NPM_TOKEN needed.
-        # Prerequisites on npmjs.com (configure once per package):
-        #   GitHub user/org:    om-tajne
-        #   Repository:         pkgdiet
-        #   Workflow filename:  publish.yml   ← filename only, not the full path
-        run: npm publish --workspace=packages/core --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --workspace=packages/core --access public
 
-  # ── Publish @pkgdiet/mcp (after core lands in registry) ──────────────────
+  # 📦 Publish @pkgdiet/mcp (after core lands in registry) 📦
   publish-mcp:
     name: Publish @pkgdiet/mcp
     needs: publish-core
@@ -135,9 +132,11 @@ jobs:
         run: npx tsc -b packages/core packages/mcp
 
       - name: Publish @pkgdiet/mcp
-        run: npm publish --workspace=packages/mcp --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --workspace=packages/mcp --access public
 
-  # ── Publish pkgdiet CLI (after mcp lands in registry) ────────────────────
+  # 📦 Publish pkgdiet CLI (after mcp lands in registry) 📦
   publish-cli:
     name: Publish pkgdiet (CLI)
     needs: publish-mcp
@@ -160,4 +159,6 @@ jobs:
         run: npx tsc -b packages/core packages/mcp packages/cli
 
       - name: Publish pkgdiet
-        run: npm publish --workspace=packages/cli --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --workspace=packages/cli --access public
