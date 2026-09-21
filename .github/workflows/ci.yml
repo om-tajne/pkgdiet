@@ -3,8 +3,28 @@ name: Node.js CI
 on:
   push:
     branches: ["main"]
+    paths:
+      - "packages/**"
+      - "scripts/**"
+      - "action.yml"
+      - ".github/workflows/ci.yml"
+      - "*.json"
+      - "*.yaml"
+      - "*.yml"
+      - "!apps/**"
+      - "!*.tgz"
   pull_request:
     branches: ["main"]
+    paths:
+      - "packages/**"
+      - "scripts/**"
+      - "action.yml"
+      - ".github/workflows/ci.yml"
+      - "*.json"
+      - "*.yaml"
+      - "*.yml"
+      - "!apps/**"
+      - "!*.tgz"
 
 # Least-privilege: only read repo contents
 permissions:
