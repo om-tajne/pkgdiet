@@ -67,13 +67,13 @@ program
     await import('@pkgdiet/core/dist/alternatives.js'); // Ensure dataset is loaded
     const { checkPackage } = await import('@pkgdiet/core/dist/checker.js');
     const { loadPolicy, applyEnvironment } = await import('@pkgdiet/core/dist/policy.js');
+    const { assertPackageName } = await import('@pkgdiet/core/dist/validation.js');
 
     let policy = loadPolicy(options.path);
     if (options.env) policy = applyEnvironment(policy, options.env);
 
     // Normalize: split any single string containing spaces or commas into multiple
     // package names (common when AI agents build arguments from natural language).
-    // Also lowercase everything — npm names are case-insensitive but always stored lowercase.
     const normalizedPackages = packages
       .flatMap(p => p.split(/[\s,]+/))
       .map(p => p.trim().toLowerCase())
@@ -91,12 +91,23 @@ program
       process.exit(1);
     }
 
-    const isBatch = normalizedPackages.length > 1;
+    // Validate all names at the CLI boundary before any network call
+    const validatedPackages = [];
+    for (const name of normalizedPackages) {
+      try {
+        validatedPackages.push(assertPackageName(name));
+      } catch (err) {
+        process.stderr.write(`Error: ${err.message}\n`);
+        process.exit(1);
+      }
+    }
+
+    const isBatch = validatedPackages.length > 1;
 
     if (isBatch) {
       // ─── Batch mode: compact table ────────────────────────────
       const results = await Promise.all(
-        normalizedPackages.map(pkgName => checkPackage(pkgName, options.path, { policy }))
+        validatedPackages.map(pkgName => checkPackage(pkgName, options.path, { policy }))
       );
 
       if (options.json) {
@@ -125,7 +136,7 @@ program
       if (hasBlock) process.exit(1);
     } else {
       // ─── Single mode: detailed output ─────────────────────────
-      const pkgName = normalizedPackages[0];
+      const pkgName = validatedPackages[0];
       const result = await checkPackage(pkgName, options.path, { policy });
 
       if (options.json) {

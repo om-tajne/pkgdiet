@@ -1,0 +1,163 @@
+name: Publish to npm (Trusted Publishing)
+
+# Triggers only on version tags: v2.0.0, v2.1.0, v2.0.1, etc.
+# Do NOT trigger on pre-release tags like v2.0.0-beta.1 — add a separate workflow for that.
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+# Trusted Publishing requires id-token: write (OIDC).
+# No NPM_TOKEN secret is needed — npm generates provenance automatically.
+permissions:
+  contents: read
+  id-token: write
+
+# Prevent concurrent publish runs (e.g. two tags pushed close together).
+# cancel-in-progress: false ensures an in-flight publish is never killed mid-run.
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  # ── Verify: build, test, version check, dry-run pack ─────────────────────
+  verify:
+    name: Verify build and tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          cache: "npm"
+
+      - name: Install
+        run: npm ci
+
+      - name: Build all supported packages
+        # Explicitly lists only supported packages — experimental apps are excluded.
+        run: npx tsc -b packages/core packages/mcp packages/cli
+
+      - name: Check tag version matches all package.json versions
+        # Ensures the pushed tag (e.g. v2.0.0) matches every package before any publish.
+        # Stops the entire workflow if any package is out of sync.
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const tag = process.env.GITHUB_REF_NAME;
+          const expected = tag.replace(/^v/, '');
+          const files = [
+            'packages/core/package.json',
+            'packages/mcp/package.json',
+            'packages/cli/package.json',
+          ];
+          for (const file of files) {
+            const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
+            if (pkg.version !== expected) {
+              throw new Error(
+                `${file} has version ${pkg.version}; tag is ${tag} (expected ${expected})`
+              );
+            }
+          }
+          console.log(`All packages verified at version ${expected}`);
+          NODE
+
+      - name: Run tests
+        run: |
+          node --test packages/core/tests/run.contract.test.js
+          node --test packages/core/tests/policy.unit.test.js
+          node --test packages/core/tests/checker.unit.test.js
+
+      - name: Dry-run pack (inspect published file list)
+        # Review output to confirm tarballs exclude: .env, .npmrc, node_modules, *.db,
+        # *.sqlite, .pkgdiet-cache.json, .pkgdiet-metrics.json, apps/, *.vsix, *.tgz
+        run: |
+          npm pack --dry-run --workspace=packages/core
+          npm pack --dry-run --workspace=packages/mcp
+          npm pack --dry-run --workspace=packages/cli
+
+  # ── Publish @pkgdiet/core ─────────────────────────────────────────────────
+  publish-core:
+    name: Publish @pkgdiet/core
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          cache: "npm"
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npx tsc -b packages/core
+
+      - name: Publish @pkgdiet/core
+        # Trusted Publishing: OIDC short-lived token exchange — no NPM_TOKEN needed.
+        # Prerequisites on npmjs.com (configure once per package):
+        #   GitHub user/org:    om-tajne
+        #   Repository:         pkgdiet
+        #   Workflow filename:  publish.yml   ← filename only, not the full path
+        run: npm publish --workspace=packages/core --access public
+
+  # ── Publish @pkgdiet/mcp (after core lands in registry) ──────────────────
+  publish-mcp:
+    name: Publish @pkgdiet/mcp
+    needs: publish-core
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          cache: "npm"
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npx tsc -b packages/core packages/mcp
+
+      - name: Publish @pkgdiet/mcp
+        run: npm publish --workspace=packages/mcp --access public
+
+  # ── Publish pkgdiet CLI (after mcp lands in registry) ────────────────────
+  publish-cli:
+    name: Publish pkgdiet (CLI)
+    needs: publish-mcp
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          cache: "npm"
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npx tsc -b packages/core packages/mcp packages/cli
+
+      - name: Publish pkgdiet
+        run: npm publish --workspace=packages/cli --access public

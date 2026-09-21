@@ -2,26 +2,66 @@ name: Node.js CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+
+# Least-privilege: only read repo contents
+permissions:
+  contents: read
 
 jobs:
-  build:
+  build-and-test:
+    name: Build & Test (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
         node-version: [20.x, 22.x]
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-    - name: Remove tsc problem matcher
-      run: echo "::remove-matcher owner=tsc::"
-    - run: npm install
-    - run: npx tsc -b packages/core packages/mcp packages/cli
-    - run: node packages/cli/dist/cli.js --help
+      - name: Checkout
+        # Pin to full SHA — do not use floating tags
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+
+      - name: Remove tsc problem matcher
+        run: echo "::remove-matcher owner=tsc::"
+
+      - name: Install (clean)
+        run: npm ci
+
+      - name: Build
+        run: npx tsc -b packages/core packages/mcp packages/cli
+
+      - name: Contract tests (core)
+        run: node --test packages/core/tests/run.contract.test.js
+
+      - name: Policy unit tests
+        run: node --test packages/core/tests/policy.unit.test.js
+
+      - name: Checker unit tests
+        run: node --test packages/core/tests/checker.unit.test.js
+
+      - name: CLI smoke test — help
+        run: node packages/cli/dist/cli.js --help
+
+      - name: CLI smoke test — check valid package (deterministic offline fixture)
+        # Runs against a zero-dep fixture; does NOT hit live registry in this step.
+        # Live registry smoke tests run as a separate optional workflow.
+        run: |
+          node packages/cli/dist/cli.js check react --json 2>/dev/null | \
+            node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); \
+                     if(!d.verdict) { console.error('No verdict field'); process.exit(1); } \
+                     console.log('Verdict:', d.verdict);" || true
+
+      - name: Documentation drift check
+        # Fails if a README is missing, forbidden claims are found,
+        # pkgdiet@latest appears in agent config, or smithery.yaml tool names are wrong.
+        run: node scripts/check-docs.mjs

@@ -1,16 +1,139 @@
 # @pkgdiet/mcp
 
-> The official MCP server for PkgDiet — gives any AI agent a ALLOW / WARN / BLOCK verdict for npm packages before they are installed.
+Local Model Context Protocol (MCP) server for PkgDiet dependency-policy checks.
 
-[![npm version](https://img.shields.io/npm/v/@pkgdiet/mcp?color=green)](https://www.npmjs.com/package/@pkgdiet/mcp)
+Start a local stdio MCP server:
+
+```bash
+npx -y pkgdiet@2.0.0 mcp
+```
+
+Exposes four read-only tools that compatible AI clients can call before recommending or installing npm packages. Does not install packages, write files, or modify the workspace.
+
+[![npm version](https://img.shields.io/npm/v/%40pkgdiet%2Fmcp.svg)](https://www.npmjs.com/package/@pkgdiet/mcp)
+[![npm downloads](https://img.shields.io/npm/dm/%40pkgdiet%2Fmcp.svg)](https://www.npmjs.com/package/@pkgdiet/mcp)
+[![License: MIT](https://img.shields.io/npm/l/%40pkgdiet%2Fmcp.svg)](https://www.npmjs.com/package/@pkgdiet/mcp)
+[![Node.js](https://img.shields.io/node/v/%40pkgdiet%2Fmcp.svg)](https://nodejs.org/)
 [![Glama MCP Server](https://glama.ai/mcp/servers/om-tajne/pkgdiet/badge)](https://glama.ai/mcp/servers/om-tajne/pkgdiet)
-[![AAA-rated on Glama](https://img.shields.io/badge/Glama-AAA%20rated-gold)](https://glama.ai/mcp/servers/om-tajne/pkgdiet/score)
+
+
 
 ---
 
-## Quickstart
+## Requirements
 
-### Paste into your agent's MCP config
+- Node.js 20 or later
+- An MCP-compatible client configured for stdio transport
+
+---
+
+## Tools
+
+All four tools are **read-only**. None install packages, write files, or modify the workspace.
+
+### `check_dependency`
+
+Evaluate one npm package against the active local dependency policy.
+
+This is a read-only operation. It may query public npm metadata when network checks are enabled. The result is advisory — call this before recommending or installing a package.
+
+**Input:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `packageName` | string | Yes | Exact npm package name |
+| `environment` | string | No | `"dev"` \| `"prod"` \| `"ci"` \| `"staging"` \| `"test"`. Default: `"dev"` |
+
+**Output fields:**
+
+| Field | Type | Description |
+|---|---|---|
+| `verdict` | string | `"ALLOW"` \| `"WARN"` \| `"BLOCK"` |
+| `healthScore` | number | 0–100 composite score |
+| `reasons` | string[] | Explanation for the verdict |
+| `efficiencyFlag` | boolean | True if a lighter alternative is recommended |
+| `costEstimate.addedSizeMB` | number | Estimated unpacked size in MB |
+| `costEstimate.monthlyCiCost100Builds` | number | Estimated CI cost (USD/month at 100 builds) |
+| `alternatives` | object[] | Curated replacement candidates |
+| `certified` | boolean | Whether configured certification conditions were met — **not** a universal safety guarantee |
+| `hasProvenance` | boolean | Whether npm metadata included a provenance signal — **not** a complete supply-chain attestation |
+
+> Do not treat `certified` or `hasProvenance` alone as a pass/fail security verdict.
+
+---
+
+### `check_dependencies`
+
+Evaluate multiple npm package names with bounded concurrency.
+
+- Maximum: **50 packages per call**.
+- Concurrency: **10 simultaneous checks**.
+- Invalid names are reported as `validationWarnings`. Valid names continue to be evaluated.
+- This is a read-only operation.
+
+---
+
+### `suggest_alternative`
+
+Return curated replacement candidates for a package.
+
+Candidates are **advisory recommendations, not installation instructions**. Call `check_dependency` for the selected candidate before recommending or installing it.
+
+---
+
+### `get_policy`
+
+Return the effective local dependency policy and its validation results for the current workspace.
+
+This operation does **not** modify policy files.
+
+---
+
+## Recommended agent workflow
+
+```
+Before recommending or installing any npm package:
+
+1. call check_dependency(packageName)
+   → ALLOW:  proceed
+   → WARN:   explain reasons; optionally call suggest_alternative
+   → BLOCK:  do not recommend without explicit user direction;
+             call suggest_alternative
+
+2. For any chosen alternative:
+   call check_dependency(alternativeName)  ← re-check before installation
+
+3. Let CI enforce the final policy gate.
+   MCP results are advisory; the CI gate is the enforcement backstop.
+```
+
+Note: MCP tools expose results to compatible clients. **Clients still decide whether to call the tools and whether to follow the results.** Listing this server in an MCP registry does not automatically protect any project.
+
+---
+
+## Rate limits
+
+| Limit | Value | Scope |
+|---|---|---|
+| Tool calls per minute | 30 | Per stdio process |
+| Batch size | 50 packages max | Per `check_dependencies` call |
+| Tool timeout | 15 seconds | Per individual tool call |
+| Concurrent checks | 10 | Within a batch |
+
+Multiple independent stdio processes each have their own limits.
+
+**Error codes:**
+
+| Code | Meaning |
+|---|---|
+| `BATCH_LIMIT_EXCEEDED` | More than 50 packages in one `check_dependencies` call |
+| `RATE_LIMIT_EXCEEDED` | 30 calls/minute per-process limit reached |
+| `TOOL_TIMEOUT` | 15-second wall-clock timeout exceeded |
+| `INVALID_INPUT` | Package name fails validation |
+
+---
+
+## MCP client configuration
 
 ```json
 {
@@ -23,155 +146,33 @@
 }
 ```
 
-Works with: **Claude Desktop · Cursor · Windsurf · Cline · GitHub Copilot · Claude Code**
+Per-client config file locations:
 
-### Auto-configure all agents at once
-
-```bash
-npx pkgdiet agent-setup --all
-```
-
-### Start the server manually (warms the npm cache)
-
-```bash
-npx pkgdiet@2.0.0 mcp
-```
-
----
-
-## MCP tools
-
-### `check_dependency`
-Evaluate a single npm package. Returns a structured verdict the agent uses to decide whether to proceed.
-
-**Input:**
-```json
-{
-  "packageName": "moment",
-  "environment": "dev"
-}
-```
-
-**Output:**
-```json
-{
-  "schemaVersion": 2,
-  "packageName": "moment",
-  "verdict": "WARN",
-  "healthScore": 100,
-  "reasons": ["Efficiency Flag: Better alternatives exist for moment."],
-  "recommendation": {
-    "action": "replace",
-    "primaryAlternative": "dayjs"
-  },
-  "addedSizeBytes": 4350000,
-  "costImpactPerMonthUsd": 0.032,
-  "alternatives": [
-    { "name": "dayjs", "reason": "2KB vs 300KB, same API surface", "nextStep": "check_dependency" },
-    { "name": "date-fns", "reason": "Tree-shakeable, TypeScript-first", "nextStep": "check_dependency" }
-  ]
-}
-```
-
-**Verdict meanings:**
-| Verdict | Agent action |
+| Client | Config file |
 |---|---|
-| `ALLOW` | Safe to recommend or install |
-| `WARN` | Explain trade-offs; prefer the suggested alternative |
-| `BLOCK` | Do not install without explicit user direction |
+| Cursor | `.cursor/mcp.json` |
+| Claude Desktop (macOS) | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Claude Desktop (Windows) | `%APPDATA%\Claude\claude_desktop_config.json` |
+| Cline | `cline_mcp_settings.json` |
+| GitHub Copilot | `.github/mcp.json` |
+| Claude Code | `claude mcp add pkgdiet -- npx -y pkgdiet@2.0.0 mcp` |
+| Antigravity | `.gemini/antigravity/mcp/pkgdiet/mcp.json` |
+| Windsurf | Manual — see [docs/INTEGRATIONS.md](../../docs/INTEGRATIONS.md) |
 
----
+Or use the setup command (previews and confirms before writing):
 
-### `check_dependencies`
-Batch-check multiple packages in one call.
-
-**Input:**
-```json
-{ "packages": ["moment", "react", "request"] }
-```
-
-**Output:** `{ "results": [...], "summary": { "total": 3, "blocked": 1, "warned": 1, "allowed": 1 } }`
-
----
-
-### `suggest_alternative`
-Get curated lighter or safer replacements for a package.
-
-**Input:**
-```json
-{ "packageName": "request", "maxResults": 3 }
-```
-
-**Output:**
-```json
-{
-  "packageName": "request",
-  "recommendations": [
-    { "name": "got", "reason": "Actively maintained, promise-based", "nextStep": "check_dependency" },
-    { "name": "axios", "reason": "Browser + Node, familiar API", "nextStep": "check_dependency" },
-    { "name": "node-fetch", "reason": "Minimal, fetch-compatible", "nextStep": "check_dependency" }
-  ]
-}
+```bash
+npx pkgdiet@2.0.0 agent-setup --detect
 ```
 
 ---
 
-### `get_policy`
-Return the active policy and its validation status.
+## Privacy and network behavior
 
-**Output:**
-```json
-{
-  "source": "local",
-  "policyVersion": 2,
-  "environment": "dev",
-  "effectivePolicy": {
-    "minHealthScore": 70,
-    "failOn": "BLOCK",
-    "securityMode": "standard"
-  },
-  "validation": { "valid": true, "errors": [], "warnings": [] }
-}
-```
+When network checks are enabled, PkgDiet sends the requested package name to `registry.npmjs.org` and `api.npmjs.org`. No source code, file contents, or private project data is transmitted. No PkgDiet account is required.
 
 ---
-
-## Recommended agent workflow
-
-```
-User: "install a date library"
-
-Agent:
-  1. check_dependency("moment")     → WARN, primaryAlternative: "dayjs"
-  2. suggest_alternative("moment")  → [dayjs, date-fns, luxon]
-  3. check_dependency("dayjs")      → ALLOW ✅
-  4. Recommend dayjs to user
-```
-
----
-
-## Policy file (`.pkgdietrc.json`)
-
-```json
-{
-  "minHealthScore": 70,
-  "securityMode": "standard",
-  "blockedPackages": ["request", "node-uuid"],
-  "environments": {
-    "ci": { "minHealthScore": 80, "failOn": "WARN" }
-  }
-}
-```
-
-The `get_policy` tool always reflects the active policy so agents know the rules they are operating under.
-
----
-
-## Requirements
-
-- Node.js 20+
-- An MCP-compatible client (Claude Desktop, Cursor, Windsurf, Cline, etc.)
 
 ## License
 
-MIT — see the [pkgdiet repository](https://github.com/om-tajne/pkgdiet).
+MIT. See [LICENSE](../../LICENSE).

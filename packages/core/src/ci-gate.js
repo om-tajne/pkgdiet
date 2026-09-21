@@ -1,6 +1,56 @@
 import { checkPackage } from './checker.js';
 import { loadPolicy, applyEnvironment } from './policy.js';
 
+const CHECK_TIMEOUT_MS = Number(process.env.PKGDIET_CHECK_TIMEOUT_MS || '10000');
+const MAX_CONCURRENT   = 10;
+
+/**
+ * Race a promise against a timeout.
+ * Returns a WARN result on timeout rather than rejecting.
+ */
+function withTimeout(packageName, promise) {
+  const timeout = new Promise(resolve =>
+    setTimeout(() => resolve({
+      name: packageName,
+      verdict: 'WARN',
+      reasons: ['Dependency check timed out — registry may be slow. Re-run to retry.'],
+      healthScore: null,
+      costEstimate: { addedSizeMB: 0, monthlyCiCost100Builds: 0 },
+      alternatives: [],
+      flags: [],
+      efficiencyFlag: false,
+      hasProvenance: false,
+      integrityCheck: 'missing',
+    }), CHECK_TIMEOUT_MS)
+  );
+  return Promise.race([promise, timeout]);
+}
+
+/**
+ * Bounded concurrency pool that consumes tasks iteratively.
+ * Results preserve input order.
+ */
+async function withConcurrency(tasks, limit) {
+  const results = new Array(tasks.length);
+  const executing = new Set();
+
+  for (let i = 0; i < tasks.length; i++) {
+    const idx = i;
+    const p = tasks[idx]().then(
+      result => { executing.delete(p); results[idx] = result; },
+      err    => { executing.delete(p); results[idx] = null; console.error(`[pkgdiet] ci-gate task error: ${err?.message}`); }
+    );
+    executing.add(p);
+
+    if (executing.size >= limit) {
+      await Promise.race(executing);
+    }
+  }
+
+  await Promise.all(executing);
+  return results.filter(Boolean);
+}
+
 /**
  * Run the CI gate against a list of newly added package names.
  *
@@ -11,21 +61,34 @@ import { loadPolicy, applyEnvironment } from './policy.js';
  * @returns {{ markdown: string, hasBlocks: boolean, hasWarns: boolean, results: object[] }}
  */
 export async function runCiGate(packageNames, projectPath = process.cwd(), policyModified = false, envName = null) {
-  // Load and optionally overlay environment-specific policy
   let policy = loadPolicy(projectPath);
   if (envName) {
     policy = applyEnvironment(policy, envName);
   }
 
-  const results = [];
-  for (const pkg of packageNames) {
-    results.push(await checkPackage(pkg, projectPath, { policy }));
-  }
+  // Evaluate all packages in parallel with bounded concurrency and per-package timeout
+  const tasks = packageNames.map(pkg => () =>
+    withTimeout(pkg, checkPackage(pkg, projectPath, { policy }))
+      .catch(err => ({
+        name: pkg,
+        verdict: 'WARN',
+        reasons: [`Evaluation error: ${err?.message ?? 'unknown'}`],
+        healthScore: null,
+        costEstimate: { addedSizeMB: 0, monthlyCiCost100Builds: 0 },
+        alternatives: [],
+        flags: [],
+        efficiencyFlag: false,
+        hasProvenance: false,
+        integrityCheck: 'missing',
+      }))
+  );
+
+  const results = await withConcurrency(tasks, MAX_CONCURRENT);
 
   const hasBlocks = results.some(r => r.verdict === 'BLOCK');
   const hasWarns  = results.some(r => r.verdict === 'WARN');
 
-  // ── Build Markdown table ────────────────────────────────────
+  // ── Build Markdown table ─────────────────────────────────────────────────────
   let md = '### 🥗 PkgDiet PR Gate\n\n';
 
   if (envName) {
@@ -47,7 +110,6 @@ export async function runCiGate(packageNames, projectPath = process.cwd(), polic
     const scoreStr   = r.healthScore !== null && r.healthScore !== undefined ? r.healthScore : 'N/A';
     const notes      = r.reasons.join(' ');
 
-    // Inline alternatives in Notes column
     const altStr = r.alternatives?.length > 0
       ? ` → Try: ${r.alternatives.slice(0, 3).map(a => typeof a === 'string' ? a : a.replacement).join(', ')}`
       : '';
@@ -55,7 +117,6 @@ export async function runCiGate(packageNames, projectPath = process.cwd(), polic
     md += `| \`${r.name}\` | ${icon} | ${scoreStr} | ${sizeMB} | ${costImpact} | ${notes}${altStr} |\n`;
   }
 
-  // Automated PR flag
   if (process.env.PR_AUTHOR && process.env.PR_AUTHOR.includes('bot')) {
     md += '\n> 🤖 **Note:** Automated author detected. Please review dependency choices carefully.\n';
   }

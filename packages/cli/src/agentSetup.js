@@ -29,7 +29,10 @@ export async function setupAgents(agents, cwd, options = {}) {
 
   const mcpEntry = {
     command: 'npx',
-    args: ['-y', 'pkgdiet@latest', 'mcp']
+    // Pinned to exact version for reproducibility — never use @latest in
+    // security-sensitive generated configuration. Run `npx pkgdiet upgrade-agent-config`
+    // to update this version when upgrading PkgDiet.
+    args: ['-y', 'pkgdiet@2.0.0', 'mcp']
   };
 
   const backupFile = (filePath) => {
@@ -121,10 +124,10 @@ export async function setupAgents(agents, cwd, options = {}) {
     else if (agent === 'claude-code') {
       if (!remove && !dryRun) {
         try {
-          execSync('claude mcp add pkgdiet -- npx -y pkgdiet@latest mcp', { stdio: 'ignore' });
+          execSync('claude mcp add pkgdiet -- npx -y pkgdiet@2.0.0 mcp', { stdio: 'ignore' });
           console.log(`✓ Added pkgdiet MCP server to Claude Code via native CLI`);
         } catch (e) {
-          console.log(`⚠ Could not execute 'claude mcp add'. Please run manually: claude mcp add pkgdiet -- npx -y pkgdiet@latest mcp`);
+          console.log(`⚠ Could not execute 'claude mcp add'. Please run manually: claude mcp add pkgdiet -- npx -y pkgdiet@2.0.0 mcp`);
         }
       }
       updateRuleFile(path.join(cwd, 'CLAUDE.md'));
