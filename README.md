@@ -132,6 +132,11 @@ MCP is optional. CI enforcement works even when no AI client is configured.
 
 MCP is optional. The CI gate works independently, so dependency policy can be enforced even when no AI client is configured.
 
+### Enterprise Rollout
+You cannot force-enable PkgDiet globally across an organization via hidden hooks. PkgDiet is designed as a transparent, opt-in layer. 
+
+For organizational deployment (MDM payloads, reusable CI workflows, and global MCP settings), see the **[Enterprise Adoption Guide](docs/ENTERPRISE-ADOPTION.md)**.
+
 ---
 
 ## Example output
