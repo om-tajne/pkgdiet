@@ -2,9 +2,11 @@
 
 > Dependency policy for AI-assisted JavaScript and TypeScript development.
 
-PkgDiet helps developers and compatible AI clients review npm packages before installation. It applies local project policy, evaluates available npm metadata, suggests curated alternatives, and provides CI enforcement.
+**The Problem:** AI coding agents frequently hallucinate legacy, deprecated, or bloated npm packages (like `request`, `moment`, or obsolete TS typings) because their training data heavily favors older, ubiquitous libraries. 
 
-PkgDiet is local-first and opt-in. MCP provides guidance to compatible AI clients; CI is the enforcement backstop.
+**The Solution:** PkgDiet is a deterministic guardrail. It checks proposed dependencies against registry health, deprecation status, and local project policy *before* they are installed, forcing agents to pivot to modern alternatives.
+
+PkgDiet is local-first and opt-in. MCP provides guidance to AI clients; CI is the enforcement backstop.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org/)
@@ -21,52 +23,19 @@ PkgDiet is local-first and opt-in. MCP provides guidance to compatible AI client
 
 ---
 
-## Commands
+## Quick Start
 
+**Evaluate a package before installing:**
 ```bash
-# Full project audit (default)
-npx -y pkgdiet@2.0.0 audit
-
-# Check one or more packages before installing them
-npx -y pkgdiet@2.0.0 check moment request lodash
-
-# CI gate — evaluate newly added packages in a PR (lockfile-diff-based, not full audit)
-npx -y pkgdiet@2.0.0 ci --base HEAD~1 --env ci
-
-# Start the MCP server for AI agent integration
-npx -y pkgdiet@2.0.0 mcp
-
-# Interactive setup wizard
-npx -y pkgdiet@2.0.0 setup
-
-# All-in-one setup: creates policy, CI workflow, and agent configs
-npx -y pkgdiet@2.0.0 init
-
-# Configure MCP for supported AI agents non-interactively
-npx -y pkgdiet@2.0.0 agent-setup --detect
-
-# Browse all curated alternatives
-npx -y pkgdiet@2.0.0 alternatives list
-
-# Find alternatives for a specific package
-npx -y pkgdiet@2.0.0 alternatives search request
-
-# Detect health drift in installed dependencies
-npx -y pkgdiet@2.0.0 drift
-
-# Validate your .pkgdietrc.json policy file
-npx -y pkgdiet@2.0.0 policy-check
-
-# Generate a reviewer-ready PR to add PkgDiet to any repo
-npx -y pkgdiet@2.0.0 pr
-
-# Automatically configure Claude Desktop MCP
-npx -y pkgdiet@2.0.0 mcp-install
+npx -y pkgdiet@2.0.0 check request moment
 ```
 
-> **Setup vs Init:** `setup` is the interactive wizard that prompts you for policy and agent selections. `init` is the non-interactive, all-in-one setup command. Both commands preview the exact files they will create or update and ask for confirmation before writing.
-> 
-> **CI command:** `pkgdiet ci` compares the current lockfile with a base Git ref and evaluates newly added dependencies. It does not replace `pkgdiet audit` (which checks all dependencies).
+**Run the MCP server for your AI Agent:**
+```bash
+npx -y pkgdiet@2.0.0 mcp
+```
+
+*(See [All commands](#all-commands) below for `audit`, `ci`, `setup`, and more)*
 
 ---
 
@@ -95,12 +64,10 @@ PkgDiet is not a security scanner. It reads public npm metadata and applies a lo
 
 PkgDiet does not replace:
 
-- vulnerability scanners (use `npm audit`, Snyk, or Socket.dev alongside PkgDiet);
-- code review;
-- lockfile integrity controls;
-- package provenance review;
-- maintainer due diligence;
-- secure CI configuration.
+- **Vulnerability scanners:** PkgDiet checks for package health, deprecation, and modernization (e.g., swapping `request` for `undici`). Tools like `npm audit` check for known CVE vulnerabilities in packages you've already installed. Use both together.
+- **Code review & maintainer due diligence.**
+- **Lockfile integrity controls & package provenance review.**
+- **Secure CI configuration.**
 
 MCP tools provide guidance to compatible clients. They do not force an AI client to call a tool or follow its result.
 
@@ -261,6 +228,10 @@ See [`docs/POLICY.md`](docs/POLICY.md) for the full schema reference.
 | `pkgdiet policy-check` | Validate your `.pkgdietrc.json` |
 | `pkgdiet alternatives search <pkg>` | Browse curated replacements |
 | `pkgdiet drift` | Detect health degradation in installed dependencies |
+
+> **Setup vs Init:** `setup` is the interactive wizard that prompts you for policy and agent selections. `init` is the non-interactive, all-in-one setup command. Both commands preview the exact files they will create or update and ask for confirmation before writing.
+> 
+> **CI command:** `pkgdiet ci` compares the current lockfile with a base Git ref and evaluates newly added dependencies. It does not replace `pkgdiet audit` (which checks all dependencies).
 
 ---
 
