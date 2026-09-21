@@ -4,15 +4,15 @@ services:
   postgres:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: pkgdiet
-      POSTGRES_PASSWORD: pkgdiet_password
-      POSTGRES_DB: pkgdiet
+      POSTGRES_USER: ${POSTGRES_USER:-pkgdiet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-pkgdiet}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pkgdiet"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pkgdiet}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -24,10 +24,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=postgresql://pkgdiet:pkgdiet_password@postgres:5432/pkgdiet
-      - GITHUB_APP_ID=\
-      - GITHUB_WEBHOOK_SECRET=\
-      - GITHUB_PRIVATE_KEY=\
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
+      - GITHUB_APP_ID=${GITHUB_APP_ID:?GITHUB_APP_ID is required}
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET:?GITHUB_WEBHOOK_SECRET is required}
+      - GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY:?GITHUB_APP_PRIVATE_KEY is required}
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,8 +39,8 @@ services:
     ports:
       - "3001:3000"
     environment:
-      - DATABASE_URL=postgresql://pkgdiet:pkgdiet_password@postgres:5432/pkgdiet
-      - NEXT_PUBLIC_GITHUB_APP_URL=http://localhost:3000
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
+      - NEXT_PUBLIC_GITHUB_APP_URL=${NEXT_PUBLIC_GITHUB_APP_URL:-http://localhost:3000}
     depends_on:
       postgres:
         condition: service_healthy
