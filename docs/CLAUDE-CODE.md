@@ -1,33 +1,36 @@
 # Claude Code Integration
 
-Claude Code supports multiple MCP scopes (global/user, project, and local).
+## 1. Scope and Supported Client Version
+* **Scope:** User (Global), Project (Shared), or Managed Organization.
+* **Tested Version:** Claude Code >= 0.2.29 (verify organization-managed capabilities for your specific enterprise tier).
 
-## User Scope (Global)
-To enable PkgDiet for all projects on a developer's machine:
+## 2. Recommended Configuration
+Claude Code supports different scopes. 
 
+**For Project-scoped rollout (recommended for repositories):**
+```bash
+claude mcp add --scope project pkgdiet -- npx -y pkgdiet@2.0.0 mcp
+```
+
+**For User-scoped rollout (developer machine):**
 ```bash
 claude mcp add --scope user pkgdiet -- npx -y pkgdiet@2.0.0 mcp
 ```
 
-## Project Scope (Shared)
-To configure PkgDiet for a specific repository (can be committed to share with the team):
+*Organization administrators should deploy the server using Anthropic's supported managed-MCP mechanism for their tier.*
 
+## 3. Verification Command
+Verify the tool is available to Claude:
 ```bash
-claude mcp add --scope project pkgdiet -- npx -y pkgdiet@2.0.0 mcp
+claude mcp list
 ```
-*Note: Ensure you only commit non-secret settings. PkgDiet requires no API keys, making it safe to commit.*
 
-## Manual JSON Configuration
+## 4. What PkgDiet Can and Cannot Enforce
+* **Can:** Supply Claude Code with real-time dependency verdicts (ALLOW/WARN/BLOCK) and curated alternatives before package installation.
+* **Cannot:** Prevent a developer from overriding Claude Code or running `npm install` manually in another terminal. True enforcement requires the PkgDiet GitHub Action in your CI pipeline.
 
-Claude Code writes to `claude.json` (location depends on scope). The configuration block resembles:
-
-```json
-{
-  "mcpServers": {
-    "pkgdiet": {
-      "command": "npx",
-      "args": ["-y", "pkgdiet@2.0.0", "mcp"]
-    }
-  }
-}
-```
+## 5. Removal / Rollback Instructions
+To remove PkgDiet from Claude Code:
+1. Run `claude mcp remove pkgdiet` (specify `--scope project` if applicable).
+2. Alternatively, remove the `pkgdiet` entry from the relevant `claude.json` file.
+3. Restart the Claude Code session.

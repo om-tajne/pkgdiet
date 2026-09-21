@@ -1,12 +1,13 @@
 # Antigravity Integration
 
-Google Antigravity supports both global and workspace-level MCP configurations.
+## 1. Scope and Supported Client Version
+* **Scope:** Workspace (Project) or Global.
+* **Tested Version:** Antigravity IDE / CLI supporting `.gemini` configurations. *Note: Configuration locations can vary by Antigravity version/environment; verify paths locally.*
 
-## Workspace Configuration (Recommended for Teams)
+## 2. Recommended Configuration
 
-To enable PkgDiet specifically for one project, configure it in the workspace's `.gemini` directory. This is usually located at:
-`.gemini/antigravity/mcp/pkgdiet/mcp.json`
-
+**Workspace Configuration (Recommended):**
+Create `.gemini/antigravity/mcp/pkgdiet/mcp.json` in your project root:
 ```json
 {
   "mcpServers": {
@@ -18,13 +19,8 @@ To enable PkgDiet specifically for one project, configure it in the workspace's 
 }
 ```
 
-## Global Configuration
-
-To enable it for all Antigravity instances on a developer's machine, the typical global configuration location is:
-`~/.gemini/config/mcp_config.json`
-
-Add the server definition:
-
+**Global User Configuration:**
+Create or update `~/.gemini/config/mcp_config.json`:
 ```json
 {
   "mcpServers": {
@@ -36,6 +32,15 @@ Add the server definition:
 }
 ```
 
-## Setup Notes
-* Antigravity reads standard stdio MCP servers.
-* *Note: The exact configuration paths are subject to the installed Antigravity version. Always test the connection after modifying the configuration.*
+## 3. Verification Command
+Reload Antigravity (e.g., via command palette `Developer: Reload Window` or by restarting the CLI/Agent).
+Verify the server appears in the active MCP server list or logs.
+
+## 4. What PkgDiet Can and Cannot Enforce
+* **Can:** Provide dependency evaluation context directly into Antigravity's context window.
+* **Cannot:** Block Antigravity from suggesting an unverified package if the agent hallucinates or ignores the tool output. CI enforcement is required as a backstop.
+
+## 5. Removal / Rollback Instructions
+To remove PkgDiet from Antigravity:
+1. Delete the `pkgdiet` key from your global `mcp_config.json` OR delete the workspace `.gemini/antigravity/mcp/pkgdiet/mcp.json` file.
+2. Reload the Antigravity client.
