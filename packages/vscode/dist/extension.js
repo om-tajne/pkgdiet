@@ -42,21 +42,54 @@ var import_path = require("path");
 var CACHE_FILE = ".pkgdiet-cache.json";
 var CACHE_TTL_HOURS = Number(process.env.PKGDIET_CACHE_TTL_HOURS || "24");
 var CACHE_TTL_MS = CACHE_TTL_HOURS * 60 * 60 * 1e3;
+function cleanupStaleTemps(cachePath) {
+  try {
+    const dir = (0, import_path.dirname)(cachePath);
+    const base = CACHE_FILE;
+    const entries = (0, import_fs.readdirSync)(dir);
+    for (const entry of entries) {
+      if (entry.startsWith(base) && entry.includes(".tmp")) {
+        try {
+          (0, import_fs.unlinkSync)((0, import_path.join)(dir, entry));
+        } catch {
+        }
+      }
+    }
+  } catch {
+  }
+}
 function loadCache(projectPath) {
   const cachePath = (0, import_path.join)(projectPath, CACHE_FILE);
+  cleanupStaleTemps(cachePath);
   if (!(0, import_fs.existsSync)(cachePath)) {
     return { version: 1, entries: {} };
   }
+  let raw;
   try {
-    const content = (0, import_fs.readFileSync)(cachePath, "utf-8");
-    const cache = JSON.parse(content);
-    if (cache.version !== 1) {
-      return { version: 1, entries: {} };
-    }
-    return cache;
+    raw = (0, import_fs.readFileSync)(cachePath, "utf-8");
   } catch {
     return { version: 1, entries: {} };
   }
+  let cache;
+  try {
+    cache = JSON.parse(raw);
+  } catch {
+    const corruptPath = `${cachePath}.corrupt.${Date.now()}`;
+    try {
+      (0, import_fs.renameSync)(cachePath, corruptPath);
+    } catch {
+    }
+    return { version: 1, entries: {} };
+  }
+  if (!cache || cache.version !== 1 || typeof cache.entries !== "object") {
+    const corruptPath = `${cachePath}.corrupt.${Date.now()}`;
+    try {
+      (0, import_fs.renameSync)(cachePath, corruptPath);
+    } catch {
+    }
+    return { version: 1, entries: {} };
+  }
+  return cache;
 }
 function getCached(projectPath, packageName, key) {
   const cache = loadCache(projectPath);
@@ -94,46 +127,52 @@ function timeSince(dateString) {
 // ../core/dist/health.js
 var NPM_REGISTRY = "https://registry.npmjs.org";
 var NPM_DOWNLOADS = "https://api.npmjs.org/downloads/point";
-var MAX_CONCURRENT = Number(process.env.PKGDIET_CONCURRENCY || "15");
+var MAX_CONCURRENT = Number(process.env.PKGDIET_CONCURRENCY || "10");
 var MAX_RETRIES = 3;
 var RETRY_DELAY_MS = 1e3;
+var FETCH_TIMEOUT_MS = Number(process.env.PKGDIET_FETCH_TIMEOUT_MS || "10000");
+async function fetchWithTimeout(url, timeoutMs = FETCH_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    if (response.status === 404)
+      return { data: null, status: "not_found" };
+    if (response.status === 429)
+      return { data: null, status: "rate_limited" };
+    if (response.status >= 500)
+      return { data: null, status: "server_error" };
+    if (!response.ok)
+      return { data: null, status: "network_error" };
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      return { data: null, status: "invalid_json" };
+    }
+    return { data, status: "ok" };
+  } catch (err) {
+    clearTimeout(timer);
+    if (err.name === "AbortError")
+      return { data: null, status: "timeout" };
+    return { data: null, status: "network_error" };
+  }
+}
 async function fetchWithRetry(url, retries = MAX_RETRIES) {
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5e3);
-    try {
-      const response = await fetch(url, {
-        headers: { "Accept": "application/json" },
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      if (response.status === 429 || response.status >= 500) {
-        if (attempt < retries) {
-          const delay = RETRY_DELAY_MS * Math.pow(2, attempt);
-          await new Promise((r) => setTimeout(r, delay));
-          continue;
-        }
-      }
-      if (!response.ok) {
-        if (response.status === 404)
-          return { _notFound: true };
-        return null;
-      }
-      return await response.json();
-    } catch (err) {
-      clearTimeout(timeoutId);
-      if (err.name === "AbortError") {
-        return null;
-      }
-      if (attempt < retries) {
-        const delay = RETRY_DELAY_MS * Math.pow(2, attempt);
-        await new Promise((r) => setTimeout(r, delay));
-        continue;
-      }
-      return null;
+    const result = await fetchWithTimeout(url);
+    if ((result.status === "rate_limited" || result.status === "server_error") && attempt < retries) {
+      const delay = RETRY_DELAY_MS * Math.pow(2, attempt);
+      await new Promise((r) => setTimeout(r, delay));
+      continue;
     }
+    return result;
   }
-  return null;
+  return { data: null, status: "network_error" };
 }
 async function fetchPackageHealth(packageName, projectPath, useCache) {
   if (useCache) {
@@ -143,21 +182,11 @@ async function fetchPackageHealth(packageName, projectPath, useCache) {
     }
   }
   const encodedName = encodeURIComponent(packageName).replace("%40", "@");
-  const [registryData, downloadsData] = await Promise.all([
+  const [registryResult, downloadsResult] = await Promise.all([
     fetchWithRetry(`${NPM_REGISTRY}/${encodedName}`),
     fetchWithRetry(`${NPM_DOWNLOADS}/last-month/${encodedName}`)
   ]);
-  if (!registryData) {
-    return {
-      name: packageName,
-      score: null,
-      flags: ["skipped"],
-      reason: "Could not fetch registry data (private registry or network error)",
-      skipped: true,
-      notFound: false
-    };
-  }
-  if (registryData._notFound) {
+  if (registryResult.status === "not_found") {
     return {
       name: packageName,
       score: null,
@@ -167,29 +196,47 @@ async function fetchPackageHealth(packageName, projectPath, useCache) {
       notFound: true
     };
   }
+  if (registryResult.status === "timeout") {
+    return {
+      name: packageName,
+      score: null,
+      flags: ["skipped"],
+      reason: "Registry request timed out \u2014 network may be slow",
+      skipped: true,
+      notFound: false,
+      timedOut: true
+    };
+  }
+  if (!registryResult.data) {
+    return {
+      name: packageName,
+      score: null,
+      flags: ["skipped"],
+      reason: `Registry unavailable (status: ${registryResult.status})`,
+      skipped: true,
+      notFound: false
+    };
+  }
+  const registryData = registryResult.data;
   const lastPublish = registryData.time?.modified || null;
   const maintainers = registryData.maintainers || [];
   const latestVersion = registryData["dist-tags"]?.latest;
   const latestMeta = latestVersion ? registryData.versions?.[latestVersion] : null;
-  const monthlyDownloads = downloadsData?.downloads || 0;
+  const monthlyDownloads = downloadsResult.data?.downloads || 0;
   const deprecated = registryData.versions?.[latestVersion]?.deprecated || null;
   const installScripts = [];
-  if (latestMeta && latestMeta.scripts) {
+  if (latestMeta?.scripts) {
     for (const scriptName of ["preinstall", "install", "postinstall"]) {
-      if (latestMeta.scripts[scriptName]) {
+      if (latestMeta.scripts[scriptName])
         installScripts.push(scriptName);
-      }
     }
   }
-  let hasTypes = false;
-  if (latestMeta) {
-    hasTypes = !!(latestMeta.types || latestMeta.typings);
-  }
+  let hasTypes = !!(latestMeta?.types || latestMeta?.typings);
   let hasExternalTypes = false;
   if (!hasTypes && !packageName.startsWith("@types/")) {
     const typesName = `@types/${packageName.replace("@", "").replace("/", "__")}`;
-    const typesData = await fetchWithRetry(`${NPM_REGISTRY}/${encodeURIComponent(typesName).replace("%40", "@")}`);
-    hasExternalTypes = typesData !== null && !typesData._notFound;
+    const typesResult = await fetchWithTimeout(`${NPM_REGISTRY}/${encodeURIComponent(typesName).replace("%40", "@")}`);
+    hasExternalTypes = typesResult.status === "ok" && typesResult.data !== null;
   }
   const scores = {};
   if (lastPublish) {
@@ -230,18 +277,16 @@ async function fetchPackageHealth(packageName, projectPath, useCache) {
   else
     scores.types = 0;
   let totalScore = Math.round(scores.lastPublish * 0.35 + scores.downloads * 0.25 + scores.maintainers * 0.2 + scores.types * 0.2);
-  if (deprecated) {
+  if (deprecated)
     totalScore = Math.min(totalScore, 15);
-  }
   const flags = [];
   if (deprecated) {
     flags.push({ type: "critical", label: `Deprecated: ${deprecated}` });
   }
   if (lastPublish) {
     const { years } = timeSince(lastPublish);
-    if (years >= 2) {
+    if (years >= 2)
       flags.push({ type: "critical", label: `Unmaintained (${years}yr)` });
-    }
   }
   if (maintainers.length === 1) {
     flags.push({ type: "warning", label: "Single maintainer" });
@@ -654,6 +699,7 @@ async function checkPackage(packageSpec, projectPath = process.cwd(), options = 
   if (atIndex > 0) {
     packageName = packageSpec.substring(0, atIndex);
   }
+  packageName = packageName.trim().toLowerCase();
   const warnOnInternalPrefix = matchesInternalPrefix(packageName, policy.internalNamePrefixes);
   const healthResult = await fetchPackageHealth(packageName, projectPath, true);
   if (healthResult.skipped) {
