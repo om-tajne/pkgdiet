@@ -1,0 +1,49 @@
+{
+  "name": "io.github.om-tajne/pkgdiet",
+  "displayName": "PkgDiet",
+  "version": "2.0.0",
+  "description": "Local npm dependency-policy checks for compatible MCP clients.",
+  "repository": {
+    "url": "https://github.com/om-tajne/pkgdiet",
+    "source": "github"
+  },
+  "license": "MIT",
+  "runtime": {
+    "node": ">=20"
+  },
+  "transport": ["stdio"],
+  "start": {
+    "command": "npx",
+    "args": ["-y", "pkgdiet@2.0.0", "mcp"]
+  },
+  "tools": [
+    {
+      "name": "check_dependency",
+      "description": "Evaluate one npm package against the active local dependency policy."
+    },
+    {
+      "name": "check_dependencies",
+      "description": "Evaluate multiple npm packages with bounded concurrency."
+    },
+    {
+      "name": "suggest_alternative",
+      "description": "Return curated replacement candidates for a package."
+    },
+    {
+      "name": "get_policy",
+      "description": "Return the effective local policy and validation result."
+    }
+  ],
+  "privacy": {
+    "localFirst": true,
+    "hostedAccountRequired": false,
+    "packageNamesSentToPublicNpm": true,
+    "sourceCodeUploaded": false,
+    "projectFilesUploaded": false
+  },
+  "limitations": [
+    "MCP tools are advisory and do not force client compliance.",
+    "PkgDiet does not install packages or modify project files through MCP.",
+    "CI remains the enforcement backstop."
+  ]
+}
