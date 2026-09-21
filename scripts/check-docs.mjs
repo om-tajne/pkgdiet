@@ -154,10 +154,19 @@ if (smithery) {
 const CANONICAL = [
   // { label, pattern, files }
   {
-    label: 'costEstimate.addedSizeMB field name (not addedSizeBytes)',
+    label: 'CLI costEstimate uses addedSizeMB (not addedSizeBytes)',
     pattern: /addedSizeMB/,
-    antiPattern: /addedSizeBytes/,
-    files: ['packages/core/README.md', 'packages/mcp/README.md', 'packages/cli/README.md', 'README.md'],
+    files: ['packages/cli/README.md'],
+  },
+  {
+    label: 'MCP response uses addedSizeBytes (not addedSizeMB)',
+    pattern: /addedSizeBytes/,
+    files: ['docs/MCP.md'],
+  },
+  {
+    label: 'MCP response uses costImpactPerMonthUsd',
+    pattern: /costImpactPerMonthUsd/,
+    files: ['docs/MCP.md'],
   },
   {
     label: 'failOn: NONE documented',
@@ -239,7 +248,8 @@ for (const pkg of PUBLISHABLE) {
 
 const topHelp = tryHelp('--help');
 const helpHelp = tryHelp('help');
-const CLI_COMMANDS = ['audit', 'check', 'ci', 'mcp', 'setup', 'agent-setup', 'policy-check', 'drift'];
+// Authoritative list from packages/cli/src/cli.js (compiled dist):
+const CLI_COMMANDS = ['audit', 'check', 'ci', 'mcp', 'setup', 'agent-setup', 'drift', 'init', 'pr', 'mcp-install', 'policy-check'];
 
 for (const cmd of CLI_COMMANDS) {
   const subHelp = tryHelp(`${cmd} --help`);
@@ -335,7 +345,99 @@ rootReadme.includes(CI_BADGE_URL)
   ? pass('README.md: CI badge points to correct workflow')
   : fail(`README.md: CI badge URL incorrect — expected "${CI_BADGE_URL}"`);
 
-// ── Summary ───────────────────────────────────────────────────────────────
+
+// ── 17. Action inputs and outputs match docs/CI.md ─────────────────────────
+
+const actionYml = readFile('action.yml') || '';
+const ciMd = readFile('docs/CI.md') || '';
+
+// Parse action.yml inputs
+const inputsMatch = actionYml.match(/inputs:\s*([\s\S]*?)(?:outputs:|runs:)/);
+const actionInputs = [];
+const ignoreFields = new Set(['description', 'required', 'default', 'value']);
+if (inputsMatch) {
+  const inputMatches = [...inputsMatch[1].matchAll(/^\s+([a-zA-Z0-9_-]+):/gm)];
+  for (const m of inputMatches) {
+    if (!ignoreFields.has(m[1])) actionInputs.push(m[1]);
+  }
+}
+
+// Parse action.yml outputs
+const outputsMatch = actionYml.match(/outputs:\s*([\s\S]*?)(?:runs:)/);
+const actionOutputs = [];
+if (outputsMatch) {
+  const outputMatches = [...outputsMatch[1].matchAll(/^\s+([a-zA-Z0-9_-]+):/gm)];
+  for (const m of outputMatches) {
+    if (!ignoreFields.has(m[1])) actionOutputs.push(m[1]);
+  }
+}
+
+// Check CI.md contains all inputs
+for (const input of actionInputs) {
+  if (ciMd.includes(`\`${input}\``) || ciMd.includes(`| ${input} |`)) {
+    pass(`docs/CI.md documents action input: ${input}`);
+  } else {
+    fail(`docs/CI.md is missing documentation for action input: ${input}`);
+  }
+}
+
+// Check CI.md contains all outputs
+for (const output of actionOutputs) {
+  if (ciMd.includes(`\`${output}\``) || ciMd.includes(`| ${output} |`)) {
+    pass(`docs/CI.md documents action output: ${output}`);
+  } else {
+    fail(`docs/CI.md is missing documentation for action output: ${output}`);
+  }
+}
+
+// ── 18. setup/init distinction and ci behavior ────────────────────────────
+
+const cliReadmeCheck = readFile('packages/cli/README.md') || '';
+if (cliReadmeCheck.includes('setup vs init') || (cliReadmeCheck.includes('interactive wizard') && cliReadmeCheck.includes('all-in-one setup command'))) {
+  pass('packages/cli/README.md distinguishes setup from init');
+} else {
+  fail('packages/cli/README.md fails to distinguish setup and init properly');
+}
+
+if (cliReadmeCheck.includes('lockfile-diff-based')) {
+  pass('packages/cli/README.md describes ci as lockfile-diff-based');
+} else {
+  fail('packages/cli/README.md missing lockfile-diff-based description for ci command');
+}
+
+// ── 19. MCP docs projectPath and fields ───────────────────────────────────
+
+const mcpDocsNew = readFile('docs/MCP.md') || '';
+if (mcpDocsNew.includes('projectPath')) {
+  if (mcpDocsNew.includes('do not accept a `projectPath` argument')) {
+    pass('docs/MCP.md correctly disclaims projectPath');
+  } else {
+    fail('docs/MCP.md incorrectly mentions projectPath as an input');
+  }
+} else {
+  pass('docs/MCP.md does not mention projectPath');
+}
+
+// ── 20. @pkgdiet/ai-tool is private or explicitly published ───────────────
+
+const aiToolJson = readFile('packages/ai-tool/package.json');
+if (aiToolJson) {
+  const aiTool = JSON.parse(aiToolJson);
+  if (aiTool.private === true) {
+    pass('packages/ai-tool is correctly marked private');
+  } else {
+    fail('packages/ai-tool is NOT private. If intended to be published, verify publish.yml.');
+  }
+}
+
+// ── 21. Lockfile support labels match fixture coverage ─────────────────────
+
+const archMd = readFile('docs/architecture.md') || '';
+if (archMd.includes('Experimental') && archMd.includes('No fixture tests')) {
+  pass('docs/architecture.md accurately describes experimental status of lockfile parsers without fixtures');
+} else {
+  fail('docs/architecture.md must clarify lockfile parsers without fixtures as experimental');
+}// ── Summary ───────────────────────────────────────────────────────────────
 
 console.log('');
 console.log(`Documentation check complete: ${errors} error(s), ${warnings} warning(s)`);
