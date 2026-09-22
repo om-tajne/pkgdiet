@@ -1,0 +1,17 @@
+{
+  "name": "@pkgdiet/mastra-example",
+  "version": "2.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@mastra/core": "^0.1.37",
+    "pkgdiet": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.1",
+    "typescript": "^5.4.5"
+  }
+}
