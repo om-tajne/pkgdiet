@@ -1,6 +1,6 @@
 {
   "name": "@pkgdiet/ai-tool",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Universal AI tool definitions for PkgDiet — add npm package safety checking to any LangChain, Vercel AI SDK, OpenAI, or Anthropic agent in 2 lines.",
   "type": "module",
   "main": "src/index.js",

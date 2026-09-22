@@ -12,7 +12,7 @@ Cursor reads `.cursor/mcp.json`. Create or update this file in the repository ro
   "mcpServers": {
     "pkgdiet": {
       "command": "npx",
-      "args": ["-y", "pkgdiet@2.0.0", "mcp"]
+      "args": ["-y", "pkgdiet@2.0.1", "mcp"]
     }
   }
 }

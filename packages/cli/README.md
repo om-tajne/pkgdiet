@@ -16,7 +16,7 @@ Returns `ALLOW`, `WARN`, or `BLOCK` verdicts based on available npm metadata and
 ## Run without global installation
 
 ```bash
-npx -y pkgdiet@2.0.0 setup
+npx -y pkgdiet@2.0.1 setup
 ```
 
 ---
@@ -33,43 +33,43 @@ npx -y pkgdiet@2.0.0 setup
 
 ```bash
 # Full project audit (default)
-npx -y pkgdiet@2.0.0 audit
+npx -y pkgdiet@2.0.1 audit
 
 # Check one or more packages before installing them
-npx -y pkgdiet@2.0.0 check moment request lodash
+npx -y pkgdiet@2.0.1 check moment request lodash
 
 # CI gate — evaluate newly added packages in a PR (lockfile-diff-based, not full audit)
-npx -y pkgdiet@2.0.0 ci --base HEAD~1 --env ci
+npx -y pkgdiet@2.0.1 ci --base HEAD~1 --env ci
 
 # Start the MCP server for AI agent integration
-npx -y pkgdiet@2.0.0 mcp
+npx -y pkgdiet@2.0.1 mcp
 
 # Interactive setup wizard
-npx -y pkgdiet@2.0.0 setup
+npx -y pkgdiet@2.0.1 setup
 
 # All-in-one setup: creates policy, CI workflow, and agent configs
-npx -y pkgdiet@2.0.0 init
+npx -y pkgdiet@2.0.1 init
 
 # Configure MCP for supported AI agents non-interactively
-npx -y pkgdiet@2.0.0 agent-setup --detect
+npx -y pkgdiet@2.0.1 agent-setup --detect
 
 # Browse all curated alternatives
-npx -y pkgdiet@2.0.0 alternatives list
+npx -y pkgdiet@2.0.1 alternatives list
 
 # Find alternatives for a specific package
-npx -y pkgdiet@2.0.0 alternatives search request
+npx -y pkgdiet@2.0.1 alternatives search request
 
 # Detect health drift in installed dependencies
-npx -y pkgdiet@2.0.0 drift
+npx -y pkgdiet@2.0.1 drift
 
 # Validate your .pkgdietrc.json policy file
-npx -y pkgdiet@2.0.0 policy-check
+npx -y pkgdiet@2.0.1 policy-check
 
 # Generate a reviewer-ready PR to add PkgDiet to any repo
-npx -y pkgdiet@2.0.0 pr
+npx -y pkgdiet@2.0.1 pr
 
 # Automatically configure Claude Desktop MCP
-npx -y pkgdiet@2.0.0 mcp-install
+npx -y pkgdiet@2.0.1 mcp-install
 ```
 
 ---
@@ -77,8 +77,8 @@ npx -y pkgdiet@2.0.0 mcp-install
 ## JSON output (`--json`)
 
 ```bash
-npx -y pkgdiet@2.0.0 check moment --json
-npx -y pkgdiet@2.0.0 audit --json
+npx -y pkgdiet@2.0.1 check moment --json
+npx -y pkgdiet@2.0.1 audit --json
 ```
 
 JSON is written to **stdout**. Human-readable diagnostics are written to **stderr**.
@@ -137,7 +137,7 @@ Both commands preview the exact files they will create or update and ask for con
 ## CI usage
 
 ```bash
-npx -y pkgdiet@2.0.0 ci --base HEAD~1 --env ci
+npx -y pkgdiet@2.0.1 ci --base HEAD~1 --env ci
 ```
 
 `pkgdiet ci` compares the current lockfile with a base Git ref and evaluates newly added dependencies. It is lockfile-diff-based and does not replace `pkgdiet audit` (which checks all dependencies).
@@ -159,7 +159,7 @@ Or use the reusable GitHub Action:
 ## MCP server
 
 ```bash
-npx -y pkgdiet@2.0.0 mcp
+npx -y pkgdiet@2.0.1 mcp
 ```
 
 Starts a local stdio MCP server exposing four read-only tools. Compatible AI clients can call these before recommending or installing packages.

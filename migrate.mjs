@@ -13,7 +13,7 @@ run('git checkout -b feat/sprint0-monorepo');
 // 2. Root config
 fs.writeFileSync('package.json', JSON.stringify({
   name: "pkgdiet-monorepo",
-  version: "2.0.0",
+  version: "2.0.1",
   private: true,
   workspaces: ["packages/*", "apps/*"],
   scripts: {
@@ -53,7 +53,7 @@ for (const f of coreFiles) {
 
 fs.writeFileSync('packages/core/package.json', JSON.stringify({
   name: "@pkgdiet/core",
-  version: "2.0.0",
+  version: "2.0.1",
   type: "module",
   main: "dist/index.js",
   types: "dist/index.d.ts",
@@ -84,15 +84,15 @@ run('git mv packages/cli/src/cli.js packages/cli/src/cli.ts');
 
 fs.writeFileSync('packages/cli/package.json', JSON.stringify({
   name: "pkgdiet",
-  version: "2.0.0",
+  version: "2.0.1",
   type: "module",
   bin: { "pkgdiet": "./dist/cli.js" },
   main: "dist/cli.js",
   files: ["dist"],
   scripts: { "build": "tsc -b" },
   dependencies: {
-    "@pkgdiet/core": "^2.0.0",
-    "@pkgdiet/mcp": "^2.0.0",
+    "@pkgdiet/core": "^2.0.1",
+    "@pkgdiet/mcp": "^2.0.1",
     "commander": "^13.1.0",
     "chalk": "^5.4.1",
     "ora": "^8.2.0"
@@ -110,7 +110,7 @@ fs.writeFileSync('packages/cli/tsconfig.json', JSON.stringify({
 fs.mkdirSync('packages/mcp/src', { recursive: true });
 fs.writeFileSync('packages/mcp/package.json', JSON.stringify({
   name: "@pkgdiet/mcp",
-  version: "2.0.0",
+  version: "2.0.1",
   type: "module",
   main: "dist/index.js",
   types: "dist/index.d.ts",
@@ -123,7 +123,7 @@ fs.writeFileSync('packages/mcp/package.json', JSON.stringify({
   files: ["dist"],
   scripts: { "build": "tsc -b" },
   dependencies: {
-    "@pkgdiet/core": "^2.0.0",
+    "@pkgdiet/core": "^2.0.1",
     "@modelcontextprotocol/sdk": "^1.0.1",
     "zod": "^3.24.0"
   }

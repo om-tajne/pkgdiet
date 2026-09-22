@@ -65,12 +65,12 @@ const http = new Hono();
 // ──────────────────────────────────────────────────────────────
 
 // Liveness probe
-http.get("/health", (c) => c.json({ status: "ok", version: "2.0.0" }));
+http.get("/health", (c) => c.json({ status: "ok", version: "2.0.1" }));
 
 // Sprint 7: Readiness probe — checks DB + registry
 http.get("/ready", async (c) => {
   const result: Record<string, string> = {
-    version: "2.0.0",
+    version: "2.0.1",
     db: "error",
     registry: "error",
     status: "error",

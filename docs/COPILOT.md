@@ -14,7 +14,7 @@ Create or update `.github/mcp.json` in the repository root:
   "mcpServers": {
     "pkgdiet": {
       "command": "npx",
-      "args": ["-y", "pkgdiet@2.0.0", "mcp"]
+      "args": ["-y", "pkgdiet@2.0.1", "mcp"]
     }
   }
 }

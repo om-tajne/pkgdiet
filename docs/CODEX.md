@@ -8,16 +8,16 @@
 Run the following command to add PkgDiet to your Codex configuration:
 
 ```bash
-codex mcp add pkgdiet -- npx -y pkgdiet@2.0.0 mcp
+codex mcp add pkgdiet -- npx -y pkgdiet@2.0.1 mcp
 ```
 
 Alternatively, manually edit your `~/.codex/config.toml` (or equivalent location):
 ```toml
 [mcp_servers.pkgdiet]
 command = "npx"
-args = ["-y", "pkgdiet@2.0.0", "mcp"]
+args = ["-y", "pkgdiet@2.0.1", "mcp"]
 ```
-*Enterprise Note: Ensure `npx` is in the system PATH. Pin to `@2.0.0` for predictable rollouts.*
+*Enterprise Note: Ensure `npx` is in the system PATH. Pin to `@2.0.1` for predictable rollouts.*
 
 ## 3. Verification Command
 Verify the server is registered:

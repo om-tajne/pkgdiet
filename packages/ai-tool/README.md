@@ -110,7 +110,7 @@ const result = checkDependency('moment');
 
 ## Zero runtime dependencies
 
-`@pkgdiet/ai-tool` has **no runtime dependencies**. It shells out to `npx pkgdiet@2.0.0` at call time — no install required beyond this package itself. Framework packages (LangChain, Vercel AI, OpenAI SDK, Anthropic SDK) are all optional peer dependencies.
+`@pkgdiet/ai-tool` has **no runtime dependencies**. It shells out to `npx pkgdiet@2.0.1` at call time — no install required beyond this package itself. Framework packages (LangChain, Vercel AI, OpenAI SDK, Anthropic SDK) are all optional peer dependencies.
 
 ## Exports
 

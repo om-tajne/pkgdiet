@@ -52,7 +52,7 @@ All supported clients use the same JSON block. Place it in the client-specific c
   "mcpServers": {
     "pkgdiet": {
       "command": "npx",
-      "args": ["-y", "pkgdiet@2.0.0", "mcp"]
+      "args": ["-y", "pkgdiet@2.0.1", "mcp"]
     }
   }
 }
@@ -65,7 +65,7 @@ All supported clients use the same JSON block. Place it in the client-specific c
 | Claude Desktop (Windows) | `%APPDATA%\Claude\claude_desktop_config.json` |
 | Cline | VS Code settings or `cline_mcp_settings.json` |
 | GitHub Copilot | `<project>/.github/mcp.json` |
-| Claude Code | `claude mcp add pkgdiet -- npx -y pkgdiet@2.0.0 mcp` |
+| Claude Code | `claude mcp add pkgdiet -- npx -y pkgdiet@2.0.1 mcp` |
 | Antigravity | `<project>/.antigravity/mcp.json` |
 
 ---
@@ -75,14 +75,14 @@ All supported clients use the same JSON block. Place it in the client-specific c
 To write the config for all detected clients in the current project — with preview and confirmation:
 
 ```bash
-npx pkgdiet@2.0.0 agent-setup --detect
+npx pkgdiet@2.0.1 agent-setup --detect
 ```
 
 For a specific client:
 
 ```bash
-npx pkgdiet@2.0.0 agent-setup --agent cursor
-npx pkgdiet@2.0.0 agent-setup --agent claude-desktop
+npx pkgdiet@2.0.1 agent-setup --agent cursor
+npx pkgdiet@2.0.1 agent-setup --agent claude-desktop
 ```
 
 ---

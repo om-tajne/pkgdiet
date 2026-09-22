@@ -65,7 +65,7 @@ async function withConcurrency(tasks, limit) {
 export async function startMcpServer() {
     const server = new McpServer({
         name: "pkgdiet",
-        version: "2.0.0",
+        version: "2.0.1",
     });
     // ── check_dependency ────────────────────────────────────────────────────────
     server.tool("check_dependency", "Evaluate a single npm package against the active PkgDiet policy to determine if it is safe, lightweight, and healthy to install. Use this read-only tool before proposing or installing any package. It returns a structured verdict (ALLOW, WARN, BLOCK), health score, cost impact, and security signals. It does not install packages, edit files, or modify the project. Always evaluate a package with this tool before recommending it.", {

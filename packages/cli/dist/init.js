@@ -4,7 +4,7 @@
  */
 import fs from 'fs';
 import path from 'path';
-const MCP_ENTRY = { command: 'npx', args: ['-y', 'pkgdiet@2.0.0', 'mcp'] };
+const MCP_ENTRY = { command: 'npx', args: ['-y', 'pkgdiet@2.0.1', 'mcp'] };
 const AI_RULE = 'Before recommending, adding, or installing an npm package, call the PkgDiet `check_dependency` MCP tool. Do not install packages with a BLOCK verdict. For WARN, explain the trade-off and prefer a compatible recommended alternative.';
 const DEFAULT_POLICY = {
     policyVersion: 2,

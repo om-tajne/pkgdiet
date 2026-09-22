@@ -11,7 +11,7 @@ const program = new Command();
 program
     .name('pkgdiet')
     .description('🥗 Put your node_modules on a diet — find unused, bloated, and unhealthy npm packages')
-    .version('2.0.0', '-v, --version');
+    .version('2.0.1', '-v, --version');
 program
     .command('audit')
     .description('Run full repository audit (default)')
@@ -159,10 +159,10 @@ program
     .description('Start the MCP JSON-RPC server over stdio (for Claude, Cursor, Windsurf, Copilot, etc.)')
     .addHelpText('after', `
 Tip: Run this once manually to warm the npm cache before connecting your agent:
-  $ npx pkgdiet@2.0.0 mcp
+  $ npx pkgdiet@2.0.1 mcp
 
 Then add to your agent config (e.g. .cursor/mcp.json or claude_desktop_config.json):
-  { "pkgdiet": { "command": "npx", "args": ["-y", "pkgdiet@2.0.0", "mcp"] } }
+  { "pkgdiet": { "command": "npx", "args": ["-y", "pkgdiet@2.0.1", "mcp"] } }
 
 Or run: npx pkgdiet agent-setup --all   to configure all agents automatically.`)
     .action(async () => {

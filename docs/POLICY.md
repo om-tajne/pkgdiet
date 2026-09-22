@@ -9,7 +9,7 @@ Full schema reference for `.pkgdietrc.json`.
 Run the interactive setup wizard:
 
 ```bash
-npx pkgdiet@2.0.0 setup
+npx pkgdiet@2.0.1 setup
 ```
 
 Or create `.pkgdietrc.json` manually in your project root. The file must be valid JSON.
@@ -89,7 +89,7 @@ Or create `.pkgdietrc.json` manually in your project root. The file must be vali
 ## Validation
 
 ```bash
-npx pkgdiet@2.0.0 policy-check
+npx pkgdiet@2.0.1 policy-check
 ```
 
 **Errors** (cause incorrect behavior):
@@ -117,8 +117,8 @@ If no file is found, all defaults apply.
 ## Environment overlays
 
 ```bash
-npx pkgdiet@2.0.0 check moment --env ci
-npx pkgdiet@2.0.0 ci --base HEAD~1 --env ci
+npx pkgdiet@2.0.1 check moment --env ci
+npx pkgdiet@2.0.1 ci --base HEAD~1 --env ci
 ```
 
 The overlay merges on top of the base policy. Any key in the overlay overrides the base value for that run.

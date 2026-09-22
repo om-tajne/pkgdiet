@@ -1,4 +1,4 @@
-# PkgDiet v2.0.0 — AI Platform Integration Proposal
+# PkgDiet v2.0.1 — AI Platform Integration Proposal
 
 ## One-line summary
 PkgDiet is a local-first dependency-policy layer for AI-assisted JavaScript and TypeScript development. It gives compatible AI clients read-only package-policy tools and gives organizations CI enforcement independent of the AI client.
@@ -36,7 +36,7 @@ Registry checks send only the package name being evaluated to public npm metadat
 
 ## Installation
 ```bash
-npx -y pkgdiet@2.0.0 mcp
+npx -y pkgdiet@2.0.1 mcp
 ```
 
 ## Validation

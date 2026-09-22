@@ -55,7 +55,7 @@ const MCP_CONFIG = `{
   "mcpServers": {
     "pkgdiet": {
       "command": "npx",
-      "args": ["-y", "pkgdiet@2.0.0", "mcp"]
+      "args": ["-y", "pkgdiet@2.0.1", "mcp"]
     }
   }
 }`;

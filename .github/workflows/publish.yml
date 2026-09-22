@@ -1,7 +1,7 @@
 name: Publish to npm (Trusted Publishing)
 
-# Triggers only on version tags: v2.0.0, v2.1.0, v2.0.1, etc.
-# Do NOT trigger on pre-release tags like v2.0.0-beta.1 — add a separate workflow for that.
+# Triggers only on version tags: v2.0.1, v2.1.0, v2.0.1, etc.
+# Do NOT trigger on pre-release tags like v2.0.1-beta.1 — add a separate workflow for that.
 on:
   push:
     tags:
@@ -45,7 +45,7 @@ jobs:
         run: npx tsc -b packages/core packages/mcp packages/cli
 
       - name: Check tag version matches all package.json versions
-        # Ensures the pushed tag (e.g. v2.0.0) matches every package before any publish.
+        # Ensures the pushed tag (e.g. v2.0.1) matches every package before any publish.
         # Stops the entire workflow if any package is out of sync.
         run: |
           node - <<'NODE'

@@ -3,7 +3,7 @@
 All notable changes to the supported packages are documented here.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
-Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
+Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.1.html)
 
 ---
 
@@ -13,14 +13,14 @@ _No changes yet._
 
 ---
 
-## [2.0.0] — 2026-09-21
+## [2.0.1] — 2026-09-21
 
 ### Packages
 
 This release covers the supported npm packages:
-- `@pkgdiet/core@2.0.0`
-- `@pkgdiet/mcp@2.0.0`
-- `pkgdiet@2.0.0`
+- `@pkgdiet/core@2.0.1`
+- `@pkgdiet/mcp@2.0.1`
+- `pkgdiet@2.0.1`
 
 The GitHub App, Dashboard, and Docker deployment are **experimental** and are not part of this release.
 
@@ -67,7 +67,7 @@ The following fields in the `run()` result object have been renamed. Old names n
 
 **`pkgdiet` CLI**
 - `assertPackageName` validation at the `check` command boundary — exits 1 with a clear error message on invalid package names.
-- `agent-setup` MCP args pinned to `pkgdiet@2.0.0` — not `@latest`.
+- `agent-setup` MCP args pinned to `pkgdiet@2.0.1` — not `@latest`.
 
 **CI / Publishing**
 - `.github/workflows/ci.yml` — actions pinned to full SHAs; `permissions: contents: read`; `npm ci`; three test suites; CLI smoke test.
@@ -111,9 +111,9 @@ The following fields in the `run()` result object have been renamed. Old names n
 
 ## [1.x]
 
-End of life. Upgrade to v2.0.0.
+End of life. Upgrade to v2.0.1.
 
 ---
 
-[Unreleased]: https://github.com/om-tajne/pkgdiet/compare/v2.0.0...HEAD
-[2.0.0]: https://github.com/om-tajne/pkgdiet/releases/tag/v2.0.0
+[Unreleased]: https://github.com/om-tajne/pkgdiet/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/om-tajne/pkgdiet/releases/tag/v2.0.1

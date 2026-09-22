@@ -9,12 +9,12 @@ Claude Code supports different scopes.
 
 **For Project-scoped rollout (recommended for repositories):**
 ```bash
-claude mcp add --scope project pkgdiet -- npx -y pkgdiet@2.0.0 mcp
+claude mcp add --scope project pkgdiet -- npx -y pkgdiet@2.0.1 mcp
 ```
 
 **For User-scoped rollout (developer machine):**
 ```bash
-claude mcp add --scope user pkgdiet -- npx -y pkgdiet@2.0.0 mcp
+claude mcp add --scope user pkgdiet -- npx -y pkgdiet@2.0.1 mcp
 ```
 
 *Organization administrators should deploy the server using Anthropic's supported managed-MCP mechanism for their tier.*

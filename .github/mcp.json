@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "pkgdiet@2.0.0",
+        "pkgdiet@2.0.1",
         "mcp"
       ]
     }
