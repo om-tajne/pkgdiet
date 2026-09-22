@@ -1,0 +1,32 @@
+trigger:
+  - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '20.x'
+    displayName: 'Install Node.js 20.x'
+
+  - script: |
+      npm ci
+    displayName: 'Install dependencies'
+
+  # The PkgDiet CI Gate
+  # This blocks the pipeline if vulnerable, deprecated, or overly bloated
+  # dependencies are detected in the lockfile.
+  - script: |
+      npx -y pkgdiet ci
+    displayName: 'PkgDiet Security & Health Gate'
+    env:
+      CI: true
+
+  - script: |
+      npm run build
+    displayName: 'Build project'
+
+  - script: |
+      npm test
+    displayName: 'Run tests'
