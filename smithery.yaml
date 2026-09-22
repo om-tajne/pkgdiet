@@ -11,3 +11,4 @@ startCommand:
   - name: check_dependencies
   - name: suggest_alternative
   - name: get_policy
+iconUrl: https://raw.githubusercontent.com/om-tajne/pkgdiet/main/logo.png
