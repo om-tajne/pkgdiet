@@ -5,3 +5,9 @@ startCommand:
     - "-y"
     - "pkgdiet@2.0.1"
     - "mcp"
+
+# Tool documentation for drift checks
+  - name: check_dependency
+  - name: check_dependencies
+  - name: suggest_alternative
+  - name: get_policy
