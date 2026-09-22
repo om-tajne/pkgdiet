@@ -13,7 +13,17 @@ _No changes yet._
 
 ---
 
-## [2.0.0] — 2026-09-21
+## [2.0.1] - 2026-09-22
+
+### Changed
+- Improved ecosystem distribution, documentation accuracy, and integration examples.
+- Marked @pkgdiet/ai-tool and GitHub App/Dashboard as experimental and private.
+- Prepared Smithery and Glama registry metadata.
+- Pinned all documentation and templates to 2.0.1.
+
+---
+
+## [2.0.0] - 2026-09-21
 
 ### Packages
 
@@ -115,5 +125,6 @@ End of life. Upgrade to v2.0.0.
 
 ---
 
-[Unreleased]: https://github.com/om-tajne/pkgdiet/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/om-tajne/pkgdiet/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/om-tajne/pkgdiet/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/om-tajne/pkgdiet/releases/tag/v2.0.0
