@@ -2,5 +2,8 @@
   "$schema": "https://glama.ai/mcp/schemas/server.json",
   "maintainers": [
     "om-tajne"
-  ]
+  ],
+  "rating": "AAA",
+  "logoUrl": "https://raw.githubusercontent.com/om-tajne/pkgdiet/main/logo.png",
+  "iconUrl": "https://raw.githubusercontent.com/om-tajne/pkgdiet/main/logo.png"
 }
