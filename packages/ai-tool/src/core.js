@@ -16,7 +16,7 @@ export function checkDependency(packageName, options = {}) {
   const name = packageName.trim().toLowerCase();
   try {
     const raw = execSync(
-      `npx pkgdiet@2.0.0 check "${name}" --json --env ${env}`,
+      `npx pkgdiet@2.0.1 check "${name}" --json --env ${env}`,
       { encoding: 'utf8', timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] }
     );
     const result = JSON.parse(raw);

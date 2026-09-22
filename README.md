@@ -27,12 +27,12 @@ PkgDiet is local-first and opt-in. MCP provides guidance to AI clients; CI is th
 
 **Evaluate a package before installing:**
 ```bash
-npx -y pkgdiet@2.0.0 check request moment
+npx -y pkgdiet@2.0.1 check request moment
 ```
 
 **Run the MCP server for your AI Agent:**
 ```bash
-npx -y pkgdiet@2.0.0 mcp
+npx -y pkgdiet@2.0.1 mcp
 ```
 
 *(See [All commands](#all-commands) below for `audit`, `ci`, `setup`, and more)*
@@ -175,7 +175,7 @@ For organizational deployment (MDM payloads, reusable CI workflows, and global M
   "mcpServers": {
     "pkgdiet": {
       "command": "npx",
-      "args": ["-y", "pkgdiet@2.0.0", "mcp"]
+      "args": ["-y", "pkgdiet@2.0.1", "mcp"]
     }
   }
 }
@@ -184,7 +184,7 @@ For organizational deployment (MDM payloads, reusable CI workflows, and global M
 Or use the setup command to configure supported agents in the current project:
 
 ```bash
-npx pkgdiet@2.0.0 agent-setup --detect
+npx pkgdiet@2.0.1 agent-setup --detect
 ```
 
 This previews and confirms before writing any configuration file.
@@ -251,7 +251,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
         with: { fetch-depth: 0 }
-      - run: npx -y pkgdiet@2.0.0 ci --base HEAD~1 --env ci
+      - run: npx -y pkgdiet@2.0.1 ci --base HEAD~1 --env ci
 ```
 
 Or use the reusable GitHub Action:

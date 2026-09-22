@@ -44,7 +44,7 @@ test('renderReport — all-clear (no issues)', () => {
     sizeResults: { totalNodeModules: 699_400_192 },
   })));
 
-  assert.ok(logs.some(l => l.includes('🥗 PkgDiet v2.0.0')));
+  assert.ok(logs.some(l => l.includes('🥗 PkgDiet v2.0.1')));
   assert.ok(logs.some(l => l.includes('Overall Score: 100/100 ✅')));
   assert.ok(logs.some(l => l.includes('Repo Safety Score: 100/100 (Excellent)')));
   assert.ok(logs.some(l => l.includes('NO UNUSED DEPENDENCIES')));

@@ -15,7 +15,7 @@ This extension is an **internal beta**. It is not published to the VS Code Marke
 Install from the `.vsix` file:
 
 ```bash
-code --install-extension pkgdiet-vscode-2.0.0.vsix
+code --install-extension pkgdiet-vscode-2.0.1.vsix
 ```
 
 Or in VS Code: Extensions → `⋯` menu → **Install from VSIX…**

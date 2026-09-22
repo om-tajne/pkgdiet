@@ -13,7 +13,7 @@ Create `.gemini/antigravity/mcp/pkgdiet/mcp.json` in your project root:
   "mcpServers": {
     "pkgdiet": {
       "command": "npx",
-      "args": ["-y", "pkgdiet@2.0.0", "mcp"]
+      "args": ["-y", "pkgdiet@2.0.1", "mcp"]
     }
   }
 }
@@ -26,7 +26,7 @@ Create or update `~/.gemini/config/mcp_config.json`:
   "mcpServers": {
     "pkgdiet": {
       "command": "npx",
-      "args": ["-y", "pkgdiet@2.0.0", "mcp"]
+      "args": ["-y", "pkgdiet@2.0.1", "mcp"]
     }
   }
 }

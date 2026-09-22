@@ -5,7 +5,7 @@ Local Model Context Protocol (MCP) server for PkgDiet dependency-policy checks.
 Start a local stdio MCP server:
 
 ```bash
-npx -y pkgdiet@2.0.0 mcp
+npx -y pkgdiet@2.0.1 mcp
 ```
 
 Exposes four read-only tools that compatible AI clients can call before recommending or installing npm packages. Does not install packages, write files, or modify the workspace.
@@ -140,7 +140,7 @@ Multiple independent stdio processes each have their own limits.
   "mcpServers": {
     "pkgdiet": {
       "command": "npx",
-      "args": ["-y", "pkgdiet@2.0.0", "mcp"]
+      "args": ["-y", "pkgdiet@2.0.1", "mcp"]
     }
   }
 }
@@ -155,14 +155,14 @@ Per-client config file locations:
 | Claude Desktop (Windows) | `%APPDATA%\Claude\claude_desktop_config.json` |
 | Cline | `cline_mcp_settings.json` |
 | GitHub Copilot | `.github/mcp.json` |
-| Claude Code | `claude mcp add pkgdiet -- npx -y pkgdiet@2.0.0 mcp` |
+| Claude Code | `claude mcp add pkgdiet -- npx -y pkgdiet@2.0.1 mcp` |
 | Antigravity | `.gemini/antigravity/mcp/pkgdiet/mcp.json` |
 | Windsurf | Manual — see [docs/INTEGRATIONS.md](../../docs/INTEGRATIONS.md) |
 
 Or use the setup command (previews and confirms before writing):
 
 ```bash
-npx pkgdiet@2.0.0 agent-setup --detect
+npx pkgdiet@2.0.1 agent-setup --detect
 ```
 
 ---

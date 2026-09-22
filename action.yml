@@ -30,7 +30,7 @@ inputs:
   version:
     description: 'PkgDiet version to use'
     required: false
-    default: '2.0.0'
+    default: '2.0.1'
   node-version:
     description: 'Node.js version'
     required: false

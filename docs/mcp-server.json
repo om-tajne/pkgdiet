@@ -1,7 +1,7 @@
 {
   "name": "io.github.om-tajne/pkgdiet",
   "displayName": "PkgDiet",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Local npm dependency-policy checks for compatible MCP clients.",
   "repository": {
     "url": "https://github.com/om-tajne/pkgdiet",
@@ -14,7 +14,7 @@
   "transport": ["stdio"],
   "start": {
     "command": "npx",
-    "args": ["-y", "pkgdiet@2.0.0", "mcp"]
+    "args": ["-y", "pkgdiet@2.0.1", "mcp"]
   },
   "tools": [
     {

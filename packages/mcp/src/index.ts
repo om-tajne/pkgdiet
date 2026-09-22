@@ -77,7 +77,7 @@ async function withConcurrency<T>(tasks: Array<() => Promise<T>>, limit: number)
 export async function startMcpServer() {
   const server = new McpServer({
     name:    "pkgdiet",
-    version: "2.0.0",
+    version: "2.0.1",
   });
 
   // ── check_dependency ────────────────────────────────────────────────────────

@@ -33,11 +33,11 @@ jobs:
 
       - name: Run PkgDiet CI Gate
         # Recommended default for strict supply-chain controls: pin to a full commit SHA
-        # uses: om-tajne/pkgdiet@<FULL_40_CHARACTER_COMMIT_SHA> # v2.0.0
+        # uses: om-tajne/pkgdiet@<FULL_40_CHARACTER_COMMIT_SHA> # v2.0.1
         # Convenience option for automatic minor patches:
         uses: om-tajne/pkgdiet@v2
         with:
           base: 'HEAD~1'
           environment: 'ci'
           fail-on: 'BLOCK'
-          version: '2.0.0'
+          version: '2.0.1'

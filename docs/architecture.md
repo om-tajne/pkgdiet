@@ -9,7 +9,7 @@ Technical walkthrough of the monorepo structure, data flow, and module responsib
 ## Release surface
 
 ```
-Supported (v2.0.0):
+Supported (v2.0.1):
   @pkgdiet/core   — shared business logic library
   @pkgdiet/mcp    — MCP server (four read-only tools)
   pkgdiet         — CLI
@@ -18,7 +18,7 @@ Supported (v2.0.0):
 Internal beta:
   pkgdiet-vscode  — VS Code extension (not published to Marketplace)
 
-Experimental (not part of v2.0.0 release):
+Experimental (not part of v2.0.1 release):
   @pkgdiet/ai-tool    — framework SDK adapters (LangChain, Vercel AI, OpenAI, Anthropic)
                         private: true — must not be published until stable API, docs, tests
   apps/github-app     — webhook handler (Node.js, Hono, Prisma)
@@ -256,7 +256,7 @@ A verdict is a policy decision. It is not a universal security verdict. An alter
 ### `certified` and `hasProvenance` meaning
 
 - **`certified: true`** = score >= 90 + ALLOW + no alternatives + no efficiency flag. A policy-satisfaction indicator, not a security certification.
-- **`hasProvenance: false`** = provenance **not evaluated** in v2.0.0. Does not mean the package lacks npm provenance.
+- **`hasProvenance: false`** = provenance **not evaluated** in v2.0.1. Does not mean the package lacks npm provenance.
 - **`integrityCheck: "missing"`** = verification not performed, not that verification failed.
 
 ---
@@ -305,7 +305,7 @@ Runs: `npx pkgdiet@<version> ci --env <environment> --base <base>`
 | `fail-on` | `BLOCK` | Threshold: `BLOCK` or `WARN` |
 | `dry-run` | `false` | Exit 0 always |
 | `working-directory` | `.` | Subdirectory with package.json |
-| `version` | `2.0.0` | PkgDiet version to pin |
+| `version` | `2.0.1` | PkgDiet version to pin |
 | `node-version` | `20` | Node.js version |
 
 ### Outputs
@@ -321,7 +321,7 @@ Caller must use `fetch-depth: 0` in `actions/checkout`.
 
 ## MCP Server — `@pkgdiet/mcp`
 
-The server evaluates the project from its own launch directory. **v2.0.0 tool schemas do not accept a `projectPath` argument.** Tools always use `process.cwd()`.
+The server evaluates the project from its own launch directory. **v2.0.1 tool schemas do not accept a `projectPath` argument.** Tools always use `process.cwd()`.
 
 Rate limits: 30 calls/min per process. 50 packages/batch. 15 s tool timeout. 10 concurrent fetches.
 
@@ -351,4 +351,4 @@ No source code, file contents, project paths, or credentials are transmitted. Lo
 
 ---
 
-*Last updated for v2.0.0*
+*Last updated for v2.0.1*

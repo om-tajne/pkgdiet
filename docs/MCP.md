@@ -6,7 +6,7 @@ MCP tools and client setup for local dependency-policy checks.
 
 ## Working directory
 
-The MCP server evaluates packages from the directory in which the server process is launched. **The v2.0.0 tool schemas do not accept a `projectPath` argument.** All tools use `process.cwd()`.
+The MCP server evaluates packages from the directory in which the server process is launched. **The v2.0.1 tool schemas do not accept a `projectPath` argument.** All tools use `process.cwd()`.
 
 To check packages for a specific project, launch the server from that project's root, or use the CLI instead.
 
@@ -23,7 +23,7 @@ The server does not install packages, write files, modify the workspace, or acce
 ## Starting the server
 
 ```bash
-npx -y pkgdiet@2.0.0 mcp
+npx -y pkgdiet@2.0.1 mcp
 ```
 
 ---
@@ -58,7 +58,7 @@ Evaluate a single npm package against the active project policy.
 
 > **Field name note:** The CLI (`pkgdiet check`) and the MCP tool use different field names. The MCP response uses `addedSizeBytes` and `costImpactPerMonthUsd`. Do not assume they match CLI output.
 >
-> **`hasProvenance: false`** means provenance was not evaluated in v2.0.0. It does not mean the package lacks npm provenance attestation.
+> **`hasProvenance: false`** means provenance was not evaluated in v2.0.1. It does not mean the package lacks npm provenance attestation.
 >
 > **`integrityCheck: "missing"`** means verification was not performed, not that verification failed.
 
@@ -172,7 +172,7 @@ The MCP entry block is the same for all clients. The config file location varies
 | Claude Desktop | `claude_desktop_config.json` (platform-specific path) |
 | Cline | `cline_mcp_settings.json` |
 | GitHub Copilot | `.github/mcp.json` |
-| Claude Code | `claude mcp add pkgdiet -- npx -y pkgdiet@2.0.0 mcp` |
+| Claude Code | `claude mcp add pkgdiet -- npx -y pkgdiet@2.0.1 mcp` |
 | Windsurf | See `### Windsurf` below |
 
 ### Windsurf
@@ -186,7 +186,7 @@ The MCP entry block is the same for all clients. The config file location varies
   "mcpServers": {
     "pkgdiet": {
       "command": "npx",
-      "args": ["-y", "pkgdiet@2.0.0", "mcp"]
+      "args": ["-y", "pkgdiet@2.0.1", "mcp"]
     }
   }
 }
@@ -195,7 +195,7 @@ The MCP entry block is the same for all clients. The config file location varies
 **Automated setup** (previews and confirms before writing):
 
 ```bash
-npx pkgdiet@2.0.0 agent-setup --detect
+npx pkgdiet@2.0.1 agent-setup --detect
 ```
 
 ---
