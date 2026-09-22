@@ -1,0 +1,51 @@
+name: PkgDiet Dependency Guardrail
+
+on:
+  pull_request:
+    paths:
+      - 'package-lock.json'
+      - 'yarn.lock'
+      - 'pnpm-lock.yaml'
+      - '.pkgdietrc.json'
+
+jobs:
+  pkgdiet-check:
+    name: Dependency Health Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # Required to post PR comments
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required to compare against the base branch
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run PkgDiet CI Gate
+        id: pkgdiet
+        # Runs the CI gate comparing against the base branch of the PR.
+        # This will exit 1 if blocked packages or policy tampering is detected.
+        run: npx -y pkgdiet@latest ci --base origin/${{ github.base_ref }}
+        
+      - name: Comment on PR (If Issues Found)
+        if: failure() && steps.pkgdiet.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('pkgdiet-pr-comment.md')) {
+              const body = fs.readFileSync('pkgdiet-pr-comment.md', 'utf8');
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## 🛡️ PkgDiet Guardrail Alert\n\n${body}`
+              });
+            }
