@@ -1,0 +1,20 @@
+{
+  "name": "pkgdiet-vercel-ai-example",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "ai": "latest",
+    "@ai-sdk/mcp": "latest",
+    "@ai-sdk/openai": "latest",
+    "@modelcontextprotocol/sdk": "latest",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.1",
+    "typescript": "^5.4.3",
+    "@types/node": "^20.11.30"
+  }
+}
