@@ -74,7 +74,7 @@ async function withConcurrency<T>(tasks: Array<() => Promise<T>>, limit: number)
 
 // ── MCP Server ────────────────────────────────────────────────────────────────
 
-export async function startMcpServer() {
+export function createMcpServer() {
   const server = new McpServer({
     name:    "pkgdiet",
     version: "2.0.1",
@@ -356,6 +356,11 @@ export async function startMcpServer() {
     }
   );
 
+  return server;
+}
+
+export async function startMcpServer() {
+  const server = createMcpServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
