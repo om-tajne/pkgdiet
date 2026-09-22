@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.om-tajne/pkgdiet",
-  "version": "1.2.1",
-  "description": "Put your node_modules on a diet - find unused dependencies, analyze health, and reduce size",
+  "version": "2.0.0",
+  "description": "Dependency policy and MCP server for AI-assisted JavaScript development. Stop AI coding agents from hallucinating deprecated npm packages.",
   "repository": {
     "source": "github",
     "url": "https://github.com/om-tajne/pkgdiet"
@@ -11,7 +11,7 @@
     {
       "registryType": "npm",
       "identifier": "pkgdiet",
-      "version": "1.2.1",
+      "version": "2.0.0",
       "transport": {
         "type": "stdio"
       }
