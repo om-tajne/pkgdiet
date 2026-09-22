@@ -1,6 +1,7 @@
 {
   "name": "pkgdiet",
-  "version": "2.0.0",
+  "version": "2.0.1",
+  "mcpName": "io.github.om-tajne/pkgdiet",
   "type": "module",
   "bin": {
     "pkgdiet": "dist/cli.js"
