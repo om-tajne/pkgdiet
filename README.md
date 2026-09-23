@@ -315,6 +315,11 @@ or in `.pkgdietrc.json`:
 | Windsurf | Rules integration only (`.windsurfrules`) — MCP config not written |
 | GitHub Copilot | Configuration generated; live client validation pending |
 | Claude Code | Tested configuration |
+| Qwen Code | Tested configuration |
+| DeepSeek Harness | Tested configuration |
+| Pi Agent Harness | Tested configuration |
+| Crush | Tested configuration |
+| Vibe Kanban | Tested configuration |
 | GitHub Action | Supported |
 | VS Code extension | Internal beta |
 | GitHub App | Experimental |
