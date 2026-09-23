@@ -15,6 +15,11 @@ Tested client support matrix for MCP and CI integrations.
 | Claude Code | stdio | CLI (`claude mcp add`) + `CLAUDE.md` | ✅ Supported |
 | Windsurf | stdio | `.windsurfrules` (rules only — no MCP JSON written) | ⚠️ Agent rules only |
 | Antigravity | stdio | `.gemini/antigravity/mcp/pkgdiet/mcp.json` | ✅ Supported |
+| Qwen Code | stdio | `packages/core/src/skills/bundled/` | ✅ Supported |
+| DeepSeek Harness | stdio | `.agents/skills/` | ✅ Supported |
+| Pi Agent Harness | stdio | `.pi/skills/` | ✅ Supported |
+| Crush | stdio | `.agents/skills/` | ✅ Supported |
+| Vibe Kanban | stdio | `.agents/skills/` | ✅ Supported |
 
 "Supported" means the MCP server has been registered and the tools respond to calls from that client. It does not mean the client is required to call the tools before every installation, or that the client follows tool results.
 
