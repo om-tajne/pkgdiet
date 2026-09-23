@@ -1,0 +1,12 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "request"
+      - dependency-name: "form-data"
+      - dependency-name: "qs"
+      - dependency-name: "uuid"
+      - dependency-name: "tough-cookie"
