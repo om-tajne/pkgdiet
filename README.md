@@ -311,7 +311,6 @@ or in `.pkgdietrc.json`:
 | Cursor | Tested configuration |
 | Claude Desktop | Tested configuration |
 | Cline | Tested configuration |
-| Roo Code | Tested configuration |
 | Antigravity | Tested configuration |
 | Windsurf | Rules integration only (`.windsurfrules`) — MCP config not written |
 | GitHub Copilot | Configuration generated; live client validation pending |
@@ -321,9 +320,6 @@ or in `.pkgdietrc.json`:
 | Pi Agent Harness | Tested configuration |
 | Crush | Tested configuration |
 | Vibe Kanban | Tested configuration |
-| Aider | Planned (No native MCP yet) |
-| Continue | Planned |
-| Goose | Planned |
 | GitHub Action | Supported |
 | VS Code extension | Internal beta |
 | GitHub App | Experimental |
