@@ -20,10 +20,6 @@ Tested client support matrix for MCP and CI integrations.
 | Pi Agent Harness | stdio | `.pi/skills/` | ✅ Supported |
 | Crush | stdio | `.agents/skills/` | ✅ Supported |
 | Vibe Kanban | stdio | `.agents/skills/` | ✅ Supported |
-| Roo Code | stdio | `roo_mcp_settings.json` | ✅ Supported |
-| Aider | - | - | ⏳ Planned (No native MCP yet) |
-| Continue | stdio | `config.json` | ⏳ Planned |
-| Goose | stdio | Goose CLI | ⏳ Planned |
 
 "Supported" means the MCP server has been registered and the tools respond to calls from that client. It does not mean the client is required to call the tools before every installation, or that the client follows tool results.
 
