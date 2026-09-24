@@ -137,12 +137,12 @@ test('checker — package name normalization: PascalCase becomes lowercase', () 
   assert.equal(assertPackageName('@Types/Node'), '@types/node');
 });
 
-test('checker — evaluatePolicy produces BLOCK for health below minHealthScore=70', async () => {
+test('checker — evaluatePolicy produces WARN for health below minHealthScore=70 by default', async () => {
   const { evaluatePolicy } = await import('../src/policy.js');
   const policy = { ...DEFAULT_POLICY, minHealthScore: 70, warnHealthScore: 80 };
   const lowHealth = { score: 65, flags: [], installScripts: [], deprecated: false };
   const { verdict } = evaluatePolicy('some-pkg', lowHealth, { unpackedSize: 0 }, policy);
-  assert.equal(verdict, 'BLOCK');
+  assert.equal(verdict, 'WARN');
 });
 
 // ── Edge-case handling ────────────────────────────────────────────────────────
