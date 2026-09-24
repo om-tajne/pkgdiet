@@ -18,6 +18,7 @@
     "./dist/alternatives.js": "./dist/alternatives.js",
     "./dist/alternatives-extension.js": "./dist/alternatives-extension.js",
     "./dist/policy.js": "./dist/policy.js",
+    "./dist/policyEngine.js": "./dist/policyEngine.js",
     "./dist/lockfile/index.js": "./dist/lockfile/index.js",
     "./dist/ci-gate.js": "./dist/ci-gate.js",
     "./dist/drift.js": "./dist/drift.js",

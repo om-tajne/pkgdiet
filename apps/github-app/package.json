@@ -7,22 +7,22 @@
     "build": "tsc -b",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:studio": "prisma studio"
+    "db:generate": "npx prisma generate",
+    "db:push": "npx prisma db push",
+    "db:studio": "npx prisma studio"
   },
   "dependencies": {
     "@octokit/app": "^15.0.0",
     "@octokit/rest": "^21.0.0",
     "@octokit/webhooks": "^13.0.0",
     "@pkgdiet/core": "2.0.1",
-    "@prisma/client": "^6.0.0",
+    "@prisma/client": "^5.0.0",
     "hono": "^4.0.0"
   },
   "devDependencies": {
-    "prisma": "^8.0.0-rc.15",
+    "prisma": "^5.0.0",
     "tsx": "^4.0.0",
-    "typescript": "^7.0.2"
+    "typescript": "^5.0.0"
   },
   "private": "true"
 }
