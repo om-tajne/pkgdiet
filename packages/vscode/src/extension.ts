@@ -20,7 +20,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Inject alternatives dataset at activation time.
     // injectAlternatives() validates the dataset shape — throws TypeError on invalid input.
     try {
-        injectAlternatives(alternativesData as Record<string, unknown>);
+        injectAlternatives(alternativesData as Record<string, any>);
         getOutputChannel().appendLine('[PkgDiet] Alternatives dataset loaded successfully.');
     } catch (error) {
         getOutputChannel().appendLine(

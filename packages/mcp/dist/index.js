@@ -194,17 +194,17 @@ export function createMcpServer() {
         })());
     });
     // ── suggest_alternative ─────────────────────────────────────────────────────
-    server.tool("suggest_alternative", "Use this read-only tool after check_dependency returns WARN or BLOCK, or when a developer asks for a replacement for an npm package. Returns curated candidates with reasons, compatibility notes, and migration guidance. Verify each candidate with check_dependency before recommending or installing.", {
+    server.tool("suggest_alternative", "Suggest a lighter, healthier alternative for an npm package. Use this read-only tool when a developer asks for a package replacement, or when check_dependency returns a WARN or BLOCK verdict (e.g., due to bloat, security risks, or deprecation). It returns a curated list of alternative candidates, including compatibility notes, size guidance, and migration steps. Behavior: It queries the PkgDiet curated alternatives dataset for the given package name and returns ranked recommendations based on the specified runtime and reason. Guidelines: Always verify each recommended candidate with the check_dependency tool before actually installing it or presenting it as a final solution. Do not use this tool to install packages.", {
         packageName: z.string().min(1).max(214)
-            .describe("The npm package to replace."),
+            .describe("The exact npm package name you want to replace (e.g., 'request', 'moment', 'lodash')."),
         reason: z.enum(["deprecated", "security", "health", "size", "policy", "compatibility", "all"]).default("all")
-            .describe("Primary reason for replacement."),
+            .describe("The primary reason you are seeking an alternative. Helps rank the best candidates (e.g., choose 'size' if replacing a bloated package)."),
         maxResults: z.number().int().min(1).max(5).default(3)
-            .describe("Maximum number of candidates to return (1–5)."),
+            .describe("The maximum number of alternative candidates to return. Recommended: 3."),
         runtime: z.enum(["node", "browser", "edge", "universal"]).default("node")
-            .describe("Runtime where the replacement will be used."),
+            .describe("The target runtime environment where the replacement package will be executed."),
         includeMigrationNotes: z.boolean().default(true)
-            .describe("Include API compatibility and migration guidance."),
+            .describe("If true, includes API compatibility warnings and migration guidance for the suggested alternatives."),
     }, async (args) => {
         if (!checkRateLimit())
             return RATE_EXCEEDED_RESPONSE;
