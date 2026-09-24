@@ -114,8 +114,15 @@ test('evaluatePolicy — explicitly allowed package bypasses all checks', () => 
   assert.equal(ignored, true);
 });
 
-test('evaluatePolicy — package below minHealthScore is BLOCK', () => {
+test('evaluatePolicy — package below minHealthScore is WARN by default', () => {
   const policy = { ...DEFAULT_POLICY, minHealthScore: 50 };
+  const lowHealth = { ...HEALTHY_PKG, score: 30 };
+  const { verdict } = evaluatePolicy('some-pkg', lowHealth, SMALL_SIZE, policy);
+  assert.equal(verdict, 'WARN');
+});
+
+test('evaluatePolicy — package below minHealthScore is BLOCK if blockOnLowHealth=true', () => {
+  const policy = { ...DEFAULT_POLICY, minHealthScore: 50, blockOnLowHealth: true };
   const lowHealth = { ...HEALTHY_PKG, score: 30 };
   const { verdict } = evaluatePolicy('some-pkg', lowHealth, SMALL_SIZE, policy);
   assert.equal(verdict, 'BLOCK');
