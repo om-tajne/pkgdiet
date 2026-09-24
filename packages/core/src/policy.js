@@ -10,6 +10,8 @@ export const DEFAULT_POLICY = {
   ignoreRules: [],
   blockDeprecated: true,
   blockInstallScripts: false,
+  blockOnLowHealth: false,
+  blockOnOversized: false,
   failOn: 'BLOCK', // CI exit behavior: 'BLOCK' | 'WARN' | 'NONE'
 
   // Sprint 7: Security hardening
@@ -207,7 +209,7 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
   // 3. Health score
   if (pkgHealth) {
     if (pkgHealth.score < policy.minHealthScore) {
-      verdict = 'BLOCK';
+      verdict = policy.blockOnLowHealth ? 'BLOCK' : (verdict === 'BLOCK' ? 'BLOCK' : 'WARN');
       reasons.push(`Health score ${pkgHealth.score} is below minimum allowed (${policy.minHealthScore}).`);
     } else if (pkgHealth.score < policy.warnHealthScore) {
       verdict = verdict === 'BLOCK' ? 'BLOCK' : 'WARN';
@@ -227,7 +229,7 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
   if (sizeInfo && sizeInfo.unpackedSize > policy.maxPackageSizeBytes) {
     const sizeMB = (sizeInfo.unpackedSize / (1024 * 1024)).toFixed(2);
     const maxMB  = (policy.maxPackageSizeBytes / (1024 * 1024)).toFixed(2);
-    verdict = verdict === 'BLOCK' ? 'BLOCK' : 'WARN';
+    verdict = policy.blockOnOversized ? 'BLOCK' : (verdict === 'BLOCK' ? 'BLOCK' : 'WARN');
     reasons.push(`Package size (${sizeMB}MB) exceeds limit (${maxMB}MB).`);
   }
 
