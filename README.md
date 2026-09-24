@@ -14,6 +14,7 @@ PkgDiet is local-first and opt-in. MCP provides guidance to AI clients; CI is th
 [![npm version](https://img.shields.io/npm/v/pkgdiet.svg)](https://www.npmjs.com/package/pkgdiet)
 [![npm downloads](https://img.shields.io/npm/dm/pkgdiet.svg)](https://www.npmjs.com/package/pkgdiet)
 [![Glama MCP Server](https://glama.ai/mcp/servers/om-tajne/pkgdiet/badge)](https://glama.ai/mcp/servers/om-tajne/pkgdiet)
+[![Listed on mcpservers.org](https://mcpservers.org/badge.svg)](https://mcpservers.org/servers/om-tajne/pkgdiet)
 
 [View PkgDiet on Glama](https://glama.ai/mcp/servers/om-tajne/pkgdiet)
 
