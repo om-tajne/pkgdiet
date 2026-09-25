@@ -1,0 +1,6 @@
+{
+  "minHealthScore": 80,
+  "failOn": "WARN",
+  "securityMode": "fail-closed",
+  "blockedPackages": ["bad-package"]
+}

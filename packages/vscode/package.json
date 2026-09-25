@@ -95,7 +95,7 @@
     "build": "npm run compile"
   },
   "dependencies": {
-    "@pkgdiet/core": "^2.0.1"
+    "@pkgdiet/core": "2.0.1"
   },
   "devDependencies": {
     "@types/vscode": "^1.138.0",

@@ -1,0 +1,8 @@
+{
+  "name": "demo-repo",
+  "version": "1.0.0",
+  "description": "Demo repository for PkgDiet 2.0.1",
+  "dependencies": {
+    "lodash": "^4.17.21"
+  }
+}

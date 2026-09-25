@@ -1,14 +1,8 @@
 startCommand:
   type: stdio
-  command: npx
-  args:
-    - "-y"
-    - "pkgdiet@2.0.1"
-    - "mcp"
-
-# Tool documentation for drift checks
-  - name: check_dependency
-  - name: check_dependencies
-  - name: suggest_alternative
-  - name: get_policy
-iconUrl: https://raw.githubusercontent.com/om-tajne/pkgdiet/main/logo.png
+  config:
+    command: npx
+    args:
+      - -y
+      - pkgdiet@2.0.1
+      - mcp

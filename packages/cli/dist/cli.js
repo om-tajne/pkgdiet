@@ -1,20 +1,53 @@
 #!/usr/bin/env node
 /**
- * PkgDiet CLI — Put your node_modules on a diet
- * Usage: npx pkgdiet [options]
+ * PkgDiet CLI
+ *
+ * Dependency policy for AI-assisted development.
+ * Audit, check, and enforce npm dependency rules.
+ *
+ * Brand tagline: Put your node_modules on a diet.
+ *
+ * Usage:
+ * npx pkgdiet <command> [options]
  */
 import { Command } from 'commander';
-import { run } from '@pkgdiet/core/dist/index.js';
+import { run } from '@pkgdiet/core';
 import { renderReport, renderPackageCheck, renderError, renderJson } from './reporter.js';
 import chalk from 'chalk';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const { version } = require('../package.json');
 const program = new Command();
 program
     .name('pkgdiet')
-    .description('🥗 Put your node_modules on a diet — find unused, bloated, and unhealthy npm packages')
-    .version('2.0.1', '-v, --version');
+    .description('Dependency policy for AI-assisted development — audit, check, and enforce npm dependency rules')
+    .version(version, '-v, --version');
+program.addHelpText('before', '\n🥗 PkgDiet — Put your node_modules on a diet\nRepository-owned dependency policy for developers and AI coding agents.\n');
+program.addHelpText('after', `
+Examples:
+  # Audit the current repository
+  $ npx pkgdiet audit
+
+  # Check one or more candidate packages
+  $ npx pkgdiet check request undici
+
+  # Run locally against a branch or Git ref
+  $ npx pkgdiet ci --base origin/main --env ci
+
+  # GitHub Actions: use the pull request base commit SHA
+  $ npx pkgdiet ci --base <pull-request-base-sha> --env ci
+
+  # Validate local policy
+  $ npx pkgdiet policy-check
+
+  # Start the MCP server for a compatible AI coding agent
+  $ npx pkgdiet mcp
+
+Docs: https://github.com/om-tajne/pkgdiet
+`);
 program
     .command('audit')
-    .description('Run full repository audit (default)')
+    .description('Audit existing dependencies for policy, health, size, and unused-package signals')
     .option('-p, --path <path>', 'Path to the project to analyze', '.')
     .option('--unused', 'Only show unused dependencies')
     .option('--health', 'Only show health analysis')
@@ -52,7 +85,7 @@ program
 // ─── check ────────────────────────────────────────────────────────────────────
 program
     .command('check <packages...>')
-    .description('Instantly check one or more packages for health, size, and policy compliance')
+    .description('Evaluate npm packages against this repository’s dependency policy')
     .option('-p, --path <path>', 'Path to project policy (default: .)', '.')
     .option('--json', 'Output machine-readable JSON')
     .option('--env <name>', 'Apply environment policy overlay (e.g. ci, dev, prod)')
@@ -156,7 +189,7 @@ program
 // ─── mcp ──────────────────────────────────────────────────────────────────────
 program
     .command('mcp [args...]')
-    .description('Start the MCP JSON-RPC server over stdio (for Claude, Cursor, Windsurf, Copilot, etc.)')
+    .description('Start the MCP JSON-RPC server over stdio for MCP-compatible AI coding agents')
     .addHelpText('after', `
 Tip: Run this once manually to warm the npm cache before connecting your agent:
   $ npx pkgdiet@2.0.1 mcp
@@ -173,18 +206,24 @@ Or run: npx pkgdiet agent-setup --all   to configure all agents automatically.`)
 // ─── ci ───────────────────────────────────────────────────────────────────────
 program
     .command('ci')
-    .description('Run CI PR gate checks based on lockfile diff')
+    .description('Enforce policy for dependency changes introduced by this branch')
     .option('--base <ref>', 'Base git ref to compare against', 'HEAD~1')
     .option('--dry-run', 'Evaluate without enforcing — always exits 0')
     .option('--env <name>', 'Apply environment policy overlay (e.g. ci, dev, prod)')
     .action(async (options) => {
-    const { getLockfileDiff } = await import('@pkgdiet/core/dist/lockfile/index.js');
     const { runCiGate } = await import('@pkgdiet/core/dist/ci-gate.js');
     if (options.dryRun) {
         console.log('⚠️  Running in --dry-run mode. Results are informational only; exit code will always be 0.\n');
     }
-    // 1. Anti-tampering check
+    // 1. Anti-tampering and base ref check
     const { execSync } = await import('child_process');
+    try {
+        execSync(`git rev-parse --verify ${options.base}`, { stdio: 'ignore' });
+    }
+    catch (e) {
+        console.error(`ERROR GIT_BASE_UNAVAILABLE: Could not resolve base revision "${options.base}". For GitHub Actions, use actions/checkout@v4 with fetch-depth: 0.`);
+        process.exit(2);
+    }
     let policyModified = false;
     try {
         const changedFiles = execSync(`git diff --name-only ${options.base} HEAD`, { encoding: 'utf8' });
@@ -193,19 +232,40 @@ program
         }
     }
     catch (e) {
-        // Ignore git errors
+        // Ignore diff errors if HEAD is somehow weird
     }
-    // 2. Lockfile diff
-    const diff = getLockfileDiff(options.base, 'HEAD');
-    if (!diff.added || diff.added.length === 0) {
-        console.log(`✅ No new dependencies found in ${diff.type} lockfile.`);
+    // 2. package.json diff
+    function getPackageJsonDeps(ref) {
+        try {
+            const content = execSync(`git show ${ref}:package.json`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+            const pkg = JSON.parse(content);
+            return {
+                ...pkg.dependencies,
+                ...pkg.devDependencies,
+                ...pkg.optionalDependencies,
+                ...pkg.peerDependencies,
+            };
+        }
+        catch (e) {
+            return {};
+        }
+    }
+    const baseDeps = getPackageJsonDeps(options.base);
+    const headDeps = getPackageJsonDeps('HEAD');
+    const addedPackages = [];
+    for (const [pkg, version] of Object.entries(headDeps)) {
+        if (baseDeps[pkg] !== version) {
+            addedPackages.push(pkg);
+        }
+    }
+    if (addedPackages.length === 0) {
+        console.log(`✅ No new or updated dependencies found in package.json.`);
         process.exit(0);
     }
-    console.log(`[PkgDiet] Found ${diff.added.length} new dependencies in ${diff.type} lockfile. Scanning...`);
+    console.log(`[PkgDiet] Found ${addedPackages.length} new/updated dependencies in package.json. Scanning...`);
     if (options.env) {
         console.log(`[PkgDiet] Using environment policy overlay: ${options.env}`);
     }
-    const addedPackages = diff.added.map(d => d.name);
     const result = await runCiGate(addedPackages, process.cwd(), policyModified, options.env || null);
     // Print fix suggestions for blocked packages
     const blocked = result.results.filter(r => r.verdict === 'BLOCK');
@@ -222,9 +282,19 @@ program
     }
     const fs = await import('fs');
     fs.writeFileSync('pkgdiet-pr-comment.md', result.markdown);
-    if (!options.dryRun && (result.hasBlocks || policyModified)) {
-        console.log('❌ PR Gate failed: BLOCKED packages or policy tampering detected.');
-        process.exit(1);
+    if (!options.dryRun || policyModified) {
+        if (policyModified) {
+            console.log('❌ PR Gate failed: Policy tampering detected.');
+            process.exit(1);
+        }
+        if (result.status === 'ERROR') {
+            console.log('❌ PR Gate execution error.');
+            process.exit(2);
+        }
+        if (result.status === 'POLICY_FAILED') {
+            console.log('❌ PR Gate failed: Policy violations detected.');
+            process.exit(1);
+        }
     }
 });
 // ─── alternatives ─────────────────────────────────────────────────────────────
@@ -253,7 +323,7 @@ altsCmd
 });
 altsCmd
     .command('search <package>')
-    .description('Find alternatives for a specific package')
+    .description('Find curated alternatives for a dependency')
     .action(async (pkgName) => {
     const { getAlternatives } = await import('@pkgdiet/core/dist/alternatives.js');
     const result = getAlternatives(pkgName);
@@ -293,7 +363,7 @@ program
 // ─── setup & agent-setup ────────────────────────────────────────────────────────
 program
     .command('setup')
-    .description('Interactive setup wizard to configure PkgDiet policies and AI agents')
+    .description('Create a starter .pkgdietrc.json policy')
     .addHelpText('after', `
 To configure AI coding agents directly (non-interactive):
   $ npx pkgdiet agent-setup --all                          Configure ALL supported agents
@@ -445,7 +515,7 @@ program
 // ─── policy-check ─────────────────────────────────────────────────────────────
 program
     .command('policy-check')
-    .description('Validate your .pkgdietrc.json policy for errors and misconfigurations')
+    .description('Validate the repository’s .pkgdietrc.json policy')
     .option('-p, --path <path>', 'Path to project containing .pkgdietrc.json', '.')
     .action(async (options) => {
     const { loadPolicy, validatePolicy } = await import('@pkgdiet/core/dist/policy.js');
@@ -551,6 +621,7 @@ function buildFixSuggestion(pkgName, result) {
 const knownCommands = [
     'audit', 'check', 'mcp', 'drift', 'init', 'mcp-install',
     'ci', 'policy-check', 'cache', 'alternatives', 'setup', 'agent-setup', 'pr',
+    '--help', '-h', '--version', '-v', '-V'
 ];
 // Override Commander's bare error messages with helpful, example-rich output
 program.configureOutput({

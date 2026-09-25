@@ -7,6 +7,8 @@ export declare const DEFAULT_POLICY: {
     ignoreRules: undefined[];
     blockDeprecated: boolean;
     blockInstallScripts: boolean;
+    blockOnLowHealth: boolean;
+    blockOnOversized: boolean;
     failOn: string;
     securityMode: string;
     internalNamePrefixes: undefined[];

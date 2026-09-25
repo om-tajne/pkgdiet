@@ -102,7 +102,7 @@ test('evaluatePolicy — explicitly blocked package is BLOCK regardless of healt
   const policy = { ...DEFAULT_POLICY, blockedPackages: ['bad-pkg'] };
   const { verdict, reasons } = evaluatePolicy('bad-pkg', HEALTHY_PKG, SMALL_SIZE, policy);
   assert.equal(verdict, 'BLOCK');
-  assert.ok(reasons.some(r => r.includes('explicitly blocked')));
+  assert.ok(reasons.some(r => r.message.includes('explicitly blocked')));
 });
 
 test('evaluatePolicy — explicitly allowed package bypasses all checks', () => {
@@ -145,7 +145,7 @@ test('evaluatePolicy — oversized package is WARN when not exceeding block thre
   const policy = { ...DEFAULT_POLICY, maxPackageSizeBytes: 10_000_000 }; // 10MB limit
   const { verdict, reasons } = evaluatePolicy('big-pkg', HEALTHY_PKG, LARGE_SIZE, policy);
   assert.equal(verdict, 'WARN');
-  assert.ok(reasons.some(r => r.includes('size')));
+  assert.ok(reasons.some(r => r.message.includes('size')));
 });
 
 test('evaluatePolicy — install scripts warn when blockInstallScripts=false', () => {
@@ -153,7 +153,7 @@ test('evaluatePolicy — install scripts warn when blockInstallScripts=false', (
   const pkgWithScripts = { ...HEALTHY_PKG, installScripts: ['postinstall'] };
   const { verdict, reasons } = evaluatePolicy('scripted-pkg', pkgWithScripts, SMALL_SIZE, policy);
   assert.equal(verdict, 'WARN');
-  assert.ok(reasons.some(r => r.includes('install scripts')));
+  assert.ok(reasons.some(r => r.message.includes('install scripts')));
 });
 
 test('evaluatePolicy — install scripts block when blockInstallScripts=true', () => {

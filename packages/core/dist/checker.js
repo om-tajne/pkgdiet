@@ -27,9 +27,9 @@ function buildNotFoundResult(packageName, policy) {
             name: packageName,
             verdict: 'BLOCK',
             reasons: [
-                `🔒 SECURITY BLOCK: Package '${packageName}' matches an internal name prefix ` +
-                    `(${internalNamePrefixes.join(', ')}) but was not found on the public registry. ` +
-                    'This may be a dependency confusion attack. Do not install from a public registry.'
+                { code: 'DEPENDENCY_CONFUSION', message: `🔒 SECURITY BLOCK: Package '${packageName}' matches an internal name prefix ` +
+                        `(${internalNamePrefixes.join(', ')}) but was not found on the public registry. ` +
+                        'This may be a dependency confusion attack. Do not install from a public registry.' }
             ],
             healthScore: null,
             costEstimate,
@@ -43,10 +43,10 @@ function buildNotFoundResult(packageName, policy) {
     // Standard 404 — potential hallucination
     return {
         name: packageName,
-        verdict: 'WARN',
+        verdict: 'BLOCK',
         reasons: [
-            '🚨 SECURITY WARNING: Package not found in registry. ' +
-                'Verify this is not a hallucinated package or dependency confusion attack.'
+            { code: 'PACKAGE_NOT_FOUND', message: '🚨 SECURITY BLOCK: Package not found in registry. ' +
+                    'Verify this is not a hallucinated package or dependency confusion attack.' }
         ],
         healthScore: null,
         costEstimate,
@@ -62,27 +62,12 @@ function buildNotFoundResult(packageName, policy) {
  */
 function buildNetworkErrorResult(packageName, policy) {
     const costEstimate = estimateCostImpact(null);
-    if (policy.securityMode === 'fail-closed') {
-        return {
-            name: packageName,
-            verdict: 'BLOCK',
-            reasons: [
-                'Registry unreachable in fail-closed mode. ' +
-                    'Set `"securityMode": "fail-open"` to allow installs when the registry is unreachable.'
-            ],
-            healthScore: null,
-            costEstimate,
-            alternatives: [],
-            flags: [],
-            efficiencyFlag: false,
-            hasProvenance: false,
-            integrityCheck: 'missing',
-        };
-    }
     return {
         name: packageName,
-        verdict: 'ALLOW',
-        reasons: ['Network error or private registry — defaulting to ALLOW (fail-open mode).'],
+        verdict: 'UNKNOWN',
+        reasons: [
+            { code: 'REGISTRY_UNAVAILABLE', message: 'Network error or private registry — registry unreachable.' }
+        ],
         healthScore: null,
         costEstimate,
         alternatives: [],
@@ -117,7 +102,7 @@ export async function checkPackage(packageSpec, projectPath = process.cwd(), opt
                 return {
                     name: packageName,
                     verdict: 'ALLOW',
-                    reasons: ['Scoped package mapped to private registry in .npmrc. Assuming internal package.'],
+                    reasons: [{ code: 'SCOPED_PRIVATE', message: 'Scoped package mapped to private registry in .npmrc. Assuming internal package.' }],
                     healthScore: null,
                     costEstimate: estimateCostImpact(null),
                     alternatives: [],
@@ -140,9 +125,10 @@ export async function checkPackage(packageSpec, projectPath = process.cwd(), opt
     // 4. Internal prefix warning: package exists on public registry but name looks internal
     if (warnOnInternalPrefix && evaluation.verdict === 'ALLOW') {
         evaluation.verdict = 'WARN';
-        evaluation.reasons.push(`⚠️ Package name '${packageName}' matches an internal prefix ` +
-            `(${policy.internalNamePrefixes.join(', ')}). ` +
-            'Ensure this is an intentional public dependency, not a name collision.');
+        evaluation.reasons.push({ code: 'INTERNAL_PREFIX_WARN', message: `⚠️ Package name '${packageName}' matches an internal prefix ` +
+                `(${policy.internalNamePrefixes.join(', ')}). ` +
+                'Ensure this is an intentional public dependency, not a name collision.'
+        });
     }
     // 5. Alternatives
     let alternatives = [];
@@ -156,7 +142,7 @@ export async function checkPackage(packageSpec, projectPath = process.cwd(), opt
         if (evaluation.verdict === 'ALLOW' && !evaluation.ignored) {
             evaluation.verdict = 'WARN';
             efficiencyFlag = true;
-            evaluation.reasons.push(`Efficiency Flag: Better alternatives exist for ${packageName}.`);
+            evaluation.reasons.push({ code: 'EFFICIENCY_FLAG', message: `Efficiency Flag: Better alternatives exist for ${packageName}.` });
         }
     }
     // 6. Provenance & integrity (MVP stubs — wire real checks in Sprint 8)

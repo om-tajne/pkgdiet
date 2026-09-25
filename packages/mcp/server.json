@@ -1,0 +1,22 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.om-tajne/pkgdiet",
+  "description": "Official MCP server for PkgDiet. Evaluates npm packages before AI agents install them.",
+  "repository": {
+    "url": "https://github.com/om-tajne/pkgdiet",
+    "source": "github",
+    "subfolder": "packages/mcp"
+  },
+  "version": "2.0.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@pkgdiet/mcp",
+      "version": "2.0.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": []
+    }
+  ]
+}

@@ -1,9 +1,7 @@
 {
-  "$schema": "https://glama.ai/mcp/schemas/server.json",
-  "maintainers": [
-    "om-tajne"
-  ],
-  "rating": "AAA",
-  "logoUrl": "https://raw.githubusercontent.com/om-tajne/pkgdiet/main/logo.png",
-  "iconUrl": "https://raw.githubusercontent.com/om-tajne/pkgdiet/main/logo.png"
+  "version": 1,
+  "name": "PkgDiet",
+  "description": "Dependency policy for AI-assisted development. Evaluates npm packages before agents install them.",
+  "icon": "https://raw.githubusercontent.com/om-tajne/pkgdiet/main/docs/logo.png",
+  "tags": ["npm", "dependencies", "security", "policy"]
 }

@@ -18,10 +18,10 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "@pkgdiet/core": "^2.0.1",
+    "@pkgdiet/core": "2.0.1",
     "zod": "^4.6.5"
   },
-  "description": "Official MCP server for PkgDiet — gives AI agents ALLOW/WARN/BLOCK verdicts for npm packages before installation.",
+  "description": "Official MCP server for PkgDiet. Evaluates npm packages before AI agents install them.",
   "license": "MIT",
   "author": "om-tajne",
   "keywords": [
@@ -50,5 +50,6 @@
   },
   "bugs": {
     "url": "https://github.com/om-tajne/pkgdiet/issues"
-  }
+  },
+  "mcpName": "io.github.om-tajne/pkgdiet"
 }

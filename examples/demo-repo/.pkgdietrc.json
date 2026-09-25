@@ -1,0 +1,6 @@
+{
+  "minHealthScore": 70,
+  "failOn": "WARN",
+  "securityMode": "fail-closed",
+  "blockedPackages": ["is-odd"]
+}

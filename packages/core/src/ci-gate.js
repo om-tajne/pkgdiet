@@ -13,7 +13,7 @@ function withTimeout(packageName, promise) {
     setTimeout(() => resolve({
       name: packageName,
       verdict: 'WARN',
-      reasons: ['Dependency check timed out — registry may be slow. Re-run to retry.'],
+      reasons: [{ code: 'TIMEOUT', message: 'Dependency check timed out — registry may be slow. Re-run to retry.' }],
       healthScore: null,
       costEstimate: { addedSizeMB: 0, monthlyCiCost100Builds: 0 },
       alternatives: [],
@@ -72,7 +72,7 @@ export async function runCiGate(packageNames, projectPath = process.cwd(), polic
       .catch(err => ({
         name: pkg,
         verdict: 'WARN',
-        reasons: [`Evaluation error: ${err?.message ?? 'unknown'}`],
+        reasons: [{ code: 'EVALUATION_ERROR', message: `Evaluation error: ${err?.message ?? 'unknown'}` }],
         healthScore: null,
         costEstimate: { addedSizeMB: 0, monthlyCiCost100Builds: 0 },
         alternatives: [],
@@ -87,6 +87,16 @@ export async function runCiGate(packageNames, projectPath = process.cwd(), polic
 
   const hasBlocks = results.some(r => r.verdict === 'BLOCK');
   const hasWarns  = results.some(r => r.verdict === 'WARN');
+  const hasErrors = results.some(r => r.verdict === 'UNKNOWN');
+
+  let status = 'SUCCESS';
+  if (hasErrors) {
+    status = 'ERROR';
+  } else if (hasBlocks && policy.failOn === 'BLOCK') {
+    status = 'POLICY_FAILED';
+  } else if ((hasBlocks || hasWarns) && policy.failOn === 'WARN') {
+    status = 'POLICY_FAILED';
+  }
 
   // ── Build Markdown table ─────────────────────────────────────────────────────
   let md = '### 🥗 PkgDiet PR Gate\n\n';
@@ -104,11 +114,11 @@ export async function runCiGate(packageNames, projectPath = process.cwd(), polic
   md += '|---|---|---|---|---|---|\n';
 
   for (const r of results) {
-    const icon       = r.verdict === 'BLOCK' ? '🔴 BLOCK' : r.verdict === 'WARN' ? '🟡 WARN' : '✅ ALLOW';
+    const icon       = r.verdict === 'BLOCK' ? '🔴 BLOCK' : r.verdict === 'WARN' ? '🟡 WARN' : r.verdict === 'UNKNOWN' ? '❓ UNKNOWN' : '✅ ALLOW';
     const costImpact = `$${(r.costEstimate?.monthlyCiCost100Builds ?? 0).toFixed(3)}/mo CI`;
     const sizeMB     = `${(r.costEstimate?.addedSizeMB ?? 0).toFixed(2)}MB`;
     const scoreStr   = r.healthScore !== null && r.healthScore !== undefined ? r.healthScore : 'N/A';
-    const notes      = r.reasons.join(' ');
+    const notes      = r.reasons.map(reason => typeof reason === 'string' ? reason : reason.message).join(' ');
 
     const altStr = r.alternatives?.length > 0
       ? ` → Try: ${r.alternatives.slice(0, 3).map(a => typeof a === 'string' ? a : a.replacement).join(', ')}`
@@ -121,5 +131,5 @@ export async function runCiGate(packageNames, projectPath = process.cwd(), polic
     md += '\n> 🤖 **Note:** Automated author detected. Please review dependency choices carefully.\n';
   }
 
-  return { markdown: md, hasBlocks, hasWarns, results };
+  return { markdown: md, status, results };
 }

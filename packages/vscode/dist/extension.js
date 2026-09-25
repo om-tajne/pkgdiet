@@ -331,6 +331,8 @@ var DEFAULT_POLICY = {
   ignoreRules: [],
   blockDeprecated: true,
   blockInstallScripts: false,
+  blockOnLowHealth: false,
+  blockOnOversized: false,
   failOn: "BLOCK",
   // CI exit behavior: 'BLOCK' | 'WARN' | 'NONE'
   // Sprint 7: Security hardening
@@ -387,48 +389,75 @@ function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
   const reasons = [];
   let verdict = "ALLOW";
   if ((policy.blockedPackages || []).includes(packageName)) {
-    return { verdict: "BLOCK", reasons: ["Package is explicitly blocked in policy."], ignored: false };
+    return { verdict: "BLOCK", reasons: [{ code: "PACKAGE_BLOCKED", message: "Package is explicitly blocked in policy." }], ignored: false };
   }
   if ((policy.allowedPackages || []).includes(packageName)) {
-    return { verdict: "ALLOW", reasons: ["Package is explicitly allowed in policy."], ignored: true };
+    return { verdict: "ALLOW", reasons: [{ code: "PACKAGE_ALLOWED", message: "Package is explicitly allowed in policy." }], ignored: true };
   }
   const ignored = isIgnored(packageName, policy.ignoreRules);
+  const exceptionCodes = policy.exceptions && policy.exceptions.allow || [];
   if (pkgHealth) {
     if (pkgHealth.score < policy.minHealthScore) {
-      verdict = "BLOCK";
-      reasons.push(`Health score ${pkgHealth.score} is below minimum allowed (${policy.minHealthScore}).`);
+      verdict = policy.blockOnLowHealth ? "BLOCK" : verdict === "BLOCK" ? "BLOCK" : "WARN";
+      reasons.push({ code: "HEALTH_SCORE_MIN", message: `Health score ${pkgHealth.score} is below minimum allowed (${policy.minHealthScore}).` });
     } else if (pkgHealth.score < policy.warnHealthScore) {
       verdict = verdict === "BLOCK" ? "BLOCK" : "WARN";
-      reasons.push(`Health score ${pkgHealth.score} is below warning threshold (${policy.warnHealthScore}).`);
+      reasons.push({ code: "HEALTH_SCORE_WARN", message: `Health score ${pkgHealth.score} is below warning threshold (${policy.warnHealthScore}).` });
     }
     if (policy.blockDeprecated && pkgHealth.flags.some((f) => {
       const label = typeof f === "string" ? f : f.label || "";
       return label === "DEPRECATED" || label.startsWith("Deprecated");
     })) {
       verdict = "BLOCK";
-      reasons.push("Package is deprecated.");
+      reasons.push({ code: "PACKAGE_DEPRECATED", message: "Package is deprecated." });
     }
   }
   if (sizeInfo && sizeInfo.unpackedSize > policy.maxPackageSizeBytes) {
     const sizeMB = (sizeInfo.unpackedSize / (1024 * 1024)).toFixed(2);
     const maxMB = (policy.maxPackageSizeBytes / (1024 * 1024)).toFixed(2);
-    verdict = verdict === "BLOCK" ? "BLOCK" : "WARN";
-    reasons.push(`Package size (${sizeMB}MB) exceeds limit (${maxMB}MB).`);
+    verdict = policy.blockOnOversized ? "BLOCK" : verdict === "BLOCK" ? "BLOCK" : "WARN";
+    reasons.push({ code: "SIZE_LIMIT_EXCEEDED", message: `Package size (${sizeMB}MB) exceeds limit (${maxMB}MB).` });
   }
   const hasInstallScripts = pkgHealth?.installScripts?.length > 0;
   if (hasInstallScripts) {
     if (policy.blockInstallScripts) {
       verdict = "BLOCK";
-      reasons.push(`Package contains install scripts (${pkgHealth.installScripts.join(", ")}).`);
+      reasons.push({ code: "INSTALL_SCRIPTS", message: `Package contains install scripts (${pkgHealth.installScripts.join(", ")}).` });
     } else {
       verdict = verdict === "BLOCK" ? "BLOCK" : "WARN";
-      reasons.push(`Security notice: Package contains install scripts (${pkgHealth.installScripts.join(", ")}).`);
+      reasons.push({ code: "INSTALL_SCRIPTS_WARN", message: `Security notice: Package contains install scripts (${pkgHealth.installScripts.join(", ")}).` });
     }
   }
+  let finalReasons = [];
+  let finalVerdict = "ALLOW";
   if (ignored && (verdict === "BLOCK" || verdict === "WARN")) {
-    return { verdict: "ALLOW", reasons: [`(Overridden by ignore rules): ${reasons.join(" ")}`], ignored: true };
+    return {
+      verdict: "ALLOW",
+      reasons: [{ code: "PACKAGE_IGNORED", message: `(Overridden by ignore rules): ${reasons.map((r) => r.message).join(" ")}` }],
+      ignored: true
+    };
   }
-  return { verdict, reasons, ignored: false };
+  if (reasons.length > 0) {
+    let hasBlock = false;
+    let hasWarn = false;
+    for (const r of reasons) {
+      if (exceptionCodes.includes(r.code)) {
+        finalReasons.push({ ...r, message: `(Overridden by exceptions): ${r.message}` });
+      } else {
+        finalReasons.push(r);
+        if (r.code === "PACKAGE_DEPRECATED" || r.code === "INSTALL_SCRIPTS" || r.code === "SIZE_LIMIT_EXCEEDED" && policy.blockOnOversized || r.code === "HEALTH_SCORE_MIN" && policy.blockOnLowHealth) {
+          hasBlock = true;
+        } else {
+          hasWarn = true;
+        }
+      }
+    }
+    if (hasBlock)
+      finalVerdict = "BLOCK";
+    else if (hasWarn)
+      finalVerdict = "WARN";
+  }
+  return { verdict: finalVerdict, reasons: finalReasons, ignored: false };
 }
 
 // ../core/dist/cost.js
@@ -632,7 +661,7 @@ function buildNotFoundResult(packageName, policy) {
       name: packageName,
       verdict: "BLOCK",
       reasons: [
-        `\u{1F512} SECURITY BLOCK: Package '${packageName}' matches an internal name prefix (${internalNamePrefixes.join(", ")}) but was not found on the public registry. This may be a dependency confusion attack. Do not install from a public registry.`
+        { code: "DEPENDENCY_CONFUSION", message: `\u{1F512} SECURITY BLOCK: Package '${packageName}' matches an internal name prefix (${internalNamePrefixes.join(", ")}) but was not found on the public registry. This may be a dependency confusion attack. Do not install from a public registry.` }
       ],
       healthScore: null,
       costEstimate,
@@ -645,9 +674,9 @@ function buildNotFoundResult(packageName, policy) {
   }
   return {
     name: packageName,
-    verdict: "WARN",
+    verdict: "BLOCK",
     reasons: [
-      "\u{1F6A8} SECURITY WARNING: Package not found in registry. Verify this is not a hallucinated package or dependency confusion attack."
+      { code: "PACKAGE_NOT_FOUND", message: "\u{1F6A8} SECURITY BLOCK: Package not found in registry. Verify this is not a hallucinated package or dependency confusion attack." }
     ],
     healthScore: null,
     costEstimate,
@@ -660,26 +689,12 @@ function buildNotFoundResult(packageName, policy) {
 }
 function buildNetworkErrorResult(packageName, policy) {
   const costEstimate = estimateCostImpact(null);
-  if (policy.securityMode === "fail-closed") {
-    return {
-      name: packageName,
-      verdict: "BLOCK",
-      reasons: [
-        'Registry unreachable in fail-closed mode. Set `"securityMode": "fail-open"` to allow installs when the registry is unreachable.'
-      ],
-      healthScore: null,
-      costEstimate,
-      alternatives: [],
-      flags: [],
-      efficiencyFlag: false,
-      hasProvenance: false,
-      integrityCheck: "missing"
-    };
-  }
   return {
     name: packageName,
-    verdict: "ALLOW",
-    reasons: ["Network error or private registry \u2014 defaulting to ALLOW (fail-open mode)."],
+    verdict: "UNKNOWN",
+    reasons: [
+      { code: "REGISTRY_UNAVAILABLE", message: "Network error or private registry \u2014 registry unreachable." }
+    ],
     healthScore: null,
     costEstimate,
     alternatives: [],
@@ -708,7 +723,7 @@ async function checkPackage(packageSpec, projectPath = process.cwd(), options = 
         return {
           name: packageName,
           verdict: "ALLOW",
-          reasons: ["Scoped package mapped to private registry in .npmrc. Assuming internal package."],
+          reasons: [{ code: "SCOPED_PRIVATE", message: "Scoped package mapped to private registry in .npmrc. Assuming internal package." }],
           healthScore: null,
           costEstimate: estimateCostImpact(null),
           alternatives: [],
@@ -727,7 +742,10 @@ async function checkPackage(packageSpec, projectPath = process.cwd(), options = 
   const evaluation = evaluatePolicy(packageName, healthResult, sizeInfo, policy);
   if (warnOnInternalPrefix && evaluation.verdict === "ALLOW") {
     evaluation.verdict = "WARN";
-    evaluation.reasons.push(`\u26A0\uFE0F Package name '${packageName}' matches an internal prefix (${policy.internalNamePrefixes.join(", ")}). Ensure this is an intentional public dependency, not a name collision.`);
+    evaluation.reasons.push({
+      code: "INTERNAL_PREFIX_WARN",
+      message: `\u26A0\uFE0F Package name '${packageName}' matches an internal prefix (${policy.internalNamePrefixes.join(", ")}). Ensure this is an intentional public dependency, not a name collision.`
+    });
   }
   let alternatives = [];
   const alts = findAlternatives([packageName]);
@@ -740,7 +758,7 @@ async function checkPackage(packageSpec, projectPath = process.cwd(), options = 
     if (evaluation.verdict === "ALLOW" && !evaluation.ignored) {
       evaluation.verdict = "WARN";
       efficiencyFlag = true;
-      evaluation.reasons.push(`Efficiency Flag: Better alternatives exist for ${packageName}.`);
+      evaluation.reasons.push({ code: "EFFICIENCY_FLAG", message: `Efficiency Flag: Better alternatives exist for ${packageName}.` });
     }
   }
   const hasProvenance = false;
