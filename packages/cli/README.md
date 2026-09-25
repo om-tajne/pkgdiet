@@ -1,211 +1,145 @@
-# pkgdiet
+# 🥗 PkgDiet
 
-CLI for reviewing npm dependencies against a local project policy.
+> **Dependency policy for AI-assisted JavaScript and TypeScript development.**  
+> *Put your node_modules on a diet.*
 
-Returns `ALLOW`, `WARN`, or `BLOCK` verdicts based on available npm metadata and your project's `.pkgdietrc.json`.
+<p align="left">
+  <!-- NPM & Usage Stats -->
+  <a href="https://www.npmjs.com/package/pkgdiet"><img src="https://img.shields.io/npm/v/pkgdiet.svg?style=flat-square&color=cb3837" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/pkgdiet"><img src="https://img.shields.io/npm/dm/pkgdiet.svg?style=flat-square&color=blue" alt="npm downloads"></a>
+  <a href="https://github.com/om-tajne/pkgdiet"><img src="https://img.shields.io/badge/Audited_by-PkgDiet-success.svg?style=flat-square" alt="Audited by PkgDiet"></a>
+  <br>
+  <!-- Build & Quality -->
+  <a href="https://github.com/om-tajne/pkgdiet/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/om-tajne/pkgdiet/ci.yml?branch=main&style=flat-square" alt="CI Status"></a>
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-%3E%3D20-brightgreen.svg?style=flat-square&logo=node.js" alt="Node.js"></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-Ready-blue.svg?style=flat-square&logo=typescript" alt="TypeScript"></a>
+  <a href="https://github.com/om-tajne/pkgdiet/issues"><img src="https://img.shields.io/github/issues/om-tajne/pkgdiet.svg?style=flat-square" alt="GitHub Issues"></a>
+  <a href="https://github.com/om-tajne/pkgdiet/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square" alt="PRs Welcome"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-gray.svg?style=flat-square" alt="License"></a>
+  <br>
+  <!-- AI & MCP Ecosystem -->
+  <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/Powered_by-MCP-8a2be2.svg?style=flat-square" alt="Powered by MCP"></a>
+  <a href="https://glama.ai/mcp/servers/om-tajne/pkgdiet"><img src="https://glama.ai/mcp/servers/om-tajne/pkgdiet/badge" alt="Glama MCP Server"></a>
+  <a href="https://smithery.ai/server/@pkgdiet/mcp"><img src="https://smithery.ai/badge/@pkgdiet/mcp" alt="Smithery MCP Server"></a>
+  <a href="https://mcpservers.org/servers/om-tajne/pkgdiet"><img src="https://mcpservers.org/badge.svg" alt="Listed on mcpservers.org"></a>
+</p>
+<p align="left">
+  <a href="https://github.com/om-tajne/pkgdiet"><img src="https://img.shields.io/github/stars/om-tajne/pkgdiet.svg?style=social&label=Star" alt="GitHub stars"></a>
+</p>
 
-[![npm version](https://img.shields.io/npm/v/pkgdiet.svg)](https://www.npmjs.com/package/pkgdiet)
-[![npm downloads](https://img.shields.io/npm/dm/pkgdiet.svg)](https://www.npmjs.com/package/pkgdiet)
-[![License: MIT](https://img.shields.io/npm/l/pkgdiet.svg)](https://www.npmjs.com/package/pkgdiet)
-[![Node.js](https://img.shields.io/node/v/pkgdiet.svg)](https://nodejs.org/)
+**The Problem:** AI coding agents can propose nonexistent, deprecated, unapproved, or unsuitable packages. Teams need a consistent way to evaluate those choices before and after dependency changes. 
 
-
+**The Solution:** PkgDiet is a deterministic dependency guardrail. It checks proposed dependencies against registry health, deprecation status, and your local project policy *before* they are installed, forcing agents to pivot to modern alternatives.
 
 ---
 
-## Run without global installation
+## 🔄 The 3-Phase Policy Loop
+
+PkgDiet guarantees that a dependency is evaluated identically at every stage of your development lifecycle using a shared core engine (`@pkgdiet/core`).
+
+1. **Repository Policy:** A single `.pkgdietrc.json` file dictates what is allowed, warned, or blocked for your project.
+2. **Agent Guidance (MCP):** AI clients connect to PkgDiet via the Model Context Protocol (`npx pkgdiet mcp`). Before writing `npm install`, the agent asks PkgDiet if a package is compliant. If blocked, PkgDiet provides curated modern alternatives.
+3. **Merge Enforcement (CI):** PkgDiet runs in GitHub Actions (`npx pkgdiet ci --base origin/main`). It diffs `package.json` to isolate newly requested direct dependencies. If a blocked package bypassed the agent and made it into the PR, CI fails and halts the merge.
+
+---
+
+## 🚀 Quick Start
+
+Initialize PkgDiet in your repository. This interactive command creates your `.pkgdietrc.json` policy, sets up your GitHub Actions CI workflow, and configures your local AI agents (Cursor, Windsurf, Cline) all at once:
 
 ```bash
-npx -y pkgdiet@2.0.1 setup
+npx pkgdiet init
+```
+
+Audit your existing project to see how your current `node_modules` stack up against your new policy:
+
+```bash
+npx pkgdiet audit
 ```
 
 ---
 
-## Requirements
+## 🛠️ CLI Commands
 
-- Node.js 20 or later
-- Git (required for `pkgdiet ci`)
-- Network access for uncached npm metadata checks (disable with `PKGDIET_NO_NETWORK=1`)
+```text
+Usage: pkgdiet [options] [command]
 
----
+Dependency policy for AI-assisted development — audit, check, and enforce npm dependency rules
 
-## Commands
+Options:
+  -v, --version                  output the version number
+  -h, --help                     display help for command
 
-```bash
-# Full project audit (default)
-npx -y pkgdiet@2.0.1 audit
-
-# Check one or more packages before installing them
-npx -y pkgdiet@2.0.1 check moment request lodash
-
-# CI gate — evaluate newly added packages in a PR (lockfile-diff-based, not full audit)
-npx -y pkgdiet@2.0.1 ci --base HEAD~1 --env ci
-
-# Start the MCP server for AI agent integration
-npx -y pkgdiet@2.0.1 mcp
-
-# Interactive setup wizard
-npx -y pkgdiet@2.0.1 setup
-
-# All-in-one setup: creates policy, CI workflow, and agent configs
-npx -y pkgdiet@2.0.1 init
-
-# Configure MCP for supported AI agents non-interactively
-npx -y pkgdiet@2.0.1 agent-setup --detect
-
-# Browse all curated alternatives
-npx -y pkgdiet@2.0.1 alternatives list
-
-# Find alternatives for a specific package
-npx -y pkgdiet@2.0.1 alternatives search request
-
-# Detect health drift in installed dependencies
-npx -y pkgdiet@2.0.1 drift
-
-# Validate your .pkgdietrc.json policy file
-npx -y pkgdiet@2.0.1 policy-check
-
-# Generate a reviewer-ready PR to add PkgDiet to any repo
-npx -y pkgdiet@2.0.1 pr
-
-# Automatically configure Claude Desktop MCP
-npx -y pkgdiet@2.0.1 mcp-install
+Commands:
+  audit [options]                Audit existing dependencies for policy, health, size, and unused-package signals
+  check [options] <packages...>  Evaluate npm packages against this repository’s dependency policy
+  mcp [args...]                  Start the MCP JSON-RPC server over stdio for MCP-compatible AI coding agents
+  ci [options]                   Enforce policy for dependency changes introduced by this branch
+  alternatives                   Browse the PkgDiet alternatives dataset
+  drift [options]                Scan project for dependency health drift over time
+  setup                          Create a starter .pkgdietrc.json policy
+  agent-setup [options]          Configure PkgDiet for AI coding agents
+  init [options]                 Set up PkgDiet in this project — creates policy, CI workflow, and all AI agent configs
+  pr [options]                   Generate a reviewer-ready pull request for adding PkgDiet to any GitHub repo
+  policy-check [options]         Validate the repository’s .pkgdietrc.json policy
 ```
 
 ---
 
-## JSON output (`--json`)
+## ⚙️ Configuration (`.pkgdietrc.json`)
 
-```bash
-npx -y pkgdiet@2.0.1 check moment --json
-npx -y pkgdiet@2.0.1 audit --json
-```
-
-JSON is written to **stdout**. Human-readable diagnostics are written to **stderr**.
-
-`check` result shape:
+Policy configuration supports environment overlays, explicit denylists, and strict failure thresholds.
 
 ```json
 {
-  "name": "moment",
-  "verdict": "WARN",
-  "healthScore": 100,
-  "efficiencyFlag": true,
-  "alternatives": [
-    { "replacement": "dayjs", "message": "..." }
-  ],
-  "costEstimate": {
-    "addedSizeMB": 4.29,
-    "ciInstallTimeSeconds": 0.09,
-    "monthlyCiCost100Builds": 0.036,
-    "serverlessColdStartClass": "10-50ms"
-  },
-  "flags": [],
-  "hasProvenance": false,
-  "integrityCheck": "missing",
-  "certified": false
-}
-```
-
-> `certified` indicates whether the package satisfied configured certification conditions in your policy — not a universal safety guarantee.<br>
-> `hasProvenance` indicates whether the npm metadata included a provenance signal — not a complete supply-chain attestation.
-
-`audit --json` result shape includes: `usedDependencies`, `unusedDependencies`, `unhealthyDependencies`, `sizeResults`, `overallScore`, `repoSafetyScore`.
-
----
-
-## Exit codes
-
-| Result | Exit code |
-|---|---:|
-| Successful command | `0` |
-| Policy failure in CI (BLOCK or WARN with `failOn: WARN`) | `1` |
-| Invalid package name or runtime error | non-zero |
-
----
-
-## Setup vs Init
-
-`setup` is the interactive wizard that prompts you for policy and agent selections. 
-
-`init` is the non-interactive, all-in-one setup command for configuring policy, a GitHub Actions CI workflow, and detected agent configurations in one shot.
-
-Both commands preview the exact files they will create or update and ask for confirmation before writing. They do not silently modify global AI configuration or shell profiles.
-
----
-
-## CI usage
-
-```bash
-npx -y pkgdiet@2.0.1 ci --base HEAD~1 --env ci
-```
-
-`pkgdiet ci` compares the current lockfile with a base Git ref and evaluates newly added dependencies. It is lockfile-diff-based and does not replace `pkgdiet audit` (which checks all dependencies).
-
-`ci` reads `failOn` from your `.pkgdietrc.json` (default: `BLOCK`). Options: `BLOCK`, `WARN`, `NONE`.
-
-Or use the reusable GitHub Action:
-
-```yaml
-- uses: om-tajne/pkgdiet@v2
-  with:
-    base: ${{ github.event.pull_request.base.sha }}
-    environment: ci
-    fail-on: BLOCK
-```
-
----
-
-## MCP server
-
-```bash
-npx -y pkgdiet@2.0.1 mcp
-```
-
-Starts a local stdio MCP server exposing four read-only tools. Compatible AI clients can call these before recommending or installing packages.
-
----
-
-## Environment variables
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `PKGDIET_NO_NETWORK` | unset | Set to `1` to disable all registry calls |
-| `PKGDIET_CONCURRENCY` | `10` | Max concurrent registry checks |
-| `PKGDIET_FETCH_TIMEOUT_MS` | `10000` | Per-request timeout (ms) |
-| `PKGDIET_CACHE_TTL_HOURS` | `24` | Local cache TTL in hours |
-| `PKGDIET_TELEMETRY_DISABLED` | unset | Set to `1` to disable local metrics |
-
----
-
-## Policy reference
-
-See [docs/POLICY.md](../../docs/POLICY.md). Quick example:
-
-```json
-{
-  "minHealthScore": 40,
-  "warnHealthScore": 60,
+  "minHealthScore": 60,
+  "warnHealthScore": 80,
   "blockDeprecated": true,
-  "maxPackageSizeBytes": 15728640,
-  "failOn": "BLOCK",
-  "securityMode": "fail-open",
+  "maxAddedSizeMB": 5.0,
+  "failOn": ["BLOCK", "UNKNOWN"],
+  
+  "blockedPackages": {
+    "moment": "Deprecated. Use date-fns instead.",
+    "request": "Deprecated. Use native fetch."
+  },
+
   "environments": {
-    "ci": { "minHealthScore": 80, "failOn": "WARN" }
+    "ci": {
+      "failOn": ["BLOCK", "UNKNOWN", "WARN"]
+    }
+  },
+
+  "exceptions": {
+    "lodash": {
+      "allow": ["HEALTH_SCORE_MIN", "PACKAGE_OVERSIZE"],
+      "expires": "2027-01-01",
+      "reason": "Legacy dependency; migration planned for Q1."
+    }
   }
 }
 ```
 
----
-
-## Privacy
-
-When network checks are enabled, package names are sent to `registry.npmjs.org` and `api.npmjs.org`. No source code or project files are uploaded. Local cache: `.pkgdiet-cache.json`. Local metrics (optional): `.pkgdiet-metrics.json`.
-
-Add both to `.gitignore`.
+*Note: Exceptions are strictly scoped. They cannot bypass `PACKAGE_NOT_FOUND` (hallucinations), registry timeouts (`UNKNOWN`), or explicit entries in `blockedPackages`.*
 
 ---
 
-## License
+## 🤖 MCP Integration
 
-MIT. See [LICENSE](../../LICENSE).
+PkgDiet acts as a local Model Context Protocol (MCP) server. 
+
+When your AI coding agent connects to PkgDiet, it gains access to:
+* `check_dependency`: Evaluates an npm package against your local `.pkgdietrc.json` policy and returns structured `ALLOW`, `WARN`, or `BLOCK` verdicts.
+* `suggest_alternative`: Queries PkgDiet's curated dataset to find modern, lighter, and maintained alternatives for blocked packages.
+
+To configure your agent automatically, run:
+```bash
+npx pkgdiet agent-setup --detect
+```
+
+---
+
+## 🔗 Documentation & Support
+
+* **GitHub Repository:** [om-tajne/pkgdiet](https://github.com/om-tajne/pkgdiet)
+* **Report an Issue:** [Issue Tracker](https://github.com/om-tajne/pkgdiet/issues)
+* **License:** MIT

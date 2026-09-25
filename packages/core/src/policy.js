@@ -197,23 +197,24 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
 
   // 1. Hard blocked/allowed lists
   if ((policy.blockedPackages || []).includes(packageName)) {
-    return { verdict: 'BLOCK', reasons: ['Package is explicitly blocked in policy.'], ignored: false };
+    return { verdict: 'BLOCK', reasons: [{ code: 'PACKAGE_BLOCKED', message: 'Package is explicitly blocked in policy.' }], ignored: false };
   }
   if ((policy.allowedPackages || []).includes(packageName)) {
-    return { verdict: 'ALLOW', reasons: ['Package is explicitly allowed in policy.'], ignored: true };
+    return { verdict: 'ALLOW', reasons: [{ code: 'PACKAGE_ALLOWED', message: 'Package is explicitly allowed in policy.' }], ignored: true };
   }
 
   // 2. Ignore rules
   const ignored = isIgnored(packageName, policy.ignoreRules);
+  const exceptionCodes = (policy.exceptions && policy.exceptions.allow) || [];
 
   // 3. Health score
   if (pkgHealth) {
     if (pkgHealth.score < policy.minHealthScore) {
       verdict = policy.blockOnLowHealth ? 'BLOCK' : (verdict === 'BLOCK' ? 'BLOCK' : 'WARN');
-      reasons.push(`Health score ${pkgHealth.score} is below minimum allowed (${policy.minHealthScore}).`);
+      reasons.push({ code: 'HEALTH_SCORE_MIN', message: `Health score ${pkgHealth.score} is below minimum allowed (${policy.minHealthScore}).` });
     } else if (pkgHealth.score < policy.warnHealthScore) {
       verdict = verdict === 'BLOCK' ? 'BLOCK' : 'WARN';
-      reasons.push(`Health score ${pkgHealth.score} is below warning threshold (${policy.warnHealthScore}).`);
+      reasons.push({ code: 'HEALTH_SCORE_WARN', message: `Health score ${pkgHealth.score} is below warning threshold (${policy.warnHealthScore}).` });
     }
 
     if (policy.blockDeprecated && pkgHealth.flags.some(f => {
@@ -221,7 +222,7 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
       return label === 'DEPRECATED' || label.startsWith('Deprecated');
     })) {
       verdict = 'BLOCK';
-      reasons.push('Package is deprecated.');
+      reasons.push({ code: 'PACKAGE_DEPRECATED', message: 'Package is deprecated.' });
     }
   }
 
@@ -230,7 +231,7 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
     const sizeMB = (sizeInfo.unpackedSize / (1024 * 1024)).toFixed(2);
     const maxMB  = (policy.maxPackageSizeBytes / (1024 * 1024)).toFixed(2);
     verdict = policy.blockOnOversized ? 'BLOCK' : (verdict === 'BLOCK' ? 'BLOCK' : 'WARN');
-    reasons.push(`Package size (${sizeMB}MB) exceeds limit (${maxMB}MB).`);
+    reasons.push({ code: 'SIZE_LIMIT_EXCEEDED', message: `Package size (${sizeMB}MB) exceeds limit (${maxMB}MB).` });
   }
 
   // 5. Install scripts
@@ -238,16 +239,42 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
   if (hasInstallScripts) {
     if (policy.blockInstallScripts) {
       verdict = 'BLOCK';
-      reasons.push(`Package contains install scripts (${pkgHealth.installScripts.join(', ')}).`);
+      reasons.push({ code: 'INSTALL_SCRIPTS', message: `Package contains install scripts (${pkgHealth.installScripts.join(', ')}).` });
     } else {
       verdict = verdict === 'BLOCK' ? 'BLOCK' : 'WARN';
-      reasons.push(`Security notice: Package contains install scripts (${pkgHealth.installScripts.join(', ')}).`);
+      reasons.push({ code: 'INSTALL_SCRIPTS_WARN', message: `Security notice: Package contains install scripts (${pkgHealth.installScripts.join(', ')}).` });
     }
   }
 
+  let finalReasons = [];
+  let finalVerdict = 'ALLOW';
+
   if (ignored && (verdict === 'BLOCK' || verdict === 'WARN')) {
-    return { verdict: 'ALLOW', reasons: [`(Overridden by ignore rules): ${reasons.join(' ')}`], ignored: true };
+    return { 
+      verdict: 'ALLOW', 
+      reasons: [{ code: 'PACKAGE_IGNORED', message: `(Overridden by ignore rules): ${reasons.map(r => r.message).join(' ')}` }], 
+      ignored: true 
+    };
   }
 
-  return { verdict, reasons, ignored: false };
+  if (reasons.length > 0) {
+    let hasBlock = false;
+    let hasWarn = false;
+    for (const r of reasons) {
+      if (exceptionCodes.includes(r.code)) {
+        finalReasons.push({ ...r, message: `(Overridden by exceptions): ${r.message}` });
+      } else {
+        finalReasons.push(r);
+        if (r.code === 'PACKAGE_DEPRECATED' || r.code === 'INSTALL_SCRIPTS' || r.code === 'SIZE_LIMIT_EXCEEDED' && policy.blockOnOversized || r.code === 'HEALTH_SCORE_MIN' && policy.blockOnLowHealth) {
+          hasBlock = true;
+        } else {
+          hasWarn = true;
+        }
+      }
+    }
+    if (hasBlock) finalVerdict = 'BLOCK';
+    else if (hasWarn) finalVerdict = 'WARN';
+  }
+
+  return { verdict: finalVerdict, reasons: finalReasons, ignored: false };
 }
