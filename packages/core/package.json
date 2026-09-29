@@ -34,7 +34,7 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@babel/parser": "^7.27.0",
+    "@babel/parser": "^7.29.9",
     "glob": "^13.0.6",
     "js-yaml": "^5.4.2"
   },
