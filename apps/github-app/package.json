@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@octokit/app": "^15.0.0",
-    "@octokit/rest": "^21.0.0",
+    "@octokit/rest": "^22.0.1",
     "@octokit/webhooks": "^13.0.0",
     "@pkgdiet/core": "2.0.1",
     "@prisma/client": "^5.0.0",
