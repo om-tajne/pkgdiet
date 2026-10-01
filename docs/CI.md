@@ -46,6 +46,7 @@ jobs:
 | `working-directory` | `.` | Subdirectory containing `package.json` |
 | `version` | `2.0.1` | PkgDiet version to use |
 | `node-version` | `20` | Node.js version |
+| `sarif-file` | (empty) | Optional path for a SARIF findings report |
 
 ### Action outputs
 
@@ -53,6 +54,7 @@ jobs:
 |---|---|
 | `verdict` | `PASS` or `FAIL` |
 | `summary` | Human-readable results summary |
+| `sarif` | SARIF report path when configured |
 
 ---
 
@@ -70,6 +72,7 @@ npx -y pkgdiet@2.0.1 ci --base HEAD~1 --env ci
 | `--env <name>` | (none) | Policy environment overlay |
 | `--fail-on WARN` | (BLOCK) | Also fail on WARN verdicts |
 | `--dry-run` | (false) | Print results without exiting non-zero |
+| `--sarif <file>` | (none) | Write policy findings as SARIF 2.1.0 |
 | `--json` | (false) | Machine-readable JSON output to stdout |
 
 ### Exit codes

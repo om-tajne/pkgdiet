@@ -31,6 +31,6 @@ export declare function checkPackage(packageSpec: any, projectPath?: string, opt
     flags: any;
     efficiencyFlag: boolean;
     hasProvenance: boolean;
-    integrityCheck: string;
+    integrityCheck: any;
     certified: boolean;
 }>;

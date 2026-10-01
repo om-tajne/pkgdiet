@@ -35,6 +35,10 @@ inputs:
     description: 'Node.js version'
     required: false
     default: '20'
+  sarif-file:
+    description: 'Optional path for a SARIF findings report'
+    required: false
+    default: ''
 
 outputs:
   verdict:
@@ -43,6 +47,9 @@ outputs:
   summary:
     description: 'Human-readable results summary'
     value: ${{ steps.pkgdiet.outputs.summary }}
+  sarif:
+    description: 'SARIF report path when sarif-file is configured'
+    value: ${{ steps.pkgdiet.outputs.sarif }}
 
 runs:
   using: composite
@@ -62,9 +69,11 @@ runs:
         set +e
         ARGS=(ci --env "${{ inputs.environment }}" --base "${{ inputs.base }}")
         [ "${{ inputs.fail-on }}" = "WARN" ] && ARGS+=(--fail-on WARN)
+        [ -n "${{ inputs.sarif-file }}" ] && ARGS+=(--sarif "${{ inputs.sarif-file }}")
         [ "${{ inputs.dry-run }}" = "true" ] && ARGS+=(--dry-run)
         npx -y "pkgdiet@${{ inputs.version }}" "${ARGS[@]}"
         CODE=$?
         [ $CODE -eq 0 ] && echo "verdict=PASS" >> $GITHUB_OUTPUT || echo "verdict=FAIL" >> $GITHUB_OUTPUT
         [ $CODE -eq 0 ] && echo "summary=All dependency checks passed." >> $GITHUB_OUTPUT || echo "summary=One or more dependencies failed the policy check." >> $GITHUB_OUTPUT
+        echo "sarif=${{ inputs.sarif-file }}" >> $GITHUB_OUTPUT
         exit $CODE

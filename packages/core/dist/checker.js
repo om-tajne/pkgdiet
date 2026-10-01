@@ -2,7 +2,9 @@ import { fetchPackageHealth } from './health.js';
 import { loadPolicy, evaluatePolicy } from './policy.js';
 import { estimateCostImpact } from './cost.js';
 import { recordCheckMetric } from './telemetry.js';
-import { findAlternatives } from './alternatives-core.js';
+// Use the Node/ESM entry point so consumers importing `checker.js` directly
+// receive the curated alternatives loader as well as the pure lookup API.
+import { findAlternatives } from './alternatives.js';
 import { isScopeMappedInNpmrc } from './npmrc.js';
 /**
  * Check whether a package name matches any internal prefix.
@@ -62,11 +64,20 @@ function buildNotFoundResult(packageName, policy) {
  */
 function buildNetworkErrorResult(packageName, policy) {
     const costEstimate = estimateCostImpact(null);
+    const failClosed = policy.securityMode === 'fail-closed';
     return {
         name: packageName,
-        verdict: 'UNKNOWN',
+        // A fail-open policy may continue with an explicit review warning. A
+        // fail-closed policy must prevent an installation when verification is
+        // unavailable; never return an ambiguous verdict for that case.
+        verdict: failClosed ? 'BLOCK' : 'WARN',
         reasons: [
-            { code: 'REGISTRY_UNAVAILABLE', message: 'Network error or private registry — registry unreachable.' }
+            {
+                code: failClosed ? 'REGISTRY_UNAVAILABLE_BLOCKED' : 'REGISTRY_UNAVAILABLE',
+                message: failClosed
+                    ? 'SECURITY BLOCK: Registry verification is unavailable under the fail-closed policy.'
+                    : 'SECURITY WARNING: Registry verification is unavailable. Review the package before installation.'
+            }
         ],
         healthScore: null,
         costEstimate,
@@ -94,6 +105,25 @@ export async function checkPackage(packageSpec, projectPath = process.cwd(), opt
     packageName = packageName.trim().toLowerCase();
     // Warn (not block) if the name matches an internal prefix but we haven't fetched yet
     const warnOnInternalPrefix = matchesInternalPrefix(packageName, policy.internalNamePrefixes);
+    // Explicit policy decisions take precedence over every external check. Apart
+    // from being faster, this prevents a registry outage from weakening a local
+    // block list or from making an explicitly approved package unusable.
+    const explicitDecision = evaluatePolicy(packageName, null, null, policy);
+    if (explicitDecision.verdict === 'BLOCK' || explicitDecision.ignored) {
+        return {
+            name: packageName,
+            verdict: explicitDecision.verdict,
+            reasons: explicitDecision.reasons,
+            healthScore: null,
+            costEstimate: estimateCostImpact(null),
+            alternatives: [],
+            flags: [],
+            efficiencyFlag: false,
+            hasProvenance: false,
+            integrityCheck: 'missing',
+            certified: false,
+        };
+    }
     // 1. Fetch health & size
     const healthResult = await fetchPackageHealth(packageName, projectPath, true);
     if (healthResult.skipped) {
@@ -145,9 +175,10 @@ export async function checkPackage(packageSpec, projectPath = process.cwd(), opt
             evaluation.reasons.push({ code: 'EFFICIENCY_FLAG', message: `Efficiency Flag: Better alternatives exist for ${packageName}.` });
         }
     }
-    // 6. Provenance & integrity (MVP stubs — wire real checks in Sprint 8)
-    const hasProvenance = false; // TODO: check npm provenance attestation
-    const integrityCheck = 'missing'; // TODO: verify dist.integrity shasum
+    // 6. Registry metadata can report provenance and an integrity digest. These
+    // fields deliberately distinguish "present" from cryptographic verification.
+    const hasProvenance = Boolean(healthResult.hasProvenance);
+    const integrityCheck = healthResult.integrityCheck || 'missing';
     // 7. Telemetry
     recordCheckMetric(projectPath, policy, {
         durationMs: Date.now() - startTime,

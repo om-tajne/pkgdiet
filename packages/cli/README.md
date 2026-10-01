@@ -10,7 +10,7 @@
   <a href="https://github.com/om-tajne/pkgdiet"><img src="https://img.shields.io/badge/Audited_by-PkgDiet-success.svg?style=flat-square" alt="Audited by PkgDiet"></a>
   <br>
   <!-- Build & Quality -->
-  <a href="https://github.com/om-tajne/pkgdiet/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/om-tajne/pkgdiet/ci.yml?branch=main&style=flat-square" alt="CI Status"></a>
+  <a href="https://github.com/om-tajne/pkgdiet/actions/workflows/ci.yml"><img src="https://github.com/om-tajne/pkgdiet/actions/workflows/ci.yml/badge.svg" alt="CI Status"></a>
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-%3E%3D20-brightgreen.svg?style=flat-square&logo=node.js" alt="Node.js"></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-Ready-blue.svg?style=flat-square&logo=typescript" alt="TypeScript"></a>
   <a href="https://github.com/om-tajne/pkgdiet/issues"><img src="https://img.shields.io/github/issues/om-tajne/pkgdiet.svg?style=flat-square" alt="GitHub Issues"></a>
@@ -19,7 +19,6 @@
   <br>
   <!-- AI & MCP Ecosystem -->
   <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/Powered_by-MCP-8a2be2.svg?style=flat-square" alt="Powered by MCP"></a>
-  <a href="https://glama.ai/mcp/servers/om-tajne/pkgdiet"><img src="https://glama.ai/mcp/servers/om-tajne/pkgdiet/badge" alt="Glama MCP Server"></a>
   <a href="https://smithery.ai/server/@pkgdiet/mcp"><img src="https://smithery.ai/badge/@pkgdiet/mcp" alt="Smithery MCP Server"></a>
   <a href="https://mcpservers.org/servers/om-tajne/pkgdiet"><img src="https://mcpservers.org/badge.svg" alt="Listed on mcpservers.org"></a>
 </p>
@@ -45,6 +44,10 @@ PkgDiet guarantees that a dependency is evaluated identically at every stage of 
 
 ## 🚀 Quick Start
 
+### setup vs init
+
+`pkgdiet setup` is the interactive wizard for creating a starter policy. `pkgdiet init` is the all-in-one setup command: it creates a policy when missing, adds the GitHub Actions workflow, and configures supported agent files without overwriting existing files.
+
 Initialize PkgDiet in your repository. This interactive command creates your `.pkgdietrc.json` policy, sets up your GitHub Actions CI workflow, and configures your local AI agents (Cursor, Windsurf, Cline) all at once:
 
 ```bash
@@ -60,6 +63,10 @@ npx pkgdiet audit
 ---
 
 ## 🛠️ CLI Commands
+
+`pkgdiet ci` is lockfile-diff-based in CI workflows: it evaluates dependency changes introduced by the branch and applies the active policy.
+
+Requires Node.js 20 or later. CLI results expose install estimates through `costEstimate.addedSizeMB`. Set `PKGDIET_TELEMETRY_DISABLED=1` to disable local usage metrics.
 
 ```text
 Usage: pkgdiet [options] [command]
@@ -95,17 +102,15 @@ Policy configuration supports environment overlays, explicit denylists, and stri
   "minHealthScore": 60,
   "warnHealthScore": 80,
   "blockDeprecated": true,
-  "maxAddedSizeMB": 5.0,
-  "failOn": ["BLOCK", "UNKNOWN"],
+  "maxPackageSizeBytes": 15728640,
+  "failOn": "BLOCK",
+  "securityMode": "fail-closed",
   
-  "blockedPackages": {
-    "moment": "Deprecated. Use date-fns instead.",
-    "request": "Deprecated. Use native fetch."
-  },
+  "blockedPackages": ["moment", "request"],
 
   "environments": {
     "ci": {
-      "failOn": ["BLOCK", "UNKNOWN", "WARN"]
+      "failOn": "WARN"
     }
   },
 
@@ -119,7 +124,12 @@ Policy configuration supports environment overlays, explicit denylists, and stri
 }
 ```
 
-*Note: Exceptions are strictly scoped. They cannot bypass `PACKAGE_NOT_FOUND` (hallucinations), registry timeouts (`UNKNOWN`), or explicit entries in `blockedPackages`.*
+### Reliable automation
+
+- `PKGDIET_NO_NETWORK=1` uses only local cached metadata; it never contacts a registry.
+- `PKGDIET_REGISTRY_URL` supports a compatible private registry endpoint.
+- `pkgdiet ci --sarif pkgdiet.sarif` creates a SARIF 2.1.0 report for code-scanning systems.
+- `pkgdiet agent-setup --verify` reports the local configuration status of supported agents.
 
 ---
 

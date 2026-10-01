@@ -99,7 +99,7 @@ test('CLI, CI, and MCP parity for fixed metadata', async () => {
     const ciResultsMap = Object.fromEntries(ciResult.results.map(r => [r.name, r]));
     
     // 3. MCP
-    const mcpPath = 'file://' + join(__dirname, '..', '..', '..', 'mcp', 'dist', 'index.js').replace(/\\/g, '/');
+    const mcpPath = 'file://' + join(__dirname, '..', '..', 'mcp', 'dist', 'index.js').replace(/\\/g, '/');
     const { createMcpServer } = await import(mcpPath);
     
     // We can intercept the server.tool call to capture the handler!
@@ -155,7 +155,7 @@ test('CLI, CI, and MCP parity for fixed metadata', async () => {
       if (pkg === 'good-package') assert.equal(cliVerdict, 'ALLOW');
       if (pkg === 'bad-package') assert.equal(cliVerdict, 'BLOCK');
       if (pkg === 'low-health-package') assert.equal(cliVerdict, 'WARN');
-      if (pkg === 'not-found-package') assert.equal(cliVerdict, 'WARN'); // fail-open hallucination check gives WARN unless it's internal prefix
+      if (pkg === 'not-found-package') assert.equal(cliVerdict, 'BLOCK'); // an unverified package name is unsafe to install
       if (pkg === 'network-error-package') assert.equal(cliVerdict, 'BLOCK'); // fail-closed security mode
     }
 

@@ -89,6 +89,7 @@ program
     .option('-p, --path <path>', 'Path to project policy (default: .)', '.')
     .option('--json', 'Output machine-readable JSON')
     .option('--env <name>', 'Apply environment policy overlay (e.g. ci, dev, prod)')
+    .option('--sarif <file>', 'Write CI findings as a SARIF report')
     .action(async (packages, options) => {
     await import('@pkgdiet/core/dist/alternatives.js'); // Ensure dataset is loaded
     const { checkPackage } = await import('@pkgdiet/core/dist/checker.js');
@@ -258,6 +259,22 @@ program
             addedPackages.push(pkg);
         }
     }
+    // Lockfile additions catch transitive changes and package-manager-only edits.
+    try {
+        const { getLockfileDiff } = await import('@pkgdiet/core/dist/lockfile/index.js');
+        for (const entry of getLockfileDiff(options.base, 'HEAD').added) {
+            if (!addedPackages.includes(entry.name))
+                addedPackages.push(entry.name);
+        }
+    }
+    catch { /* package.json diff remains a safe fallback */ }
+    // A policy-only change can weaken enforcement without changing a single
+    // dependency. Treat it as a failing gate before the no-dependency fast
+    // path, unless the caller explicitly requested a report-only run.
+    if (policyModified && !options.dryRun) {
+        console.log('❌ PR Gate failed: Policy tampering detected.');
+        process.exit(1);
+    }
     if (addedPackages.length === 0) {
         console.log(`✅ No new or updated dependencies found in package.json.`);
         process.exit(0);
@@ -282,6 +299,10 @@ program
     }
     const fs = await import('fs');
     fs.writeFileSync('pkgdiet-pr-comment.md', result.markdown);
+    if (options.sarif) {
+        const sarif = { version: '2.1.0', $schema: 'https://json.schemastore.org/sarif-2.1.0.json', runs: [{ tool: { driver: { name: 'PkgDiet', rules: [] } }, results: result.results.filter(r => r.verdict !== 'ALLOW').map(r => ({ level: r.verdict === 'BLOCK' ? 'error' : 'warning', ruleId: r.reasons?.[0]?.code || 'PKGDIET_POLICY', message: { text: (r.reasons || []).map(x => typeof x === 'string' ? x : x.message).join(' ') }, locations: [{ physicalLocation: { artifactLocation: { uri: 'package.json' } } }] })) }] };
+        fs.writeFileSync(options.sarif, JSON.stringify(sarif, null, 2));
+    }
     if (!options.dryRun || policyModified) {
         if (policyModified) {
             console.log('❌ PR Gate failed: Policy tampering detected.');
@@ -385,7 +406,17 @@ program
     .option('--all', 'Configure all supported agents')
     .option('--dry-run', 'Show what would be modified without making changes')
     .option('--remove', 'Remove PkgDiet configuration from agents')
+    .option('--verify', 'Report PkgDiet configuration status without modifying files')
     .action(async (options) => {
+    if (options.verify) {
+        const { verifyAgents } = await import('./agentSetup.js');
+        const results = verifyAgents(process.cwd());
+        for (const item of results)
+            console.log(`${item.configured ? '✓' : '○'} ${item.agent}${item.file ? ` — ${item.file}` : ''}`);
+        if (results.some(item => !item.configured && item.agent !== 'claude-desktop'))
+            process.exitCode = 1;
+        return;
+    }
     const { setupAgents, SUPPORTED_AGENTS } = await import('./agentSetup.js');
     let agents = [];
     if (options.all || options.detect) {

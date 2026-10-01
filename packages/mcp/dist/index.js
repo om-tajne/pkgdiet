@@ -115,10 +115,19 @@ export function createMcpServer() {
                                 schemaVersion: 2,
                                 packageName: result.name,
                                 verdict: result.verdict,
-                                healthScore: result.healthScore !== null ? result.healthScore : 100,
-                                reasons: result.reasons,
+                                // Do not fabricate a perfect score when the registry could
+                                // not be verified; null lets clients distinguish uncertainty.
+                                healthScore: result.healthScore,
+                                // MCP's public contract is an array of human-readable strings.
+                                // Keep the policy engine's richer objects internal to core.
+                                reasons: (result.reasons || []).map((reason) => typeof reason === "string" ? reason : reason.message),
                                 recommendation: { action, primaryAlternative },
-                                security: { registryVerified: true, hasProvenance: result.hasProvenance || false, integrityCheck: result.integrityCheck || "missing" },
+                                security: {
+                                    registryVerified: !(result.reasons || []).some((reason) => (typeof reason === "string" ? reason : reason.code) === "REGISTRY_UNAVAILABLE" ||
+                                        (typeof reason === "string" ? reason : reason.code) === "REGISTRY_UNAVAILABLE_BLOCKED"),
+                                    hasProvenance: result.hasProvenance || false,
+                                    integrityCheck: result.integrityCheck || "missing",
+                                },
                                 policy: { source, policyVersion: policy.policyVersion || 1, environment: env },
                                 addedSizeBytes: result.costEstimate?.addedSizeMB ? Math.round(result.costEstimate.addedSizeMB * 1024 * 1024) : 0,
                                 costImpactPerMonthUsd: result.costEstimate?.monthlyCiCost100Builds || 0,

@@ -4,8 +4,9 @@
  */
 import { getCached, batchSetCached } from './cache.js';
 import { timeSince } from './utils.js';
-const NPM_REGISTRY = 'https://registry.npmjs.org';
-const NPM_DOWNLOADS = 'https://api.npmjs.org/downloads/point';
+const NPM_REGISTRY = (process.env.PKGDIET_REGISTRY_URL || 'https://registry.npmjs.org').replace(/\/$/, '');
+const NPM_DOWNLOADS = (process.env.PKGDIET_DOWNLOADS_URL || 'https://api.npmjs.org/downloads/point').replace(/\/$/, '');
+const OFFLINE = process.env.PKGDIET_NO_NETWORK === '1' || process.env.PKGDIET_NO_NETWORK === 'true';
 // Configurable via env var (default: 10)
 const MAX_CONCURRENT = Number(process.env.PKGDIET_CONCURRENCY || '10');
 // Maximum packages per analyzeHealth call — split into batches above this
@@ -109,6 +110,9 @@ export async function fetchPackageHealth(packageName, projectPath, useCache) {
         if (cached) {
             return { ...cached, fromCache: true };
         }
+    }
+    if (OFFLINE) {
+        return { name: packageName, score: null, flags: ['skipped'], reason: 'Offline mode: no cached registry metadata is available.', skipped: true, notFound: false, offline: true };
     }
     const encodedName = encodeURIComponent(packageName).replace('%40', '@');
     const [registryResult, downloadsResult] = await Promise.all([
@@ -259,6 +263,8 @@ export async function fetchPackageHealth(packageName, projectPath, useCache) {
         installScripts,
         unpackedSize,
         dependencyCount,
+        hasProvenance: Boolean(latestMeta?.dist?.attestations?.provenance || latestMeta?.dist?.provenance || latestMeta?.publishConfig?.provenance),
+        integrityCheck: latestMeta?.dist?.integrity ? 'present' : 'missing',
         skipped: false,
     };
     return result;

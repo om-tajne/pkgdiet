@@ -15,13 +15,13 @@ const DEFAULT_POLICY = {
   minHealthScore: 70,
   warnHealthScore: 80,
   failOn: 'BLOCK',
-  securityMode: 'standard',
+  securityMode: 'fail-open',
   blockedPackages: [],
   internalNamePrefixes: [],
   ignoreRules: [],
   environments: {
-    ci: { minHealthScore: 80, failOn: 'BLOCK', securityMode: 'strict' },
-    dev: { minHealthScore: 60, failOn: 'BLOCK', securityMode: 'standard' }
+    ci: { minHealthScore: 80, failOn: 'BLOCK', securityMode: 'fail-closed' },
+    dev: { minHealthScore: 60, failOn: 'BLOCK', securityMode: 'fail-open' }
   }
 };
 

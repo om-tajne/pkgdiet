@@ -4,6 +4,22 @@ import { execSync } from 'child_process';
 
 export const SUPPORTED_AGENTS = ['cursor', 'windsurf', 'cline', 'copilot', 'claude-code', 'claude-desktop', 'antigravity'];
 
+export function verifyAgents(cwd) {
+  const checks = {
+    cursor: path.join(cwd, '.cursor', 'mcp.json'), cline: path.join(cwd, 'cline_mcp_settings.json'),
+    copilot: path.join(cwd, '.github', 'mcp.json'), antigravity: path.join(cwd, '.gemini', 'antigravity', 'mcp', 'pkgdiet', 'mcp.json'),
+  };
+  const results = SUPPORTED_AGENTS.map(agent => {
+    if (agent === 'windsurf') return { agent, configured: fs.existsSync(path.join(cwd, '.windsurfrules')), mode: 'rule' };
+    if (agent === 'claude-code') return { agent, configured: fs.existsSync(path.join(cwd, 'CLAUDE.md')), mode: 'rule-or-native' };
+    if (agent === 'claude-desktop') return { agent, configured: false, mode: 'global-config' };
+    const file = checks[agent];
+    try { const json = JSON.parse(fs.readFileSync(file, 'utf8')); return { agent, configured: Boolean(json?.mcpServers?.pkgdiet || json?.command), file }; }
+    catch { return { agent, configured: false, file }; }
+  });
+  return results;
+}
+
 export async function setupAgents(agents, cwd, options = {}) {
   const { dryRun = false, remove = false, detect = false, all = false } = options;
 
