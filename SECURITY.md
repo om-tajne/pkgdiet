@@ -27,9 +27,10 @@ We aim to acknowledge reports within **48 hours**. This is a target, not a guara
 
 ## What PkgDiet sends externally
 
-PkgDiet sends **package names only** to public npm registry endpoints (`registry.npmjs.org`, `api.npmjs.org`) when network checks are enabled. No source code, file contents, project structure, or private data is ever transmitted. All other data (cache, metrics, policy) stays on the local machine.
+PkgDiet sends **package names only** to public npm registry endpoints (`registry.npmjs.org`, `api.npmjs.org`) when network checks are enabled. It also queries the **OSV.dev public advisory API** (`api.osv.dev/v1/query`) with the package name and resolved version to check for known vulnerabilities. No source code, file contents, project structure, or private data is ever transmitted. All other data (cache, metrics, policy) stays on the local machine.
 
 To disable all network requests: `PKGDIET_NO_NETWORK=1 npx pkgdiet check <pkg>`
+To disable only vulnerability advisory lookups: `PKGDIET_ADVISORIES=0 npx pkgdiet check <pkg>`
 
 ## Scope
 

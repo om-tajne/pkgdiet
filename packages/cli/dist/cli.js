@@ -681,7 +681,8 @@ Demonstrates real-time enforcement against known-risky packages:
   node-uuid   old package name, superseded by 'uuid'
   lodash      large bundle, efficiency-flagged alternatives exist
 
-No packages are installed. This is a read-only policy simulation.`)
+No packages are installed. This is a read-only policy simulation.
+Verdicts are based on live registry and OSV.dev data — results may vary over time.`)
     .action(async (options) => {
     await import('@pkgdiet/core/dist/alternatives.js');
     const { checkPackage } = await import('@pkgdiet/core/dist/checker.js');

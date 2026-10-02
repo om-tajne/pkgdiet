@@ -21,6 +21,11 @@ audit.json
 audit.log
 esbuild-help.txt
 
+# Dev scratch files — never commit these
+fix-cli*.mjs
+migrate.mjs
+revert-ts.mjs
+
 # SQLite databases — never commit real data
 *.db
 *.sqlite

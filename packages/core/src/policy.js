@@ -294,7 +294,17 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
         finalReasons.push({ ...r, message: `(Overridden by exceptions): ${r.message}` });
       } else {
         finalReasons.push(r);
-        if (r.code === 'PACKAGE_DEPRECATED' || r.code === 'INSTALL_SCRIPTS' || r.code === 'KNOWN_VULNERABILITY' || r.code === 'PROVENANCE_REQUIRED' || r.code === 'INTEGRITY_REQUIRED' || r.code === 'POSSIBLE_TYPOSQUAT' && policy.blockTyposquats || r.code === 'SIZE_LIMIT_EXCEEDED' && policy.blockOnOversized || r.code === 'HEALTH_SCORE_MIN' && policy.blockOnLowHealth) {
+        if (
+          r.code === 'PACKAGE_DEPRECATED' ||
+          r.code === 'INSTALL_SCRIPTS' ||
+          r.code === 'KNOWN_VULNERABILITY' ||
+          r.code === 'PROVENANCE_REQUIRED' ||
+          r.code === 'INTEGRITY_REQUIRED' ||
+          r.code === 'PINNED_VERSION_REQUIRED' ||
+          (r.code === 'POSSIBLE_TYPOSQUAT' && policy.blockTyposquats) ||
+          (r.code === 'SIZE_LIMIT_EXCEEDED' && policy.blockOnOversized) ||
+          (r.code === 'HEALTH_SCORE_MIN' && policy.blockOnLowHealth)
+        ) {
           hasBlock = true;
         } else {
           hasWarn = true;
