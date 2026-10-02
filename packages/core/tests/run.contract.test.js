@@ -16,7 +16,7 @@ import { run } from '../src/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_ZERO_DEPS = join(__dirname, 'fixtures', 'simple-project');
-const MONOREPO_ROOT     = join(__dirname, '..', '..', '..'); // noble-rutherford
+const MONOREPO_ROOT     = join(__dirname, '..', '..', '..'); // three levels up from packages/core/tests/
 
 // ── Shape contract ─────────────────────────────────────────────────────────────
 

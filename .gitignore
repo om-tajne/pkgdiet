@@ -3,6 +3,10 @@ node_modules/
 .depsweep-cache.json
 qa-*/
 temp-express/
+test-n8n-audit/
+# Antigravity IDE files — local only, not for public repos
+.agents/
+skills-lock.json
 *.tgz
 .env
 .env.local
