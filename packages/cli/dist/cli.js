@@ -15,6 +15,7 @@ import { run } from '@pkgdiet/core';
 import { renderReport, renderPackageCheck, renderError, renderJson } from './reporter.js';
 import chalk from 'chalk';
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
 const require = createRequire(import.meta.url);
 const { version } = require('../package.json');
 const program = new Command();
@@ -253,6 +254,9 @@ program
     }
     const baseDeps = getPackageJsonDeps(options.base);
     const headDeps = getPackageJsonDeps('HEAD');
+    const { loadPolicy, applyEnvironment } = await import('@pkgdiet/core/dist/policy.js');
+    const { isPinnedVersion } = await import('@pkgdiet/core/dist/security.js');
+    const policy = options.env ? applyEnvironment(loadPolicy(process.cwd()), options.env) : loadPolicy(process.cwd());
     const addedPackages = [];
     for (const [pkg, version] of Object.entries(headDeps)) {
         if (baseDeps[pkg] !== version) {
@@ -274,6 +278,23 @@ program
     if (policyModified && !options.dryRun) {
         console.log('❌ PR Gate failed: Policy tampering detected.');
         process.exit(1);
+    }
+    // Reproducible dependency declarations are an enforceable part of the
+    // policy, independent of any registry availability.
+    if (policy.requirePinnedVersions) {
+        const unpinned = Object.entries(headDeps)
+            .filter(([, version]) => !isPinnedVersion(version))
+            .map(([name, version]) => `${name}@${version}`);
+        const hasLockfile = ['package-lock.json', 'npm-shrinkwrap.json', 'pnpm-lock.yaml', 'yarn.lock']
+            .some(file => fs.existsSync(file));
+        if (unpinned.length > 0 || !hasLockfile) {
+            const message = !hasLockfile
+                ? 'No supported lockfile is present.'
+                : `Unpinned dependency declarations: ${unpinned.join(', ')}`;
+            console.log(`❌ PkgDiet pinning gate: ${message}`);
+            if (!options.dryRun)
+                process.exit(1);
+        }
     }
     if (addedPackages.length === 0) {
         console.log(`✅ No new or updated dependencies found in package.json.`);
@@ -297,7 +318,6 @@ program
         }
         console.log('');
     }
-    const fs = await import('fs');
     fs.writeFileSync('pkgdiet-pr-comment.md', result.markdown);
     if (options.sarif) {
         const sarif = { version: '2.1.0', $schema: 'https://json.schemastore.org/sarif-2.1.0.json', runs: [{ tool: { driver: { name: 'PkgDiet', rules: [] } }, results: result.results.filter(r => r.verdict !== 'ALLOW').map(r => ({ level: r.verdict === 'BLOCK' ? 'error' : 'warning', ruleId: r.reasons?.[0]?.code || 'PKGDIET_POLICY', message: { text: (r.reasons || []).map(x => typeof x === 'string' ? x : x.message).join(' ') }, locations: [{ physicalLocation: { artifactLocation: { uri: 'package.json' } } }] })) }] };
@@ -392,7 +412,7 @@ To configure AI coding agents directly (non-interactive):
   $ npx pkgdiet agent-setup --agent cursor                 Configure only Cursor
   $ npx pkgdiet agent-setup --agent claude-desktop windsurf
 
-Supported agents: cursor, claude-code, claude-desktop, windsurf, cline, copilot, antigravity`)
+Supported agents: codex, cursor, claude-code, claude-desktop, windsurf, cline, copilot, antigravity`)
     .action(async () => {
     process.env.PKGDIET_MCP_MODE = '1';
     const { runSetupWizard } = await import('./setupWizard.js');
@@ -400,8 +420,8 @@ Supported agents: cursor, claude-code, claude-desktop, windsurf, cline, copilot,
 });
 program
     .command('agent-setup')
-    .description('Configure PkgDiet for AI coding agents (Cursor, Windsurf, Cline, Copilot, etc.)')
-    .option('-a, --agent <agents...>', 'Agents to configure (cursor, claude-code, claude-desktop, cline, windsurf, copilot, antigravity)')
+    .description('Configure PkgDiet for AI coding agents and supported install guards')
+    .option('-a, --agent <agents...>', 'Agents to configure (codex, cursor, claude-code, claude-desktop, cline, windsurf, copilot, antigravity)')
     .option('--detect', 'Detect and configure agents used in this project')
     .option('--all', 'Configure all supported agents')
     .option('--dry-run', 'Show what would be modified without making changes')
@@ -648,10 +668,104 @@ function buildFixSuggestion(pkgName, result) {
     }
     return null;
 }
+// ─── demo ───────────────────────────────────────────────────────────────────────────────
+program
+    .command('demo')
+    .description('Show live proof that PkgDiet blocks risky AI-generated dependencies before install')
+    .option('--json', 'Output machine-readable JSON proof')
+    .addHelpText('after', `
+Demonstrates real-time enforcement against known-risky packages:
+
+  moment      deprecated, better alternatives exist (date-fns)
+  request     deprecated in 2020, no security fixes
+  node-uuid   old package name, superseded by 'uuid'
+  lodash      large bundle, efficiency-flagged alternatives exist
+
+No packages are installed. This is a read-only policy simulation.`)
+    .action(async (options) => {
+    await import('@pkgdiet/core/dist/alternatives.js');
+    const { checkPackage } = await import('@pkgdiet/core/dist/checker.js');
+    const DEMO_PACKAGES = [
+        { name: 'moment', context: 'AI suggested this for date formatting' },
+        { name: 'request', context: 'AI suggested this for HTTP requests' },
+        { name: 'node-uuid', context: 'AI suggested this for UUID generation' },
+        { name: 'lodash', context: 'AI suggested this for array utilities' },
+    ];
+    if (!options.json) {
+        console.log('');
+        console.log(chalk.bold('\uD83D\uDD12 PkgDiet — Live AI Dependency Enforcement Demo'));
+        console.log(chalk.gray('   Simulating what happens when an AI agent tries to install these packages.\n'));
+    }
+    const results = [];
+    for (const { name, context } of DEMO_PACKAGES) {
+        const result = await checkPackage(name, process.cwd());
+        results.push({ ...result, context });
+        if (!options.json) {
+            const icon = result.verdict === 'BLOCK' ? '\uD83D\uDD34' : result.verdict === 'WARN' ? '\uD83D\uDFE1' : '\uD83D\uDFE2';
+            const label = result.verdict === 'BLOCK'
+                ? chalk.red.bold('  BLOCKED — ' + name)
+                : result.verdict === 'WARN'
+                    ? chalk.yellow.bold('  WARNING — ' + name)
+                    : chalk.green.bold('  ALLOWED — ' + name);
+            console.log(icon + ' ' + label);
+            console.log(chalk.gray('   Context:   ' + context));
+            console.log('   Score:     ' + (result.healthScore !== null ? result.healthScore + '/100' : 'N/A'));
+            if (result.reasons && result.reasons.length > 0) {
+                const reason = result.reasons[0];
+                const msg = typeof reason === 'string' ? reason : reason.message;
+                console.log('   Reason:    ' + msg);
+            }
+            if (result.alternatives && result.alternatives.length > 0) {
+                const alts = result.alternatives
+                    .map(a => typeof a === 'string' ? a : (a.replacement || a.name))
+                    .filter(Boolean).slice(0, 2).join(', ');
+                console.log('   Use this:  ' + chalk.green(alts));
+            }
+            if (result.evidence && result.evidence.vulnerabilityIds && result.evidence.vulnerabilityIds.length > 0) {
+                console.log('   CVEs:      ' + chalk.red(result.evidence.vulnerabilityIds.slice(0, 3).join(', ')));
+            }
+            if (result.verdict === 'BLOCK') {
+                console.log(chalk.red.bold('\n   \uD83D\uDD12 PkgDiet blocked this risky AI-generated dependency before install.\n'));
+            }
+            else {
+                console.log('');
+            }
+        }
+    }
+    if (options.json) {
+        const out = {
+            tool: 'PkgDiet',
+            version: '2.0.1',
+            timestamp: new Date().toISOString(),
+            summary: results.filter(r => r.verdict === 'BLOCK').length + ' blocked, ' +
+                results.filter(r => r.verdict === 'WARN').length + ' warned, ' +
+                results.filter(r => r.verdict === 'ALLOW').length + ' allowed',
+            results: results.map(r => ({
+                name: r.name,
+                context: r.context,
+                verdict: r.verdict,
+                healthScore: r.healthScore,
+                blockedBy: (r.evidence && r.evidence.blockReasons) || [],
+                vulnerabilities: (r.evidence && r.evidence.vulnerabilityIds) || [],
+                alternatives: (r.alternatives || []).map(a => typeof a === 'string' ? a : (a.replacement || a.name)).filter(Boolean),
+                proof: r.verdict === 'BLOCK' ? 'PkgDiet blocked this risky AI-generated dependency before install.' : undefined,
+            })),
+        };
+        console.log(JSON.stringify(out, null, 2));
+    }
+    else {
+        const blocked = results.filter(r => r.verdict === 'BLOCK').length;
+        const warned = results.filter(r => r.verdict === 'WARN').length;
+        console.log(chalk.bold('\uD83D\uDCCA Demo Summary: ' + blocked + ' blocked, ' + warned + ' warned'));
+        console.log(chalk.gray('   These checks run automatically before every npm install in your AI agent.'));
+        console.log(chalk.gray('   Setup: npx pkgdiet@2.0.1 init'));
+        console.log(chalk.gray('   Docs:  github.com/om-tajne/pkgdiet\n'));
+    }
+});
 // ─── Default: audit if no command given ───────────────────────────────────────
 const knownCommands = [
     'audit', 'check', 'mcp', 'drift', 'init', 'mcp-install',
-    'ci', 'policy-check', 'cache', 'alternatives', 'setup', 'agent-setup', 'pr',
+    'ci', 'policy-check', 'cache', 'alternatives', 'setup', 'agent-setup', 'pr', 'demo',
     '--help', '-h', '--version', '-v', '-V'
 ];
 // Override Commander's bare error messages with helpful, example-rich output

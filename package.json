@@ -16,7 +16,7 @@
     "typescript": "^7.0.2"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.10.0"
   },
   "description": "A local-first dependency gate and MCP server for checking npm package health and alternatives.",
   "license": "MIT",

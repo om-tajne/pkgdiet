@@ -47,7 +47,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: om-tajne/pkgdiet@v2
+      - uses: om-tajne/pkgdiet@v2.0.1
         with:
           base: \${{ github.event.pull_request.base.sha }}
           dry-run: 'true'

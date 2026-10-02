@@ -17,6 +17,9 @@ const DEFAULT_POLICY = {
   failOn: 'BLOCK',
   securityMode: 'fail-open',
   blockedPackages: [],
+  blockKnownVulnerabilities: true,
+  blockTyposquats: false,
+  requirePinnedVersions: true,
   internalNamePrefixes: [],
   ignoreRules: [],
   environments: {
@@ -53,7 +56,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           fetch-depth: 0
-      - uses: om-tajne/pkgdiet@v2
+      - uses: om-tajne/pkgdiet@v2.0.1
         with:
           base: \${{ github.event.pull_request.base.sha }}
           environment: ci
@@ -131,10 +134,25 @@ export async function runInit(cwd, options = {}) {
     console.log('\n🤖 AI Agent configs');
     if (writeMcpJson(path.join(cwd, '.cursor', 'mcp.json'), 'Cursor (.cursor/mcp.json)')) created++;
     if (appendRule(path.join(cwd, '.cursorrules'), 'Cursor rules (.cursorrules)')) created++;
+    // Cursor MDC always-applied rule (Cursor 0.47+)
+    const cursorRulesDir = path.join(cwd, '.cursor', 'rules');
+    if (!fs.existsSync(cursorRulesDir)) fs.mkdirSync(cursorRulesDir, { recursive: true });
+    const mdcPath = path.join(cursorRulesDir, 'pkgdiet.mdc');
+    if (!fs.existsSync(mdcPath)) {
+      const mdcContent = `---\ndescription: PkgDiet dependency policy enforcement\nglobs: ["**/*"]\nalwaysApply: true\n---\n\n# PkgDiet Dependency Guard\n\nBefore recommending or writing any \`npm install\`, \`pnpm add\`, or \`yarn add\` command, you MUST call the \`check_dependency\` MCP tool. Do not install packages with a BLOCK verdict.\n\nWhen PkgDiet blocks a package, respond with:\n\n> 🔒 **PkgDiet blocked this risky AI-generated dependency before install.**\n`;
+      fs.writeFileSync(mdcPath, mdcContent);
+      console.log('  ✅ Created Cursor MDC enforcement rule (.cursor/rules/pkgdiet.mdc)');
+      created++;
+    }
     if (appendRule(path.join(cwd, '.windsurfrules'), 'Windsurf rules (.windsurfrules)')) created++;
     if (writeMcpJson(path.join(cwd, 'cline_mcp_settings.json'), 'Cline (cline_mcp_settings.json)')) created++;
     if (writeMcpJson(path.join(cwd, '.github', 'mcp.json'), 'Copilot (.github/mcp.json)')) created++;
     if (appendRule(path.join(cwd, 'CLAUDE.md'), 'Claude Code (CLAUDE.md)')) created++;
+    const { setupAgents } = await import('./agentSetup.js');
+    // Codex: PreToolUse install guard (blocks npm/pnpm/yarn via Node hook)
+    await setupAgents(['codex'], cwd);
+    // Claude Code: PreToolUse bash install guard + MCP server
+    await setupAgents(['claude-code'], cwd);
 
     // Claude Desktop — global, platform-aware
     try {
@@ -168,8 +186,15 @@ export async function runInit(cwd, options = {}) {
 
   console.log(`\n✨ Done! ${created} file(s) created or updated.\n`);
   console.log('Next steps:');
-  console.log('  npx pkgdiet check moment    — try your first package check');
-  console.log('  npx pkgdiet audit           — audit this project');
-  console.log('  Open Cursor or Claude       — PkgDiet MCP is now active');
-  console.log('  Commit new files + open PR  — test the CI gate\n');
+  console.log('  npx pkgdiet demo              — see live enforcement proof (blocked packages + evidence)');
+  console.log('  npx pkgdiet check moment       — try your first package check');
+  console.log('  npx pkgdiet audit              — audit this project');
+  console.log('  Open Cursor or Claude          — PkgDiet MCP is now active');
+  console.log('  Commit new files + open PR     — test the CI gate\n');
+  console.log('Enforcement summary:');
+  console.log('  Codex              → PreToolUse hook blocks npm/pnpm/yarn install (.codex/hooks/)');
+  console.log('  Claude Code        → PreToolUse bash hook (.claude/hooks/pkgdiet-install-guard.sh)');
+  console.log('  Cursor             → MDC always-applied rule + MCP check_dependency');
+  console.log('  Windsurf/Cline     → MCP check_dependency via .windsurfrules');
+  console.log('  CI (GitHub Actions) → pkgdiet ci gate on every PR\n');
 }

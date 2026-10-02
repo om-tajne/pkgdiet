@@ -24,7 +24,8 @@
     "./dist/drift.js": "./dist/drift.js",
     "./dist/cache.js": "./dist/cache.js",
     "./dist/utils.js": "./dist/utils.js",
-    "./dist/validation.js": "./dist/validation.js"
+    "./dist/validation.js": "./dist/validation.js",
+    "./dist/security.js": "./dist/security.js"
   },
   "files": [
     "dist",

@@ -5,6 +5,11 @@ export declare function verifyAgents(cwd: any): ({
     mode: string;
     file?: undefined;
 } | {
+    agent: string;
+    configured: any;
+    mode: string;
+    file: string;
+} | {
     mode?: undefined;
     agent: string;
     configured: boolean;

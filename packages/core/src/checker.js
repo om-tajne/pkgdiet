@@ -2,8 +2,8 @@ import { fetchPackageHealth } from './health.js';
 import { loadPolicy, evaluatePolicy } from './policy.js';
 import { estimateCostImpact } from './cost.js';
 import { recordCheckMetric } from './telemetry.js';
-// Use the Node/ESM entry point so consumers importing `checker.js` directly
-// receive the curated alternatives loader as well as the pure lookup API.
+// alternatives.js initialises the shared store in Node and remains safe to
+// bundle because it imports the JSON dataset without path-specific loading.
 import { findAlternatives } from './alternatives.js';
 import { isScopeMappedInNpmrc } from './npmrc.js';
 
@@ -226,6 +226,17 @@ export async function checkPackage(packageSpec, projectPath = process.cwd(), opt
     efficiencyFlag,
     hasProvenance,
     integrityCheck,
+    evidence: {
+      checkedAt: new Date().toISOString(),
+      registry: 'npm',
+      advisorySource: healthResult.advisoryStatus === 'ok' ? 'OSV' : healthResult.advisoryStatus,
+      vulnerabilityIds: healthResult.vulnerabilityIds || [],
+      typosquatCandidates: healthResult.typosquatCandidates || [],
+      blocked: evaluation.verdict === 'BLOCK',
+      blockReasons: evaluation.reasons.filter(reason =>
+        ['KNOWN_VULNERABILITY', 'PACKAGE_DEPRECATED', 'INSTALL_SCRIPTS', 'PROVENANCE_REQUIRED', 'INTEGRITY_REQUIRED', 'POSSIBLE_TYPOSQUAT', 'DEPENDENCY_CONFUSION'].includes(reason.code)
+      ).map(reason => reason.code),
+    },
     certified,
   };
 }

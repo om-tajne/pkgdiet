@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { mergePolicies } from "@pkgdiet/core/dist/policyEngine.js";
 import { PrismaClient } from "@prisma/client";
 import { Octokit } from "@octokit/rest";
+import "@pkgdiet/core/dist/alternatives.js";
 import { checkPackage } from "@pkgdiet/core/dist/checker.js";
 
 // ──────────────────────────────────────────────────────────────

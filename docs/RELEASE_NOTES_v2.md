@@ -13,7 +13,7 @@ AI coding agents write code incredibly fast, but they routinely hallucinate depe
 * **The "Setup" Wizard**: Run `npx -y pkgdiet@2.0.1 setup` for an interactive, read-only preview of what PkgDiet will configure in your repository.
 
 ## 🏢 Enterprise Adoption Ready
-We have published a comprehensive [Enterprise Adoption Guide](docs/ENTERPRISE-ADOPTION.md) detailing how to roll out PkgDiet across 1-3 pilot repositories, configure organization-wide GitHub Actions, and securely distribute MCP configurations to your developers.
+We have published a comprehensive [Enterprise Adoption Guide](ENTERPRISE-ADOPTION.md) detailing how to roll out PkgDiet across 1-3 pilot repositories, configure organization-wide GitHub Actions, and securely distribute MCP configurations to your developers.
 
 ## 🛠 Installation
 
@@ -28,11 +28,11 @@ npx -y pkgdiet@2.0.1 setup
 ```
 
 ## 📝 Integration Guides
-- [Anthropic Claude Code](docs/CLAUDE-CODE.md)
-- [OpenAI Codex](docs/CODEX.md)
-- [Google Antigravity](docs/ANTIGRAVITY.md)
-- [Cursor](docs/CURSOR.md)
-- [GitHub Copilot](docs/COPILOT.md)
+- [Anthropic Claude Code](CLAUDE-CODE.md)
+- [OpenAI Codex](CODEX.md)
+- [Google Antigravity](ANTIGRAVITY.md)
+- [Cursor](CURSOR.md)
+- [GitHub Copilot](COPILOT.md)
 
 ---
 *Note: PkgDiet relies on the public npm registry for metadata. Ensure you have network access or configure your internal proxy via standard `.npmrc` mechanisms.*

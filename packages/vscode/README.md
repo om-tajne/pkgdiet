@@ -3,7 +3,7 @@
 **Internal beta** — dependency-policy feedback in `package.json`.
 
 [![Status: Internal Beta](https://img.shields.io/badge/status-internal%20beta-5865F2.svg)](../../docs/VSCODE.md)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE.txt)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org/)
 
 > This extension is an internal beta. It is not yet published to the VS Code Marketplace.

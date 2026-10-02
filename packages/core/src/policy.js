@@ -19,6 +19,9 @@ export const DEFAULT_POLICY = {
   internalNamePrefixes: [],       // e.g. ['corp-', 'acme-'] — blocks public installs
   blockOnIntegrityMismatch: false,
   requireProvenanceFor: [],       // e.g. ['@internal/*']
+  blockKnownVulnerabilities: true,
+  blockTyposquats: false,
+  requirePinnedVersions: false,
 
   // Sprint 7: Per-environment policies
   environments: {},               // Record<string, Partial<Policy>>
@@ -246,6 +249,32 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
     }
   }
 
+  if (pkgHealth?.vulnerabilityIds?.length > 0) {
+    verdict = policy.blockKnownVulnerabilities ? 'BLOCK' : (verdict === 'BLOCK' ? 'BLOCK' : 'WARN');
+    reasons.push({
+      code: 'KNOWN_VULNERABILITY',
+      message: `Known vulnerability advisories: ${pkgHealth.vulnerabilityIds.join(', ')}.`,
+    });
+  }
+
+  if (pkgHealth?.typosquatCandidates?.length > 0) {
+    verdict = policy.blockTyposquats ? 'BLOCK' : (verdict === 'BLOCK' ? 'BLOCK' : 'WARN');
+    reasons.push({
+      code: 'POSSIBLE_TYPOSQUAT',
+      message: `Package name resembles ${pkgHealth.typosquatCandidates.join(', ')}; verify the publisher before installing.`,
+    });
+  }
+
+  if ((policy.requireProvenanceFor || []).includes(packageName) && !pkgHealth?.hasProvenance) {
+    verdict = 'BLOCK';
+    reasons.push({ code: 'PROVENANCE_REQUIRED', message: 'Policy requires npm provenance metadata for this package.' });
+  }
+
+  if (policy.blockOnIntegrityMismatch && pkgHealth?.integrityCheck !== 'present') {
+    verdict = 'BLOCK';
+    reasons.push({ code: 'INTEGRITY_REQUIRED', message: 'Policy requires a registry integrity digest for this package.' });
+  }
+
   let finalReasons = [];
   let finalVerdict = 'ALLOW';
 
@@ -265,7 +294,7 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
         finalReasons.push({ ...r, message: `(Overridden by exceptions): ${r.message}` });
       } else {
         finalReasons.push(r);
-        if (r.code === 'PACKAGE_DEPRECATED' || r.code === 'INSTALL_SCRIPTS' || r.code === 'SIZE_LIMIT_EXCEEDED' && policy.blockOnOversized || r.code === 'HEALTH_SCORE_MIN' && policy.blockOnLowHealth) {
+        if (r.code === 'PACKAGE_DEPRECATED' || r.code === 'INSTALL_SCRIPTS' || r.code === 'KNOWN_VULNERABILITY' || r.code === 'PROVENANCE_REQUIRED' || r.code === 'INTEGRITY_REQUIRED' || r.code === 'POSSIBLE_TYPOSQUAT' && policy.blockTyposquats || r.code === 'SIZE_LIMIT_EXCEEDED' && policy.blockOnOversized || r.code === 'HEALTH_SCORE_MIN' && policy.blockOnLowHealth) {
           hasBlock = true;
         } else {
           hasWarn = true;

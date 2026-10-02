@@ -48,7 +48,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           fetch-depth: 0
-      - uses: om-tajne/pkgdiet@v2
+      - uses: om-tajne/pkgdiet@v2.0.1
         with:
           base: \${{ github.event.pull_request.base.sha }}
           environment: ci

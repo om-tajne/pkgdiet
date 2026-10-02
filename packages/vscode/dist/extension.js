@@ -124,9 +124,48 @@ function timeSince(dateString) {
   return { text, days: diffDays, months: diffMonths, years: diffYears };
 }
 
+// ../core/dist/security.js
+var HIGH_VALUE_PACKAGES = [
+  "axios",
+  "chalk",
+  "commander",
+  "dotenv",
+  "express",
+  "fastify",
+  "lodash",
+  "next",
+  "react",
+  "react-dom",
+  "typescript",
+  "vite",
+  "webpack",
+  "zod"
+];
+function editDistance(left, right) {
+  const row = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= left.length; i++) {
+    let previous = row[0];
+    row[0] = i;
+    for (let j = 1; j <= right.length; j++) {
+      const saved = row[j];
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, previous + (left[i - 1] === right[j - 1] ? 0 : 1));
+      previous = saved;
+    }
+  }
+  return row[right.length];
+}
+function findTyposquatCandidates(packageName) {
+  if (!packageName || packageName.startsWith("@"))
+    return [];
+  return HIGH_VALUE_PACKAGES.filter((candidate) => packageName !== candidate && packageName.length >= 4 && editDistance(packageName, candidate) <= 1);
+}
+
 // ../core/dist/health.js
-var NPM_REGISTRY = "https://registry.npmjs.org";
-var NPM_DOWNLOADS = "https://api.npmjs.org/downloads/point";
+var NPM_REGISTRY = (process.env.PKGDIET_REGISTRY_URL || "https://registry.npmjs.org").replace(/\/$/, "");
+var NPM_DOWNLOADS = (process.env.PKGDIET_DOWNLOADS_URL || "https://api.npmjs.org/downloads/point").replace(/\/$/, "");
+var OFFLINE = process.env.PKGDIET_NO_NETWORK === "1" || process.env.PKGDIET_NO_NETWORK === "true";
+var ADVISORIES_ENABLED = process.env.PKGDIET_ADVISORIES !== "0";
+var OSV_API = "https://api.osv.dev/v1/query";
 var MAX_CONCURRENT = Number(process.env.PKGDIET_CONCURRENCY || "10");
 var MAX_RETRIES = 3;
 var RETRY_DELAY_MS = 1e3;
@@ -174,12 +213,35 @@ async function fetchWithRetry(url, retries = MAX_RETRIES) {
   }
   return { data: null, status: "network_error" };
 }
+async function fetchOsvAdvisories(packageName, version) {
+  if (!ADVISORIES_ENABLED || !version)
+    return { status: "skipped", vulnerabilities: [] };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(OSV_API, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ package: { ecosystem: "npm", name: packageName }, version }),
+      signal: controller.signal
+    });
+    const data = response.ok ? await response.json() : null;
+    return { status: response.ok ? "ok" : "unavailable", vulnerabilities: data?.vulns || [] };
+  } catch {
+    return { status: "unavailable", vulnerabilities: [] };
+  } finally {
+    clearTimeout(timer);
+  }
+}
 async function fetchPackageHealth(packageName, projectPath, useCache) {
   if (useCache) {
     const cached = getCached(projectPath, packageName, "health");
     if (cached) {
       return { ...cached, fromCache: true };
     }
+  }
+  if (OFFLINE) {
+    return { name: packageName, score: null, flags: ["skipped"], reason: "Offline mode: no cached registry metadata is available.", skipped: true, notFound: false, offline: true };
   }
   const encodedName = encodeURIComponent(packageName).replace("%40", "@");
   const [registryResult, downloadsResult] = await Promise.all([
@@ -224,6 +286,8 @@ async function fetchPackageHealth(packageName, projectPath, useCache) {
   const latestMeta = latestVersion ? registryData.versions?.[latestVersion] : null;
   const monthlyDownloads = downloadsResult.data?.downloads || 0;
   const deprecated = registryData.versions?.[latestVersion]?.deprecated || null;
+  const advisoryResult = await fetchOsvAdvisories(packageName, latestVersion);
+  const typosquatCandidates = findTyposquatCandidates(packageName);
   const installScripts = [];
   if (latestMeta?.scripts) {
     for (const scriptName of ["preinstall", "install", "postinstall"]) {
@@ -297,6 +361,12 @@ async function fetchPackageHealth(packageName, projectPath, useCache) {
   if (installScripts.length > 0) {
     flags.push({ type: "warning", label: `Install scripts (${installScripts.join(", ")})` });
   }
+  if (advisoryResult.vulnerabilities.length > 0) {
+    flags.push({ type: "critical", label: `Known vulnerabilities (${advisoryResult.vulnerabilities.length})` });
+  }
+  if (typosquatCandidates.length > 0) {
+    flags.push({ type: "warning", label: `Name resembles ${typosquatCandidates.join(", ")}` });
+  }
   const unpackedSize = latestMeta?.dist?.unpackedSize || 0;
   const dependencyCount = Object.keys(latestMeta?.dependencies || {}).length;
   const result = {
@@ -313,6 +383,11 @@ async function fetchPackageHealth(packageName, projectPath, useCache) {
     installScripts,
     unpackedSize,
     dependencyCount,
+    hasProvenance: Boolean(latestMeta?.dist?.attestations?.provenance || latestMeta?.dist?.provenance || latestMeta?.publishConfig?.provenance),
+    integrityCheck: latestMeta?.dist?.integrity ? "present" : "missing",
+    advisoryStatus: advisoryResult.status,
+    vulnerabilityIds: advisoryResult.vulnerabilities.map((item) => item.id).filter(Boolean),
+    typosquatCandidates,
     skipped: false
   };
   return result;
@@ -343,11 +418,14 @@ var DEFAULT_POLICY = {
   blockOnIntegrityMismatch: false,
   requireProvenanceFor: [],
   // e.g. ['@internal/*']
+  blockKnownVulnerabilities: true,
+  blockTyposquats: false,
+  requirePinnedVersions: false,
   // Sprint 7: Per-environment policies
   environments: {},
   // Record<string, Partial<Policy>>
   policyVersion: 1,
-  telemetry: true
+  telemetry: false
 };
 function loadPolicy(projectPath) {
   const configs = [".pkgdietrc.json", "pkgdiet.config.json"];
@@ -428,6 +506,28 @@ function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
       reasons.push({ code: "INSTALL_SCRIPTS_WARN", message: `Security notice: Package contains install scripts (${pkgHealth.installScripts.join(", ")}).` });
     }
   }
+  if (pkgHealth?.vulnerabilityIds?.length > 0) {
+    verdict = policy.blockKnownVulnerabilities ? "BLOCK" : verdict === "BLOCK" ? "BLOCK" : "WARN";
+    reasons.push({
+      code: "KNOWN_VULNERABILITY",
+      message: `Known vulnerability advisories: ${pkgHealth.vulnerabilityIds.join(", ")}.`
+    });
+  }
+  if (pkgHealth?.typosquatCandidates?.length > 0) {
+    verdict = policy.blockTyposquats ? "BLOCK" : verdict === "BLOCK" ? "BLOCK" : "WARN";
+    reasons.push({
+      code: "POSSIBLE_TYPOSQUAT",
+      message: `Package name resembles ${pkgHealth.typosquatCandidates.join(", ")}; verify the publisher before installing.`
+    });
+  }
+  if ((policy.requireProvenanceFor || []).includes(packageName) && !pkgHealth?.hasProvenance) {
+    verdict = "BLOCK";
+    reasons.push({ code: "PROVENANCE_REQUIRED", message: "Policy requires npm provenance metadata for this package." });
+  }
+  if (policy.blockOnIntegrityMismatch && pkgHealth?.integrityCheck !== "present") {
+    verdict = "BLOCK";
+    reasons.push({ code: "INTEGRITY_REQUIRED", message: "Policy requires a registry integrity digest for this package." });
+  }
   let finalReasons = [];
   let finalVerdict = "ALLOW";
   if (ignored && (verdict === "BLOCK" || verdict === "WARN")) {
@@ -445,7 +545,7 @@ function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
         finalReasons.push({ ...r, message: `(Overridden by exceptions): ${r.message}` });
       } else {
         finalReasons.push(r);
-        if (r.code === "PACKAGE_DEPRECATED" || r.code === "INSTALL_SCRIPTS" || r.code === "SIZE_LIMIT_EXCEEDED" && policy.blockOnOversized || r.code === "HEALTH_SCORE_MIN" && policy.blockOnLowHealth) {
+        if (r.code === "PACKAGE_DEPRECATED" || r.code === "INSTALL_SCRIPTS" || r.code === "KNOWN_VULNERABILITY" || r.code === "PROVENANCE_REQUIRED" || r.code === "INTEGRITY_REQUIRED" || r.code === "POSSIBLE_TYPOSQUAT" && policy.blockTyposquats || r.code === "SIZE_LIMIT_EXCEEDED" && policy.blockOnOversized || r.code === "HEALTH_SCORE_MIN" && policy.blockOnLowHealth) {
           hasBlock = true;
         } else {
           hasWarn = true;
@@ -507,9 +607,7 @@ function getMetricsPath(projectPath) {
 function isTelemetryEnabled(policy) {
   if (process.env.PKGDIET_TELEMETRY_DISABLED === "1")
     return false;
-  if (policy && policy.telemetry === false)
-    return false;
-  return true;
+  return policy?.telemetry === true;
 }
 function showFirstRunNoticeIfNeeded(projectPath, policy) {
   if (!isTelemetryEnabled(policy))
@@ -517,8 +615,8 @@ function showFirstRunNoticeIfNeeded(projectPath, policy) {
   const metricsPath = getMetricsPath(projectPath);
   if (!(0, import_fs3.existsSync)(metricsPath) && !hasShownFirstRunNotice) {
     if (process.env.PKGDIET_MCP_MODE !== "1") {
-      console.error("\n[PkgDiet] Notice: PkgDiet collects anonymous local usage metrics to show you this tool's impact.");
-      console.error('          Disable this by setting PKGDIET_TELEMETRY_DISABLED=1 or "telemetry": false in your config.\n');
+      console.error("\n[PkgDiet] Local usage metrics are enabled by this repository policy.");
+      console.error('          Disable them with PKGDIET_TELEMETRY_DISABLED=1 or "telemetry": false.\n');
     }
     hasShownFirstRunNotice = true;
     saveMetrics(projectPath, {
@@ -584,9 +682,407 @@ function recordCheckMetric(projectPath, policy, { durationMs, verdict, wasOverri
   saveMetrics(projectPath, data);
 }
 
+// ../core/data/alternatives.json with { type: 'json' }
+var alternatives_default = {
+  moment: {
+    reason: "Moment.js is in maintenance mode and is 289KB+ minified. Modern alternatives are much smaller.",
+    category: "bloat",
+    alternatives: [
+      { name: "dayjs", size: "2KB", note: "Drop-in replacement with same API, 99% smaller" },
+      { name: "date-fns", size: "13KB (tree-shakeable)", note: "Functional approach, only import what you use" },
+      { name: "luxon", size: "23KB", note: "By Moment team, modern immutable API" }
+    ]
+  },
+  lodash: {
+    reason: "Most lodash utilities have native JS equivalents. Full lodash is 72KB minified.",
+    category: "bloat",
+    alternatives: [
+      { name: "lodash-es", size: "tree-shakeable", note: "ESM version \u2014 bundlers only include what you import" },
+      { name: "native JS", size: "0KB", note: "Array.find, Object.entries, optional chaining (?.), nullish coalescing (??) cover most use cases" },
+      { name: "radash", size: "tree-shakeable", note: "Modern, typed, tree-shakeable lodash alternative" }
+    ]
+  },
+  underscore: {
+    reason: "Underscore is largely superseded by native JS methods and lodash.",
+    category: "deprecated",
+    alternatives: [
+      { name: "native JS", size: "0KB", note: "Modern JS covers most underscore utilities" },
+      { name: "radash", size: "tree-shakeable", note: "Modern utility library if you need one" }
+    ]
+  },
+  request: {
+    reason: "Deprecated since February 2020. No longer receives security patches.",
+    category: "deprecated",
+    alternatives: [
+      { name: "undici", size: "built-in", note: "Node.js native HTTP client, fastest option" },
+      { name: "native fetch", size: "0KB", note: "Built into Node.js 18+, zero dependencies" },
+      { name: "axios", size: "14KB", note: "Feature-rich, interceptors, wide browser support" },
+      { name: "ky", size: "3KB", note: "Tiny, elegant HTTP client by Sindre Sorhus" }
+    ]
+  },
+  "node-fetch": {
+    reason: "Native fetch() is stable in Node.js 18+ since 2022. No need for a polyfill.",
+    category: "unnecessary",
+    alternatives: [
+      { name: "native fetch", size: "0KB", note: "Built into Node.js 18+, zero dependencies" }
+    ]
+  },
+  axios: {
+    reason: "Consider lighter alternatives if you only need basic HTTP requests.",
+    category: "optimization",
+    alternatives: [
+      { name: "native fetch", size: "0KB", note: "Built into Node.js 18+, handles most use cases" },
+      { name: "ky", size: "3KB", note: "Tiny fetch wrapper with retries, timeouts, JSON shortcuts" },
+      { name: "ofetch", size: "5KB", note: "Universal fetch by UnJS, works everywhere" }
+    ]
+  },
+  colors: {
+    reason: "Had a supply chain sabotage incident in Jan 2022. Use maintained alternatives.",
+    category: "security",
+    alternatives: [
+      { name: "chalk", size: "15KB", note: "Most popular, actively maintained, 256/truecolor support" },
+      { name: "picocolors", size: "0.5KB", note: "14x smaller than chalk, fastest option" },
+      { name: "colorette", size: "1KB", note: "Tiny and fast terminal color library" }
+    ]
+  },
+  faker: {
+    reason: "Original faker was sabotaged and abandoned. Use the community fork.",
+    category: "security",
+    alternatives: [
+      { name: "@faker-js/faker", size: "varies", note: "Official community fork, actively maintained" }
+    ]
+  },
+  uuid: {
+    reason: "Node.js and browsers have built-in UUID generation since 2021.",
+    category: "unnecessary",
+    alternatives: [
+      { name: "crypto.randomUUID()", size: "0KB", note: "Built into Node.js 19+ and all modern browsers" },
+      { name: "nanoid", size: "0.5KB", note: "Smaller, faster, URL-friendly unique IDs" }
+    ]
+  },
+  rimraf: {
+    reason: "Node.js fs.rm() with recursive option is built-in since Node 14.",
+    category: "unnecessary",
+    alternatives: [
+      { name: "fs.rm(path, { recursive: true, force: true })", size: "0KB", note: "Built into Node.js 14+, no dependency needed" }
+    ]
+  },
+  mkdirp: {
+    reason: "Node.js fs.mkdir() with recursive option is built-in since Node 10.",
+    category: "unnecessary",
+    alternatives: [
+      { name: "fs.mkdir(path, { recursive: true })", size: "0KB", note: "Built into Node.js 10+, no dependency needed" }
+    ]
+  },
+  "left-pad": {
+    reason: "String.padStart() is built into all modern JS engines.",
+    category: "unnecessary",
+    alternatives: [
+      { name: "String.padStart()", size: "0KB", note: "Built into ES2017, supported everywhere" }
+    ]
+  },
+  glob: {
+    reason: "Consider built-in Node.js fs.glob (Node 22+) or faster alternatives.",
+    category: "optimization",
+    alternatives: [
+      { name: "fast-glob", size: "smaller", note: "2-3x faster than glob, same API" },
+      { name: "tinyglobby", size: "tiny", note: "Minimal, fast globbing" },
+      { name: "fs.glob()", size: "0KB", note: "Built into Node.js 22+ (experimental)" }
+    ]
+  },
+  bluebird: {
+    reason: "Native Promises are fully featured in modern Node.js. Bluebird's perf advantage is gone.",
+    category: "unnecessary",
+    alternatives: [
+      { name: "native Promise", size: "0KB", note: "V8's native Promise is now faster than Bluebird" },
+      { name: "p-map / p-limit", size: "1KB", note: "If you need concurrency control, use focused utilities" }
+    ]
+  },
+  chalk: {
+    reason: "chalk is solid but consider lighter alternatives if you only need basic colors.",
+    category: "optimization",
+    alternatives: [
+      { name: "picocolors", size: "0.5KB", note: "14x smaller, 2x faster, covers basic use cases" },
+      { name: "colorette", size: "1KB", note: "Tiny and fast, good middle ground" }
+    ]
+  },
+  "moment-timezone": {
+    reason: "Moment-timezone is 900KB+ with timezone data. Modern alternatives are much smaller.",
+    category: "bloat",
+    alternatives: [
+      { name: "dayjs + timezone plugin", size: "5KB", note: "Same API, fraction of the size" },
+      { name: "Intl.DateTimeFormat", size: "0KB", note: "Built-in browser/Node API for timezone formatting" },
+      { name: "date-fns-tz", size: "tree-shakeable", note: "Timezone utilities for date-fns" }
+    ]
+  },
+  "node-sass": {
+    reason: "Deprecated in favor of Dart Sass. Node-sass is unmaintained and has native binding issues.",
+    category: "deprecated",
+    alternatives: [
+      { name: "sass", size: "varies", note: "Official Dart Sass, pure JS, actively maintained" }
+    ]
+  },
+  enzyme: {
+    reason: "Enzyme is abandoned and doesn't support React 18+. Use modern testing utilities.",
+    category: "deprecated",
+    alternatives: [
+      { name: "@testing-library/react", size: "varies", note: "Community standard for React testing, supports React 18+" }
+    ]
+  },
+  classnames: {
+    reason: "Consider smaller alternatives or template literals for simple use cases.",
+    category: "optimization",
+    alternatives: [
+      { name: "clsx", size: "0.3KB", note: "Same API as classnames, 2x smaller and faster" },
+      { name: "template literals", size: "0KB", note: "For simple cases: `class1 ${condition ? 'class2' : ''}`" }
+    ]
+  },
+  "body-parser": {
+    reason: "Built into Express.js 4.16+ as express.json() and express.urlencoded().",
+    category: "unnecessary",
+    alternatives: [
+      { name: "express.json()", size: "0KB", note: "Built into Express 4.16+, no separate install needed" }
+    ]
+  },
+  dotenv: {
+    reason: "Node.js 20.6+ has built-in --env-file flag for .env loading.",
+    category: "optimization",
+    alternatives: [
+      { name: "node --env-file=.env", size: "0KB", note: "Built into Node.js 20.6+, no dependency needed" }
+    ]
+  },
+  "cross-env": {
+    reason: "Modern Node.js and npm scripts handle cross-platform env vars better now.",
+    category: "optimization",
+    alternatives: [
+      { name: "node --env-file", size: "0KB", note: "Node 20.6+ built-in .env support" },
+      { name: "cross-env", size: "keep if needed", note: "Still useful if supporting older Node or complex env setups" }
+    ]
+  },
+  "express-validator": {
+    reason: "Consider lighter validation libraries if you don't need Express middleware integration.",
+    category: "optimization",
+    alternatives: [
+      { name: "zod", size: "13KB", note: "TypeScript-first schema validation, works anywhere" },
+      { name: "valibot", size: "<1KB (tree-shakeable)", note: "Modular, 98% smaller than Zod" }
+    ]
+  },
+  joi: {
+    reason: "Joi is large (145KB) and primarily server-side. Modern alternatives are smaller and more universal.",
+    category: "bloat",
+    alternatives: [
+      { name: "zod", size: "13KB", note: "TypeScript-first, much smaller, works everywhere" },
+      { name: "valibot", size: "<1KB (tree-shakeable)", note: "Modular architecture, extremely small bundle" },
+      { name: "yup", size: "20KB", note: "Familiar API, smaller than Joi" }
+    ]
+  },
+  yup: {
+    reason: "Consider newer, smaller validation libraries with better TypeScript support.",
+    category: "optimization",
+    alternatives: [
+      { name: "zod", size: "13KB", note: "Better TypeScript inference, growing ecosystem" },
+      { name: "valibot", size: "<1KB (tree-shakeable)", note: "Smallest validation library, modular" }
+    ]
+  },
+  async: {
+    reason: "Native async/await and Promise utilities replace most of the async library's functionality.",
+    category: "unnecessary",
+    alternatives: [
+      { name: "native async/await", size: "0KB", note: "Built into JS since ES2017" },
+      { name: "p-map", size: "1KB", note: "Concurrency control for async iteration" },
+      { name: "p-queue", size: "2KB", note: "Priority queue for async tasks" }
+    ]
+  },
+  querystring: {
+    reason: "Node.js built-in querystring module is deprecated. Use URLSearchParams.",
+    category: "deprecated",
+    alternatives: [
+      { name: "URLSearchParams", size: "0KB", note: "Built into Node.js and browsers, standard API" },
+      { name: "qs", size: "8KB", note: "If you need nested object support" }
+    ]
+  },
+  "path-to-regexp": {
+    reason: "URLPattern is now available in Node.js 23+ and most browsers.",
+    category: "optimization",
+    alternatives: [
+      { name: "URLPattern", size: "0KB", note: "Built into Node.js 23+ and modern browsers" }
+    ]
+  },
+  "isomorphic-fetch": {
+    reason: "fetch() is now built into both Node.js 18+ and all modern browsers.",
+    category: "unnecessary",
+    alternatives: [
+      { name: "native fetch", size: "0KB", note: "Built into Node.js 18+ and all modern browsers" }
+    ]
+  },
+  "whatwg-fetch": {
+    reason: "fetch() polyfill is no longer needed \u2014 all modern browsers support it natively.",
+    category: "unnecessary",
+    alternatives: [
+      { name: "native fetch", size: "0KB", note: "Supported in all browsers since 2017" }
+    ]
+  },
+  "core-js": {
+    reason: "Most core-js polyfills are unnecessary if targeting modern browsers/Node.js.",
+    category: "bloat",
+    alternatives: [
+      { name: "Check browserslist", size: "varies", note: "Review your target browsers \u2014 you may not need polyfills" },
+      { name: "core-js-pure", size: "smaller", note: "Non-polluting version if you still need polyfills" }
+    ]
+  },
+  winston: {
+    reason: "Consider lighter logging libraries if you don't need Winston's full transport system.",
+    category: "optimization",
+    alternatives: [
+      { name: "pino", size: "smaller", note: "5x faster, lower overhead, JSON logging" },
+      { name: "consola", size: "5KB", note: "Elegant console wrapper by UnJS" }
+    ]
+  },
+  bunyan: {
+    reason: "Bunyan is largely unmaintained. Modern alternatives are faster and lighter.",
+    category: "deprecated",
+    alternatives: [
+      { name: "pino", size: "smaller", note: "Spiritual successor, 5x faster, actively maintained" }
+    ]
+  },
+  superagent: {
+    reason: "Superagent is older and larger than modern HTTP client alternatives.",
+    category: "optimization",
+    alternatives: [
+      { name: "native fetch", size: "0KB", note: "Built into Node.js 18+ and browsers" },
+      { name: "ky", size: "3KB", note: "Modern, tiny, elegant fetch wrapper" }
+    ]
+  },
+  phantomjs: {
+    reason: "PhantomJS has been discontinued since 2018.",
+    category: "deprecated",
+    alternatives: [
+      { name: "playwright", size: "varies", note: "By Microsoft, supports all browsers, actively maintained" },
+      { name: "puppeteer", size: "varies", note: "Chrome/Firefox automation by Google" }
+    ]
+  },
+  protractor: {
+    reason: "Protractor has been deprecated since Angular 15.",
+    category: "deprecated",
+    alternatives: [
+      { name: "playwright", size: "varies", note: "Modern, fast, multi-browser testing" },
+      { name: "cypress", size: "varies", note: "Developer-friendly E2E testing" }
+    ]
+  },
+  tslint: {
+    reason: "TSLint was deprecated in 2019 in favor of ESLint with TypeScript support.",
+    category: "deprecated",
+    alternatives: [
+      { name: "eslint + @typescript-eslint", size: "varies", note: "Official replacement, actively maintained" }
+    ]
+  },
+  q: {
+    reason: "Q Promise library is obsolete \u2014 native Promises are built into JavaScript.",
+    category: "unnecessary",
+    alternatives: [
+      { name: "native Promise", size: "0KB", note: "Built into JavaScript since ES2015" }
+    ]
+  },
+  when: {
+    reason: "when.js Promise library is unmaintained \u2014 native Promises are the standard.",
+    category: "unnecessary",
+    alternatives: [
+      { name: "native Promise + async/await", size: "0KB", note: "Built into JavaScript, fully featured" }
+    ]
+  },
+  backbone: {
+    reason: "Backbone.js is from 2010 and effectively unmaintained.",
+    category: "deprecated",
+    alternatives: [
+      { name: "React / Vue / Svelte", size: "varies", note: "Modern component-based frameworks" }
+    ]
+  },
+  bower: {
+    reason: "Bower has been deprecated since 2017 in favor of npm/yarn.",
+    category: "deprecated",
+    alternatives: [
+      { name: "npm", size: "built-in", note: "Standard package manager for JavaScript" }
+    ]
+  },
+  grunt: {
+    reason: "Grunt is largely superseded by npm scripts and modern build tools.",
+    category: "deprecated",
+    alternatives: [
+      { name: "npm scripts", size: "0KB", note: "Built into npm, no task runner needed" },
+      { name: "turborepo", size: "varies", note: "If you need advanced task orchestration" }
+    ]
+  },
+  gulp: {
+    reason: "Gulp is losing adoption to modern bundlers and npm scripts.",
+    category: "optimization",
+    alternatives: [
+      { name: "npm scripts", size: "0KB", note: "For simple build tasks" },
+      { name: "vite", size: "varies", note: "Modern build tool with excellent DX" }
+    ]
+  },
+  immutable: {
+    reason: "Immutable.js adds significant bundle weight. Consider lighter approaches.",
+    category: "bloat",
+    alternatives: [
+      { name: "immer", size: "5KB", note: "Work with immutable state using normal JS syntax" },
+      { name: "structuredClone()", size: "0KB", note: "Built-in deep clone for simple immutability" }
+    ]
+  },
+  rxjs: {
+    reason: "RxJS is powerful but heavy (42KB). Consider if you really need reactive streams.",
+    category: "optimization",
+    alternatives: [
+      { name: "native EventTarget", size: "0KB", note: "Built-in event system for simple pub/sub" },
+      { name: "mitt", size: "0.2KB", note: "Tiny event emitter if you just need pub/sub" }
+    ]
+  },
+  "node-uuid": {
+    reason: "Renamed to 'uuid'. node-uuid is abandoned.",
+    category: "deprecated",
+    alternatives: [
+      { name: "crypto.randomUUID()", size: "0KB", note: "Built into Node.js 19+ and browsers" },
+      { name: "uuid", size: "varies", note: "If you need v1/v3/v5 UUIDs" }
+    ]
+  },
+  "is-odd": {
+    reason: "You really don't need a package for n % 2 !== 0.",
+    category: "unnecessary",
+    alternatives: [
+      { name: "n % 2 !== 0", size: "0KB", note: "One expression. Ship it." }
+    ]
+  },
+  "is-even": {
+    reason: "You really don't need a package for n % 2 === 0.",
+    category: "unnecessary",
+    alternatives: [
+      { name: "n % 2 === 0", size: "0KB", note: "One expression. Ship it." }
+    ]
+  },
+  "is-number": {
+    reason: "typeof n === 'number' or Number.isFinite(n) does the same thing.",
+    category: "unnecessary",
+    alternatives: [
+      { name: "typeof n === 'number'", size: "0KB", note: "Built-in JavaScript operator" }
+    ]
+  },
+  "is-string": {
+    reason: "typeof s === 'string' does the same thing.",
+    category: "unnecessary",
+    alternatives: [
+      { name: "typeof s === 'string'", size: "0KB", note: "Built-in JavaScript operator" }
+    ]
+  }
+};
+
 // ../core/dist/alternatives-core.js
 var alternativesDb = null;
 var loaderFn = null;
+function injectAlternatives(db) {
+  if (!db || typeof db !== "object" || Array.isArray(db)) {
+    throw new TypeError("[PkgDiet] injectAlternatives: dataset must be a plain object keyed by package name.");
+  }
+  alternativesDb = db;
+}
 function loadAlternatives() {
   if (alternativesDb !== null) {
     return alternativesDb;
@@ -612,6 +1108,9 @@ function findAlternatives(packageNames) {
   }
   return suggestions;
 }
+
+// ../core/dist/alternatives.js
+injectAlternatives(alternatives_default);
 
 // ../core/dist/npmrc.js
 var import_fs4 = __toESM(require("fs"), 1);
@@ -689,11 +1188,18 @@ function buildNotFoundResult(packageName, policy) {
 }
 function buildNetworkErrorResult(packageName, policy) {
   const costEstimate = estimateCostImpact(null);
+  const failClosed = policy.securityMode === "fail-closed";
   return {
     name: packageName,
-    verdict: "UNKNOWN",
+    // A fail-open policy may continue with an explicit review warning. A
+    // fail-closed policy must prevent an installation when verification is
+    // unavailable; never return an ambiguous verdict for that case.
+    verdict: failClosed ? "BLOCK" : "WARN",
     reasons: [
-      { code: "REGISTRY_UNAVAILABLE", message: "Network error or private registry \u2014 registry unreachable." }
+      {
+        code: failClosed ? "REGISTRY_UNAVAILABLE_BLOCKED" : "REGISTRY_UNAVAILABLE",
+        message: failClosed ? "SECURITY BLOCK: Registry verification is unavailable under the fail-closed policy." : "SECURITY WARNING: Registry verification is unavailable. Review the package before installation."
+      }
     ],
     healthScore: null,
     costEstimate,
@@ -716,6 +1222,22 @@ async function checkPackage(packageSpec, projectPath = process.cwd(), options = 
   }
   packageName = packageName.trim().toLowerCase();
   const warnOnInternalPrefix = matchesInternalPrefix(packageName, policy.internalNamePrefixes);
+  const explicitDecision = evaluatePolicy(packageName, null, null, policy);
+  if (explicitDecision.verdict === "BLOCK" || explicitDecision.ignored) {
+    return {
+      name: packageName,
+      verdict: explicitDecision.verdict,
+      reasons: explicitDecision.reasons,
+      healthScore: null,
+      costEstimate: estimateCostImpact(null),
+      alternatives: [],
+      flags: [],
+      efficiencyFlag: false,
+      hasProvenance: false,
+      integrityCheck: "missing",
+      certified: false
+    };
+  }
   const healthResult = await fetchPackageHealth(packageName, projectPath, true);
   if (healthResult.skipped) {
     if (healthResult.notFound) {
@@ -761,8 +1283,8 @@ async function checkPackage(packageSpec, projectPath = process.cwd(), options = 
       evaluation.reasons.push({ code: "EFFICIENCY_FLAG", message: `Efficiency Flag: Better alternatives exist for ${packageName}.` });
     }
   }
-  const hasProvenance = false;
-  const integrityCheck = "missing";
+  const hasProvenance = Boolean(healthResult.hasProvenance);
+  const integrityCheck = healthResult.integrityCheck || "missing";
   recordCheckMetric(projectPath, policy, {
     durationMs: Date.now() - startTime,
     verdict: evaluation.verdict,
@@ -781,21 +1303,21 @@ async function checkPackage(packageSpec, projectPath = process.cwd(), options = 
     efficiencyFlag,
     hasProvenance,
     integrityCheck,
+    evidence: {
+      checkedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      registry: "npm",
+      advisorySource: healthResult.advisoryStatus === "ok" ? "OSV" : healthResult.advisoryStatus,
+      vulnerabilityIds: healthResult.vulnerabilityIds || [],
+      typosquatCandidates: healthResult.typosquatCandidates || [],
+      blocked: evaluation.verdict === "BLOCK",
+      blockReasons: evaluation.reasons.filter((reason) => ["KNOWN_VULNERABILITY", "PACKAGE_DEPRECATED", "INSTALL_SCRIPTS", "PROVENANCE_REQUIRED", "INTEGRITY_REQUIRED", "POSSIBLE_TYPOSQUAT", "DEPENDENCY_CONFUSION"].includes(reason.code)).map((reason) => reason.code)
+    },
     certified
   };
 }
 
-// ../core/dist/alternatives-extension.js
-var alternativesDb2 = null;
-function injectAlternatives(db) {
-  if (!db || typeof db !== "object" || Array.isArray(db)) {
-    throw new TypeError("[PkgDiet] injectAlternatives: dataset must be a plain object keyed by package name.");
-  }
-  alternativesDb2 = db;
-}
-
 // ../core/data/alternatives.json
-var alternatives_default = {
+var alternatives_default2 = {
   moment: {
     reason: "Moment.js is in maintenance mode and is 289KB+ minified. Modern alternatives are much smaller.",
     category: "bloat",
@@ -1196,7 +1718,7 @@ function getOutputChannel() {
 }
 function activate(context) {
   try {
-    injectAlternatives(alternatives_default);
+    injectAlternatives(alternatives_default2);
     getOutputChannel().appendLine("[PkgDiet] Alternatives dataset loaded successfully.");
   } catch (error) {
     getOutputChannel().appendLine(

@@ -5,10 +5,13 @@
 
 import { getCached, batchSetCached } from './cache.js';
 import { timeSince } from './utils.js';
+import { findTyposquatCandidates } from './security.js';
 
 const NPM_REGISTRY = (process.env.PKGDIET_REGISTRY_URL || 'https://registry.npmjs.org').replace(/\/$/, '');
 const NPM_DOWNLOADS = (process.env.PKGDIET_DOWNLOADS_URL || 'https://api.npmjs.org/downloads/point').replace(/\/$/, '');
 const OFFLINE = process.env.PKGDIET_NO_NETWORK === '1' || process.env.PKGDIET_NO_NETWORK === 'true';
+const ADVISORIES_ENABLED = process.env.PKGDIET_ADVISORIES !== '0';
+const OSV_API = 'https://api.osv.dev/v1/query';
 
 // Configurable via env var (default: 10)
 const MAX_CONCURRENT = Number(process.env.PKGDIET_CONCURRENCY || '10');
@@ -80,6 +83,26 @@ async function fetchWithRetry(url, retries = MAX_RETRIES) {
     return result;
   }
   return { data: null, status: 'network_error' };
+}
+
+async function fetchOsvAdvisories(packageName, version) {
+  if (!ADVISORIES_ENABLED || !version) return { status: 'skipped', vulnerabilities: [] };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(OSV_API, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ package: { ecosystem: 'npm', name: packageName }, version }),
+      signal: controller.signal,
+    });
+    const data = response.ok ? await response.json() : null;
+    return { status: response.ok ? 'ok' : 'unavailable', vulnerabilities: data?.vulns || [] };
+  } catch {
+    return { status: 'unavailable', vulnerabilities: [] };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // ── Concurrency pool ──────────────────────────────────────────────────────────
@@ -185,6 +208,8 @@ export async function fetchPackageHealth(packageName, projectPath, useCache) {
   const latestMeta       = latestVersion ? registryData.versions?.[latestVersion] : null;
   const monthlyDownloads = downloadsResult.data?.downloads || 0;
   const deprecated       = registryData.versions?.[latestVersion]?.deprecated || null;
+  const advisoryResult = await fetchOsvAdvisories(packageName, latestVersion);
+  const typosquatCandidates = findTyposquatCandidates(packageName);
 
   // Install scripts
   const installScripts = [];
@@ -268,6 +293,12 @@ export async function fetchPackageHealth(packageName, projectPath, useCache) {
   if (installScripts.length > 0) {
     flags.push({ type: 'warning', label: `Install scripts (${installScripts.join(', ')})` });
   }
+  if (advisoryResult.vulnerabilities.length > 0) {
+    flags.push({ type: 'critical', label: `Known vulnerabilities (${advisoryResult.vulnerabilities.length})` });
+  }
+  if (typosquatCandidates.length > 0) {
+    flags.push({ type: 'warning', label: `Name resembles ${typosquatCandidates.join(', ')}` });
+  }
 
   const unpackedSize    = latestMeta?.dist?.unpackedSize || 0;
   const dependencyCount = Object.keys(latestMeta?.dependencies || {}).length;
@@ -288,6 +319,9 @@ export async function fetchPackageHealth(packageName, projectPath, useCache) {
     dependencyCount,
     hasProvenance: Boolean(latestMeta?.dist?.attestations?.provenance || latestMeta?.dist?.provenance || latestMeta?.publishConfig?.provenance),
     integrityCheck: latestMeta?.dist?.integrity ? 'present' : 'missing',
+    advisoryStatus: advisoryResult.status,
+    vulnerabilityIds: advisoryResult.vulnerabilities.map(item => item.id).filter(Boolean),
+    typosquatCandidates,
     skipped: false,
   };
 

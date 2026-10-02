@@ -9,10 +9,21 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMP_DIR = join(__dirname, 'fixtures', 'e2e-temp-repo');
 const CLI_PATH = join(__dirname, '..', '..', '..', 'packages', 'cli', 'src', 'cli.js');
 
+function removeTempRepo() {
+  fs.rmSync(TEMP_DIR, {
+    recursive: true,
+    force: true,
+    // Windows may hold a just-created Git index briefly after a child process
+    // exits. Node's built-in retry makes this integration test deterministic.
+    maxRetries: 5,
+    retryDelay: 100,
+  });
+}
+
 test('E2E GitHub Actions PR Gate', async (t) => {
   // Clean up if exists
   if (fs.existsSync(TEMP_DIR)) {
-    fs.rmSync(TEMP_DIR, { recursive: true, force: true });
+    removeTempRepo();
   }
   fs.mkdirSync(TEMP_DIR, { recursive: true });
 
@@ -76,5 +87,5 @@ test('E2E GitHub Actions PR Gate', async (t) => {
   assert.ok(tamperFailed, 'CI gate should have exited with error for policy tampering');
 
   // Clean up
-  fs.rmSync(TEMP_DIR, { recursive: true, force: true });
+  removeTempRepo();
 });

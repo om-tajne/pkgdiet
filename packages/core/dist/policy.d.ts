@@ -14,6 +14,9 @@ export declare const DEFAULT_POLICY: {
     internalNamePrefixes: undefined[];
     blockOnIntegrityMismatch: boolean;
     requireProvenanceFor: undefined[];
+    blockKnownVulnerabilities: boolean;
+    blockTyposquats: boolean;
+    requirePinnedVersions: boolean;
     environments: {};
     policyVersion: number;
     telemetry: boolean;

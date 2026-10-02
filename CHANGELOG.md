@@ -13,7 +13,41 @@ _No changes yet._
 
 ---
 
-## [2.0.1] - 2026-09-22
+## [2.0.1] - 2026-10-02
+
+### Added — Real Agent Enforcement (not just MCP advice)
+
+#### Claude Code — Native `PreToolUse` install guard
+- Added `.claude/hooks/pkgdiet-install-guard.sh` — a bash hook registered in `.claude/settings.json`
+- Intercepts every Bash tool call, extracts npm/pnpm/yarn install commands, requires pinned versions, calls `pkgdiet check --json`, and blocks unapproved installs before Claude Code executes them
+- `npx pkgdiet init` and `npx pkgdiet agent-setup --agent claude-code` write the hook automatically
+
+#### Codex (OpenAI) — `PreToolUse` Node.js install guard (improved)
+- Updated `.codex/hooks/pkgdiet-install-guard.mjs` with clearer denial messages showing the blocked package names
+- Blocks unpinned installs and policy-failing packages with structured `permissionDecision: "deny"` output
+
+#### Cursor — MDC always-applied enforcement rule
+- Added `.cursor/rules/pkgdiet.mdc` with `alwaysApply: true` — enforced on every session in Cursor 0.47+
+- `npx pkgdiet init` creates this file; `npx pkgdiet agent-setup --agent cursor` creates it too
+
+#### New `demo` command — live enforcement proof
+- `npx pkgdiet@2.0.1 demo` runs real checks against known-risky packages (moment, request, node-uuid, lodash)
+- Shows verdict, health score, block reason, CVEs, typosquat candidates, and alternatives
+- `--json` flag outputs machine-readable proof: `{ verdict: "BLOCK", proof: "PkgDiet blocked this risky AI-generated dependency before install." }`
+
+### Intelligence (all free, no paid services)
+- **OSV.dev** — known vulnerability advisory checks per package version
+- **npm provenance** — `dist.attestations.provenance` field detection
+- **Typosquat detection** — Levenshtein-distance check against 15+ popular package names
+- **Lockfile pinning** — `requirePinnedVersions` blocks unpinned declarations in CI
+- **Dependency confusion** — blocks `internalNamePrefixes` packages found on public registry
+
+### Changed
+- `agentSetup.js`: `verifyAgents` now checks actual hook files for Claude Code (`.claude/hooks/pkgdiet-install-guard.sh`) and Codex
+- `init.js`: runs Claude Code hook setup in addition to Codex; creates Cursor MDC rule; updated next-steps output with enforcement summary
+- `README.md`: full rewrite — live proof section with demo output, enforcement-by-agent table, one-command setup file table
+
+
 
 ### Changed
 - Improved ecosystem distribution, documentation accuracy, and integration examples.
