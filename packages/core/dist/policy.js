@@ -20,7 +20,7 @@ export const DEFAULT_POLICY = {
     // Sprint 7: Per-environment policies
     environments: {}, // Record<string, Partial<Policy>>
     policyVersion: 1,
-    telemetry: true,
+    telemetry: false,
 };
 /**
  * Load and merge policy from disk. Looks for:

@@ -67,7 +67,7 @@ Or create `.pkgdietrc.json` manually in your project root. The file must be vali
   ],
 
   // Enable or disable local metrics collection (.pkgdiet-metrics.json).
-  "telemetry": true,
+  "telemetry": false,
 
   // Environment-specific overlays. Known: ci, dev, prod, staging, test.
   "environments": {
@@ -136,7 +136,7 @@ The overlay merges on top of the base policy. Any key in the overlay overrides t
 | `maxPackageSizeBytes` | `15728640` (15 MB) |
 | `failOn` | `"BLOCK"` — also accepts `"WARN"` or `"NONE"` |
 | `securityMode` | `"fail-open"` — only other value is `"fail-closed"` |
-| `telemetry` | `true` (local file only) |
+| `telemetry` | `false` (set to `true` only for local-file metrics) |
 | Known `environments` keys | `ci`, `dev`, `prod`, `staging`, `test` |
 
 ---

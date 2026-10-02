@@ -1,7 +1,7 @@
 name: Publish to npm (Trusted Publishing)
 
-# Triggers only on version tags: v2.0.1, v2.1.0, v2.0.1, etc.
-# Do NOT trigger on pre-release tags like v2.0.1-beta.1 — add a separate workflow for that.
+# Triggers only on version tags such as v2.0.1, v2.1.0, or v2.0.2.
+# Do NOT trigger on pre-release tags such as v2.0.1-beta.1 — add a separate workflow for that.
 on:
   push:
     tags:
@@ -23,6 +23,8 @@ jobs:
   # ── Verify: build, test, version check, dry-run pack ─────────────────────
   verify:
     name: Verify build and tests
+    # Avoid billable GitHub-hosted runner usage when the repository is private.
+    if: github.event.repository.private == false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -85,6 +87,7 @@ jobs:
   # ── Publish @pkgdiet/core ─────────────────────────────────────────────────
   publish-core:
     name: Publish @pkgdiet/core
+    if: github.event.repository.private == false
     needs: verify
     runs-on: ubuntu-latest
     steps:
@@ -112,6 +115,7 @@ jobs:
   # 📦 Publish @pkgdiet/mcp (after core lands in registry) 📦
   publish-mcp:
     name: Publish @pkgdiet/mcp
+    if: github.event.repository.private == false
     needs: publish-core
     runs-on: ubuntu-latest
     steps:
@@ -139,6 +143,7 @@ jobs:
   # 📦 Publish pkgdiet CLI (after mcp lands in registry) 📦
   publish-cli:
     name: Publish pkgdiet (CLI)
+    if: github.event.repository.private == false
     needs: publish-mcp
     runs-on: ubuntu-latest
     steps:

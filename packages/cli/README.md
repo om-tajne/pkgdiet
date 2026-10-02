@@ -34,7 +34,7 @@
 
 ## 🔄 The 3-Phase Policy Loop
 
-PkgDiet guarantees that a dependency is evaluated identically at every stage of your development lifecycle using a shared core engine (`@pkgdiet/core`).
+PkgDiet uses a shared core engine (`@pkgdiet/core`) so supported interfaces apply the same evaluation logic.
 
 1. **Repository Policy:** A single `.pkgdietrc.json` file dictates what is allowed, warned, or blocked for your project.
 2. **Agent Guidance (MCP):** AI clients connect to PkgDiet via the Model Context Protocol (`npx pkgdiet mcp`). Before writing `npm install`, the agent asks PkgDiet if a package is compliant. If blocked, PkgDiet provides curated modern alternatives.
@@ -66,7 +66,7 @@ npx pkgdiet audit
 
 `pkgdiet ci` is lockfile-diff-based in CI workflows: it evaluates dependency changes introduced by the branch and applies the active policy.
 
-Requires Node.js 20 or later. CLI results expose install estimates through `costEstimate.addedSizeMB`. Set `PKGDIET_TELEMETRY_DISABLED=1` to disable local usage metrics.
+Requires Node.js 20 or later. CLI results expose install estimates through `costEstimate.addedSizeMB`. Local usage metrics are disabled by default; set `"telemetry": true` in policy only when you want local metrics. `PKGDIET_TELEMETRY_DISABLED=1` is an emergency override.
 
 ```text
 Usage: pkgdiet [options] [command]

@@ -1,7 +1,7 @@
 # PkgDiet 2.0.1 Architecture Guide
 ## Local-first dependency policy for AI-assisted development
 
-PkgDiet 2.0.1 evolves PkgDiet from a dependency-analysis CLI into a local-first, repository-owned dependency policy workflow for JavaScript and TypeScript projects. It helps developers and compatible AI coding agents evaluate candidate npm dependencies before they are introduced, then independently verifies dependency changes in pull-request CI. 
+PkgDiet 2.0.1 evolves PkgDiet from a dependency-analysis CLI into a local-first, repository-owned dependency policy workflow for JavaScript and TypeScript projects. It helps developers and compatible AI coding agents evaluate candidate npm dependencies before they are introduced, then independently verifies dependency changes in pull-request CI.
 
 PkgDiet returns structured `ALLOW`, `WARN`, `BLOCK`, or `UNKNOWN` decisions based on repository policy and available package metadata. PkgDiet complements vulnerability scanning, lockfile integrity controls, code review, and broader software-supply-chain security practices; it does not replace them.
 

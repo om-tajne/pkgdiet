@@ -20,7 +20,6 @@
   <!-- AI & MCP Ecosystem -->
   <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/Powered_by-MCP-8a2be2.svg?style=flat-square" alt="Powered by MCP"></a>
   <a href="https://glama.ai/mcp/servers/om-tajne/pkgdiet"><img src="https://glama.ai/mcp/servers/om-tajne/pkgdiet/badge" alt="Glama MCP Server"></a>
-  <a href="https://smithery.ai/server/@pkgdiet/mcp"><img src="https://smithery.ai/badge/@pkgdiet/mcp" alt="Smithery MCP Server"></a>
   <a href="https://mcpservers.org/servers/om-tajne/pkgdiet"><img src="https://mcpservers.org/badge.svg" alt="Listed on mcpservers.org"></a>
 </p>
 <p align="left">
@@ -35,7 +34,7 @@
 
 ## 🔄 The 3-Phase Policy Loop
 
-PkgDiet guarantees that a dependency is evaluated identically at every stage of your development lifecycle using a shared core engine (`@pkgdiet/core`).
+PkgDiet uses a shared core engine (`@pkgdiet/core`) so supported interfaces apply the same evaluation logic.
 
 1. **Repository Policy:** A single `.pkgdietrc.json` file dictates what is allowed, warned, or blocked for your project.
 2. **Agent Guidance (MCP):** AI clients connect to PkgDiet via the Model Context Protocol (`npx pkgdiet mcp`). Before writing `npm install`, the agent asks PkgDiet if a package is compliant. If blocked, PkgDiet provides curated modern alternatives.
@@ -45,7 +44,7 @@ PkgDiet guarantees that a dependency is evaluated identically at every stage of 
 
 ## 🚀 Quick Start
 
-Requires Node.js 20 or later. For offline CI, set `PKGDIET_NO_NETWORK=1` to use only `.pkgdiet-cache.json`. Set `PKGDIET_TELEMETRY_DISABLED=1` to disable local usage metrics; `.pkgdiet-metrics.json` remains local to the repository.
+Requires Node.js 20 or later. For offline CI, set `PKGDIET_NO_NETWORK=1` to use only `.pkgdiet-cache.json`. Local usage metrics are disabled by default; set `"telemetry": true` in policy only when you want `.pkgdiet-metrics.json` in the repository. `PKGDIET_TELEMETRY_DISABLED=1` is an emergency override. See [legal, privacy, and product-use notice](LEGAL.md).
 
 Initialize PkgDiet in your repository. This interactive command creates your `.pkgdietrc.json` policy, sets up your GitHub Actions CI workflow, and configures your local AI agents (Cursor, Windsurf, Cline) all at once:
 

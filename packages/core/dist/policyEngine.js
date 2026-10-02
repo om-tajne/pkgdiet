@@ -14,7 +14,7 @@ export const DEFAULT_POLICY = {
     blockedPackages: [],
     allowedPackages: [],
     ignoreRules: [],
-    telemetry: true,
+    telemetry: false,
 };
 export function mergePolicies(layers) {
     let policy = { ...DEFAULT_POLICY, ...layers.defaults };

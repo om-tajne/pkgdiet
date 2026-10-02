@@ -19,6 +19,7 @@
     "node": ">=20.0.0"
   },
   "description": "A local-first dependency gate and MCP server for checking npm package health and alternatives.",
+  "license": "MIT",
   "keywords": [
     "mcp",
     "mcp-server",

@@ -55,7 +55,7 @@ export async function runSetupWizard() {
     internalNamePrefixes: [],
     environments: {},
     blockedPackages: [],
-    telemetry: true
+    telemetry: false
   };
 
   if (response.strictness === 'strict') {
@@ -96,7 +96,6 @@ export async function runSetupWizard() {
   console.log('\nNext steps:');
   console.log('  - Run `npx pkgdiet check <package>` to evaluate deps manually.');
   if (response.orgType === 'team') {
-    console.log('  - Install the PkgDiet GitHub App at: https://github.com/apps/pkgdiet');
   }
   console.log('');
 }

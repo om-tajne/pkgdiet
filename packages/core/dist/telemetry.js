@@ -8,9 +8,7 @@ function getMetricsPath(projectPath) {
 export function isTelemetryEnabled(policy) {
     if (process.env.PKGDIET_TELEMETRY_DISABLED === '1')
         return false;
-    if (policy && policy.telemetry === false)
-        return false;
-    return true;
+    return policy?.telemetry === true;
 }
 export function showFirstRunNoticeIfNeeded(projectPath, policy) {
     if (!isTelemetryEnabled(policy))
@@ -18,8 +16,8 @@ export function showFirstRunNoticeIfNeeded(projectPath, policy) {
     const metricsPath = getMetricsPath(projectPath);
     if (!existsSync(metricsPath) && !hasShownFirstRunNotice) {
         if (process.env.PKGDIET_MCP_MODE !== '1') {
-            console.error('\n[PkgDiet] Notice: PkgDiet collects anonymous local usage metrics to show you this tool\'s impact.');
-            console.error('          Disable this by setting PKGDIET_TELEMETRY_DISABLED=1 or "telemetry": false in your config.\n');
+            console.error('\n[PkgDiet] Local usage metrics are enabled by this repository policy.');
+            console.error('          Disable them with PKGDIET_TELEMETRY_DISABLED=1 or "telemetry": false.\n');
         }
         hasShownFirstRunNotice = true;
         // Initialize the file

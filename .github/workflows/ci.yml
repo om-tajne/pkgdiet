@@ -33,6 +33,9 @@ permissions:
 jobs:
   build-and-test:
     name: Build & Test (Node ${{ matrix.node-version }})
+    # Standard GitHub-hosted runners are free for public repositories. Keep
+    # private forks from creating billable hosted-runner usage by default.
+    if: github.event.repository.private == false
     runs-on: ubuntu-latest
 
     strategy:
@@ -75,11 +78,13 @@ jobs:
       - name: CLI smoke test — check valid package (deterministic offline fixture)
         # Runs against a zero-dep fixture; does NOT hit live registry in this step.
         # Live registry smoke tests run as a separate optional workflow.
+        env:
+          PKGDIET_NO_NETWORK: '1'
         run: |
           node packages/cli/dist/cli.js check react --json 2>/dev/null | \
             node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); \
                      if(!d.verdict) { console.error('No verdict field'); process.exit(1); } \
-                     console.log('Verdict:', d.verdict);" || true
+                     console.log('Verdict:', d.verdict);"
 
       - name: Documentation drift check
         # Fails if a README is missing, forbidden claims are found,

@@ -24,7 +24,7 @@ export const DEFAULT_POLICY = {
   environments: {},               // Record<string, Partial<Policy>>
   policyVersion: 1,
 
-  telemetry: true,
+  telemetry: false,
 };
 
 /**

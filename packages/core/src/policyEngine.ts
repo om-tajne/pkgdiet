@@ -49,7 +49,7 @@ export const DEFAULT_POLICY: Policy = {
   blockedPackages: [],
   allowedPackages: [],
   ignoreRules: [],
-  telemetry: true,
+  telemetry: false,
 };
 
 export function mergePolicies(layers: PolicyLayer): Policy {

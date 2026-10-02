@@ -91,8 +91,8 @@ fs.writeFileSync('packages/cli/package.json', JSON.stringify({
   files: ["dist"],
   scripts: { "build": "tsc -b" },
   dependencies: {
-    "@pkgdiet/core": "^2.0.1",
-    "@pkgdiet/mcp": "^2.0.1",
+    "@pkgdiet/core": "2.0.1",
+    "@pkgdiet/mcp": "2.0.1",
     "commander": "^13.1.0",
     "chalk": "^5.4.1",
     "ora": "^8.2.0"
@@ -123,7 +123,7 @@ fs.writeFileSync('packages/mcp/package.json', JSON.stringify({
   files: ["dist"],
   scripts: { "build": "tsc -b" },
   dependencies: {
-    "@pkgdiet/core": "^2.0.1",
+    "@pkgdiet/core": "2.0.1",
     "@modelcontextprotocol/sdk": "^1.0.1",
     "zod": "^3.24.0"
   }

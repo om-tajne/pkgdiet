@@ -15,6 +15,6 @@
     }
   },
   "blockedPackages": [],
-  "telemetry": true,
+  "telemetry": false,
   "policyVersion": 1
 }
