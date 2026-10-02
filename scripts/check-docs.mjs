@@ -437,7 +437,53 @@ if (archMd.includes('Experimental') && archMd.includes('No fixture tests')) {
   pass('docs/architecture.md accurately describes experimental status of lockfile parsers without fixtures');
 } else {
   fail('docs/architecture.md must clarify lockfile parsers without fixtures as experimental');
-}// ── Summary ───────────────────────────────────────────────────────────────
+}
+
+// ── 22. 2.0.1 release metadata and MCP Registry identity ──────────────────
+
+const RELEASE_VERSION = '2.0.1';
+const MCP_SERVER_NAME = 'io.github.om-tajne/pkgdiet';
+const publishedManifests = [
+  ['packages/core/package.json', '@pkgdiet/core'],
+  ['packages/mcp/package.json', '@pkgdiet/mcp'],
+  ['packages/cli/package.json', 'pkgdiet'],
+];
+
+for (const [rel, expectedName] of publishedManifests) {
+  const content = readFile(rel);
+  if (!content) {
+    fail(`${rel} is missing`);
+    continue;
+  }
+  const manifest = JSON.parse(content);
+  if (manifest.name !== expectedName) fail(`${rel}: expected package name ${expectedName}`);
+  if (manifest.version !== RELEASE_VERSION) fail(`${rel}: expected version ${RELEASE_VERSION}, found ${manifest.version}`);
+  else pass(`${rel}: ${expectedName}@${RELEASE_VERSION}`);
+}
+
+const registryManifestText = readFile('server.json');
+if (!registryManifestText) {
+  fail('server.json is missing');
+} else {
+  const registryManifest = JSON.parse(registryManifestText);
+  const pkg = registryManifest.packages?.[0];
+  if (registryManifest.name !== MCP_SERVER_NAME) fail(`server.json: expected server name ${MCP_SERVER_NAME}`);
+  if (registryManifest.version !== RELEASE_VERSION) fail(`server.json: expected version ${RELEASE_VERSION}`);
+  if (pkg?.identifier !== 'pkgdiet' || pkg?.version !== RELEASE_VERSION || pkg?.transport?.type !== 'stdio') {
+    fail('server.json: must declare the pkgdiet@2.0.1 stdio launcher');
+  } else {
+    pass(`server.json: ${MCP_SERVER_NAME} → pkgdiet@${RELEASE_VERSION} (stdio)`);
+  }
+}
+
+const allDocs = fs.readdirSync(path.join(ROOT, 'docs'), { recursive: true })
+  .filter(f => typeof f === 'string' && f.endsWith('.md'))
+  .map(f => path.join('docs', f));
+const staleMcpPackage = allDocs.find(rel => (readFile(rel) || '').includes('@pkgdiet/mcp-server'));
+if (staleMcpPackage) fail(`${staleMcpPackage}: references nonexistent @pkgdiet/mcp-server package`);
+else pass('Documentation contains no nonexistent @pkgdiet/mcp-server install command');
+
+// ── Summary ───────────────────────────────────────────────────────────────
 
 console.log('');
 console.log(`Documentation check complete: ${errors} error(s), ${warnings} warning(s)`);

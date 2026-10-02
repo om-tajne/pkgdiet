@@ -8,14 +8,14 @@ PkgDiet integrates directly with Crush (by charmbracelet) to prevent its termina
     Ensure the PkgDiet server is running in the background.
 
     \\\ash
-    npx @pkgdiet/mcp-server
+    npx -y pkgdiet@2.0.1 mcp
     \\\
 
 2.  **Add the MCP Server to Crush**:
     You can add the PkgDiet MCP server to Crush using the crushrc configuration file. Run the following command in your terminal or add it to ~/.config/crush/crushrc:
 
     \\\ash
-    mcp add pkgdiet --command npx --args -y @pkgdiet/mcp-server
+    mcp add pkgdiet --command npx --args -y pkgdiet@2.0.1 mcp
     \\\
 
 3.  **Activate the Guardrail Skill**:

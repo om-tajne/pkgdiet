@@ -8,7 +8,7 @@ PkgDiet integrates directly with Qwen Code to prevent it from auto-installing de
     Ensure the PkgDiet server is running in the background.
 
     \\\ash
-    npx @pkgdiet/mcp-server
+    npx -y pkgdiet@2.0.1 mcp
     \\\
 
 2.  **Add the MCP Server to Qwen Code**:
@@ -19,7 +19,7 @@ PkgDiet integrates directly with Qwen Code to prevent it from auto-installing de
       "mcpServers": {
         "pkgdiet": {
           "command": "npx",
-          "args": ["-y", "@pkgdiet/mcp-server"]
+          "args": ["-y", "pkgdiet@2.0.1", "mcp"]
         }
       }
     }

@@ -8,7 +8,7 @@ PkgDiet integrates directly with the Pi Agent Harness (from earendil-works) to p
     Ensure the PkgDiet server is running in the background.
 
     \\\ash
-    npx @pkgdiet/mcp-server
+    npx -y pkgdiet@2.0.1 mcp
     \\\
 
 2.  **Add the MCP Server to Pi**:
@@ -19,7 +19,7 @@ PkgDiet integrates directly with the Pi Agent Harness (from earendil-works) to p
       "mcpServers": {
         "pkgdiet": {
           "command": "npx",
-          "args": ["-y", "@pkgdiet/mcp-server"]
+          "args": ["-y", "pkgdiet@2.0.1", "mcp"]
         }
       }
     }

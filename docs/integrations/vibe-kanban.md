@@ -8,7 +8,7 @@ PkgDiet integrates with Vibe Kanban to enforce dependency guardrails across all 
     Ensure the PkgDiet server is running in the background or remotely.
 
     \\\ash
-    npx @pkgdiet/mcp-server
+    npx -y pkgdiet@2.0.1 mcp
     \\\
 
 2.  **Add the MCP Server to the Agent Configurations**:
