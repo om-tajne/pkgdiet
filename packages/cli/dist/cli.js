@@ -143,7 +143,9 @@ program
                 const altNames = (r.alternatives || [])
                     .map(a => typeof a === 'string' ? a : (a.replacement || a.name))
                     .filter(Boolean).slice(0, 2).join(', ');
-                const note = altNames ? `→ ${altNames}` : (r.reasons[0] || '');
+                const firstReason = r.reasons[0];
+                const reasonText = firstReason ? (typeof firstReason === 'string' ? firstReason : firstReason.message || '') : '';
+                const note = altNames ? `→ ${altNames}` : reasonText;
                 console.log(`  ${icon} ${col(r.name + cert, 26)} ${col(r.healthScore !== null ? r.healthScore + '/100' : 'N/A', 8)} ${col(r.verdict, 10)} ${chalk.gray(note.slice(0, 48))}`);
             }
             console.log('');
