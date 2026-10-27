@@ -218,3 +218,33 @@ test('applyEnvironment — environment-specific blockedPackages replace base whe
   const result = applyEnvironment(policy, 'ci');
   assert.deepEqual(result.blockedPackages, ['ci-blocked']);
 });
+
+test('allowedPackages — supports object format with reason and active expiry', () => {
+  const policy = {
+    ...DEFAULT_POLICY,
+    allowedPackages: [
+      { package: 'legacy-pkg', reason: 'migration in progress', expiresAt: '2099-01-01' }
+    ]
+  };
+  const res = evaluatePolicy('legacy-pkg', { score: 10, flags: [] }, null, policy);
+  assert.equal(res.verdict, 'ALLOW');
+  assert.equal(res.ignored, true);
+  assert.ok(res.reasons[0].message.includes('migration in progress'));
+});
+
+test('allowedPackages — expired entry no longer allows low health package', () => {
+  const policy = {
+    ...DEFAULT_POLICY,
+    blockOnLowHealth: true,
+    minHealthScore: 60,
+    allowedPackages: [
+      { package: 'expired-pkg', reason: 'temporary exception', expiresAt: '2020-01-01' }
+    ]
+  };
+  const validation = validatePolicy(policy);
+  assert.ok(validation.warnings.some(w => w.includes('expired on 2020-01-01')));
+
+  const res = evaluatePolicy('expired-pkg', { score: 10, flags: [] }, null, policy);
+  assert.equal(res.verdict, 'BLOCK');
+  assert.ok(res.reasons.some(r => r.code === 'ALLOW_EXCEPTION_EXPIRED'));
+});

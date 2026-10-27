@@ -10,6 +10,7 @@
 
 import { readFileSync, writeFileSync, existsSync, renameSync, unlinkSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
+import { createHash } from 'crypto';
 
 const CACHE_FILE = '.pkgdiet-cache.json';
 const CACHE_MAX_ENTRIES = 5000;
@@ -18,6 +19,31 @@ const CACHE_EVICT_COUNT = 500; // evict this many oldest entries when limit hit
 // Sprint 7: configurable TTL via env var
 const CACHE_TTL_HOURS = Number(process.env.PKGDIET_CACHE_TTL_HOURS || '24');
 const CACHE_TTL_MS = CACHE_TTL_HOURS * 60 * 60 * 1000;
+
+function getRegistryUrl() {
+  return (process.env.PKGDIET_REGISTRY_URL || 'https://registry.npmjs.org').replace(/\/$/, '');
+}
+
+function getPolicyVersion(projectPath) {
+  try {
+    const policyPath = join(projectPath, '.pkgdietrc.json');
+    if (existsSync(policyPath)) {
+      const p = JSON.parse(readFileSync(policyPath, 'utf8'));
+      return String(p.policyVersion || 1);
+    }
+  } catch {}
+  return '1';
+}
+
+function computeChecksum(data, registryUrl, policyVersion = '1') {
+  try {
+    return createHash('sha256')
+      .update(JSON.stringify(data) + '|' + registryUrl + '|' + policyVersion)
+      .digest('hex');
+  } catch {
+    return null;
+  }
+}
 
 // ── Temp-file naming ──────────────────────────────────────────────────────────
 
@@ -139,6 +165,24 @@ export function getCached(projectPath, packageName, key) {
     return null; // expired
   }
 
+  // Registry and policy binding check
+  const currentRegistry = getRegistryUrl();
+  const currentPolicyVersion = getPolicyVersion(projectPath);
+  if (entry.registryUrl && entry.registryUrl !== currentRegistry) {
+    return null; // registry changed, treat as expired
+  }
+  if (entry.policyVersion && entry.policyVersion !== currentPolicyVersion) {
+    return null; // policy version changed, treat as expired
+  }
+
+  // Tamper-resistance check
+  if (entry.checksum) {
+    const expected = computeChecksum(entry[key], entry.registryUrl || currentRegistry, entry.policyVersion || currentPolicyVersion);
+    if (expected && entry.checksum !== expected) {
+      return null; // tampered with out of band
+    }
+  }
+
   return entry[key];
 }
 
@@ -147,11 +191,18 @@ export function getCached(projectPath, packageName, key) {
  */
 export function setCached(projectPath, packageName, key, data) {
   let cache = loadCache(projectPath);
+  const currentRegistry = getRegistryUrl();
+  const currentPolicyVersion = getPolicyVersion(projectPath);
+  const checksum = computeChecksum(data, currentRegistry, currentPolicyVersion);
+
   if (!cache.entries[packageName]) {
     cache.entries[packageName] = { fetchedAt: new Date().toISOString() };
   }
   cache.entries[packageName][key] = data;
   cache.entries[packageName].fetchedAt = new Date().toISOString();
+  cache.entries[packageName].registryUrl = currentRegistry;
+  cache.entries[packageName].policyVersion = currentPolicyVersion;
+  cache.entries[packageName].checksum = checksum;
   cache = evictOldest(cache);
   saveCache(projectPath, cache);
 }
@@ -161,12 +212,19 @@ export function setCached(projectPath, packageName, key, data) {
  */
 export function batchSetCached(projectPath, entries) {
   let cache = loadCache(projectPath);
+  const currentRegistry = getRegistryUrl();
+  const currentPolicyVersion = getPolicyVersion(projectPath);
+
   for (const { packageName, key, data } of entries) {
+    const checksum = computeChecksum(data, currentRegistry, currentPolicyVersion);
     if (!cache.entries[packageName]) {
       cache.entries[packageName] = { fetchedAt: new Date().toISOString() };
     }
     cache.entries[packageName][key] = data;
     cache.entries[packageName].fetchedAt = new Date().toISOString();
+    cache.entries[packageName].registryUrl = currentRegistry;
+    cache.entries[packageName].policyVersion = currentPolicyVersion;
+    cache.entries[packageName].checksum = checksum;
   }
   cache = evictOldest(cache);
   saveCache(projectPath, cache);

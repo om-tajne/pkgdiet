@@ -107,7 +107,7 @@ export function validatePolicy(policy) {
     }
     // Contradictory rules: same package in blocked AND allowed
     const blocked = new Set(policy.blockedPackages || []);
-    const allowed = new Set(policy.allowedPackages || []);
+    const allowed = new Set((policy.allowedPackages || []).map(p => typeof p === 'string' ? p : p?.package).filter(Boolean));
     for (const pkg of blocked) {
         if (allowed.has(pkg)) {
             errors.push(`Package '${pkg}' is in both \`blockedPackages\` and \`allowedPackages\`. ` +
@@ -115,6 +115,15 @@ export function validatePolicy(policy) {
         }
     }
     // ── Warnings ─────────────────────────────────────────────────────────────────
+    for (const item of policy.allowedPackages || []) {
+        const pkg = typeof item === 'string' ? item : item?.package;
+        if (item && typeof item === 'object' && item.expiresAt) {
+            const expiry = new Date(item.expiresAt).getTime();
+            if (!isNaN(expiry) && Date.now() > expiry) {
+                warnings.push(`\`allowedPackages\` entry for '${pkg}' expired on ${item.expiresAt}. It is no longer bypassing policy.`);
+            }
+        }
+    }
     if (typeof policy.minHealthScore === 'number' && policy.minHealthScore < 20) {
         warnings.push(`\`minHealthScore\` is ${policy.minHealthScore} (very lax). ` +
             'Packages with a score this low are often deprecated or unmaintained.');
@@ -149,6 +158,23 @@ function isIgnored(packageName, ignoreRules) {
         return false;
     });
 }
+function isPackageAllowed(packageName, allowedPackages) {
+    if (!allowedPackages || !Array.isArray(allowedPackages))
+        return { allowed: false };
+    for (const item of allowedPackages) {
+        const name = typeof item === 'string' ? item : item?.package;
+        if (name === packageName) {
+            if (item && typeof item === 'object' && item.expiresAt) {
+                const expiry = new Date(item.expiresAt).getTime();
+                if (!isNaN(expiry) && Date.now() > expiry) {
+                    return { allowed: false, expired: true, expiresAt: item.expiresAt, reason: item.reason };
+                }
+            }
+            return { allowed: true, reason: typeof item === 'object' ? item.reason : null };
+        }
+    }
+    return { allowed: false };
+}
 /**
  * Evaluate a package against policy.
  * @returns {{ verdict: 'ALLOW'|'WARN'|'BLOCK', reasons: string[], ignored: boolean }}
@@ -160,8 +186,18 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
     if ((policy.blockedPackages || []).includes(packageName)) {
         return { verdict: 'BLOCK', reasons: [{ code: 'PACKAGE_BLOCKED', message: 'Package is explicitly blocked in policy.' }], ignored: false };
     }
-    if ((policy.allowedPackages || []).includes(packageName)) {
-        return { verdict: 'ALLOW', reasons: [{ code: 'PACKAGE_ALLOWED', message: 'Package is explicitly allowed in policy.' }], ignored: true };
+    const allowCheck = isPackageAllowed(packageName, policy.allowedPackages);
+    if (allowCheck.allowed) {
+        const msg = allowCheck.reason
+            ? `Package is explicitly allowed in policy (${allowCheck.reason}).`
+            : 'Package is explicitly allowed in policy.';
+        return { verdict: 'ALLOW', reasons: [{ code: 'PACKAGE_ALLOWED', message: msg }], ignored: true };
+    }
+    else if (allowCheck.expired) {
+        reasons.push({
+            code: 'ALLOW_EXCEPTION_EXPIRED',
+            message: `Policy allow exception for '${packageName}' expired on ${allowCheck.expiresAt}. Evaluated normally.`
+        });
     }
     // 2. Ignore rules
     const ignored = isIgnored(packageName, policy.ignoreRules);

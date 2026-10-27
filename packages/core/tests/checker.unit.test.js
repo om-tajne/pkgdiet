@@ -166,3 +166,18 @@ test('partitionPackageNames — all invalid', () => {
   assert.deepEqual(valid, []);
   assert.equal(invalid.length, 5);
 });
+
+test('findTyposquatCandidates — detects expanded corpus and semantic typosquats', async () => {
+  const { findTyposquatCandidates } = await import('../src/security.js');
+  // Hyphen removal: 'reactdom' -> 'react-dom'
+  const c1 = findTyposquatCandidates('reactdom');
+  assert.ok(c1.includes('react-dom'), `expected react-dom in ${c1}`);
+
+  // Edit distance 1 against newly added corpus entry: 'fastefy' -> 'fastify'
+  const c2 = findTyposquatCandidates('fastefy');
+  assert.ok(c2.includes('fastify'), `expected fastify in ${c2}`);
+
+  // Pluralization: 'cross-envs' -> 'cross-env'
+  const c3 = findTyposquatCandidates('cross-envs');
+  assert.ok(c3.includes('cross-env'), `expected cross-env in ${c3}`);
+});

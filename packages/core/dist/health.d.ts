@@ -5,7 +5,7 @@
 /**
  * Fetch health data for a single package from npm registry.
  */
-export declare function fetchPackageHealth(packageName: any, projectPath: any, useCache: any): Promise<any>;
+export declare function fetchPackageHealth(packageName: any, projectPath: any, useCache: any, targetVersion?: any): Promise<any>;
 /**
  * Analyze health of all specified packages.
  * Automatically splits into batches of BATCH_LIMIT to avoid heap pressure.

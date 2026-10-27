@@ -51,3 +51,6 @@ apps/*/prisma/generated/
 .DS_Store
 Thumbs.db
 *.swp
+
+# Test artifacts
+packages/core/tests/fixtures/e2e-temp-repo/

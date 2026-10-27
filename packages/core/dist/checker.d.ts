@@ -30,6 +30,30 @@ export declare function checkPackage(packageSpec: any, projectPath?: string, opt
         addedSizeMB: number;
     };
     alternatives: any[];
+    flags: any[];
+    efficiencyFlag: boolean;
+    hasProvenance: boolean;
+    integrityCheck: string;
+    evidence: any;
+    certified: boolean;
+    version?: undefined;
+    targetVersion?: undefined;
+    scoreExplanation?: undefined;
+} | {
+    name: any;
+    version: any;
+    targetVersion: any;
+    verdict: "ALLOW" | "BLOCK" | "WARN";
+    reasons: string[];
+    healthScore: any;
+    scoreExplanation: any;
+    costEstimate: {
+        ciInstallTimeSeconds: number;
+        monthlyCiCost100Builds: number;
+        serverlessColdStartClass: string;
+        addedSizeMB: number;
+    };
+    alternatives: any[];
     flags: any;
     efficiencyFlag: boolean;
     hasProvenance: boolean;

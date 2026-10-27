@@ -52,6 +52,12 @@ Evaluate a single npm package against the active project policy.
 | `reasons` | Array of strings explaining the verdict |
 | `recommendation.action` | `"proceed"` \| `"review"` \| `"replace"` \| `"block"` |
 | `recommendation.primaryAlternative` | Top curated alternative name, or `null` |
+| `remediation.action` | `"proceed"` \| `"review"` \| `"replace"` \| `"block"` |
+| `remediation.replacement` | Primary alternative package name or `null` |
+| `remediation.command` | Actionable shell command (e.g. `npm uninstall moment && npm install dayjs`) |
+| `remediation.rationale` | Primary policy rationale string |
+| `remediation.evidenceUrls` | Array of direct URLs to OSV vulnerability records |
+| `scoreExplanation` | Itemized breakdown of component health scores and bands |
 | `alternatives` | Array of curated replacement names |
 | `addedSizeBytes` | Estimated unpacked size in bytes (scenario-based estimate) |
 | `costImpactPerMonthUsd` | Estimated CI cost impact in USD (scenario-based estimate) |
@@ -138,6 +144,19 @@ Return the effective policy and its validation result.
 | Name | Type | Required | Description |
 |---|---|---|---|
 | `environment` | string | No | Policy environment to read. Default: `"dev"` |
+
+---
+
+### `explain_verdict`
+
+Retrieve an in-depth explanation of a package verdict, including detailed component health scores, matched policy rules, OSV vulnerability URLs, and evidence justification. Use this tool when an agent or developer needs to explain why a package was WARNED or BLOCKED without hallucinating.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `packageName` | string | Yes | Exact npm package name (e.g. `moment`, `request`, `lodash`) |
+| `environment` | string | No | Policy environment. Default: `"dev"` |
 
 ---
 

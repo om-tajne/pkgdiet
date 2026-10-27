@@ -108,6 +108,19 @@ export function createMcpServer() {
                     action = "block";
                 else if (result.verdict === "WARN")
                     action = primaryAlternative ? "replace" : "review";
+                const remediation = {
+                    action,
+                    replacement: primaryAlternative,
+                    command: primaryAlternative
+                        ? `npm uninstall ${result.name} && npm install ${primaryAlternative}`
+                        : result.verdict === "BLOCK"
+                            ? null
+                            : `npm install ${result.name}`,
+                    rationale: (result.reasons || [])[0]
+                        ? (typeof result.reasons[0] === "string" ? result.reasons[0] : result.reasons[0].message)
+                        : "Package meets repository dependency policy.",
+                    evidenceUrls: (result.evidence?.vulnerabilityIds || []).map((id) => `https://osv.dev/vulnerability/${id}`),
+                };
                 return {
                     content: [{
                             type: "text",
@@ -118,6 +131,7 @@ export function createMcpServer() {
                                 // Do not fabricate a perfect score when the registry could
                                 // not be verified; null lets clients distinguish uncertainty.
                                 healthScore: result.healthScore,
+                                scoreExplanation: result.scoreExplanation || null,
                                 // MCP's public contract is an array of human-readable strings.
                                 // Keep the policy engine's richer objects internal to core.
                                 reasons: (result.reasons || []).map((reason) => typeof reason === "string" ? reason : reason.message),
@@ -126,6 +140,7 @@ export function createMcpServer() {
                                 // additive so existing MCP clients retain their contract.
                                 reasonDetails: result.reasons || [],
                                 recommendation: { action, primaryAlternative },
+                                remediation,
                                 security: {
                                     registryVerified: !(result.reasons || []).some((reason) => (typeof reason === "string" ? reason : reason.code) === "REGISTRY_UNAVAILABLE" ||
                                         (typeof reason === "string" ? reason : reason.code) === "REGISTRY_UNAVAILABLE_BLOCKED"),
@@ -326,6 +341,69 @@ export function createMcpServer() {
                 return {
                     isError: true,
                     content: [{ type: "text", text: JSON.stringify({ code: "POLICY_FAILED", message: err instanceof Error ? err.message : String(err) }, null, 2) }],
+                };
+            }
+        })());
+    });
+    // ── explain_verdict ──────────────────────────────────────────────────────────
+    server.tool("explain_verdict", "Retrieve an in-depth explanation of a package verdict, including detailed component health scores, matched policy rules, OSV vulnerability URLs, and evidence justification. Use this tool when an agent or developer needs to explain why a package was WARNED or BLOCKED without hallucinating.", {
+        packageName: z.string().min(1).max(214)
+            .describe("The npm package name to explain (e.g. 'moment', 'request', 'lodash')."),
+        environment: z.enum(["dev", "prod", "ci", "test"]).default("dev")
+            .describe("The target environment to evaluate policy for. Defaults to 'dev'."),
+    }, async (args) => {
+        if (!checkRateLimit())
+            return RATE_EXCEEDED_RESPONSE;
+        return withToolTimeout((async () => {
+            let validatedName;
+            try {
+                validatedName = assertPackageName(args.packageName);
+            }
+            catch (err) {
+                return {
+                    isError: true,
+                    content: [{ type: "text", text: JSON.stringify({ code: "INVALID_INPUT", message: err instanceof Error ? err.message : String(err) }) }],
+                };
+            }
+            try {
+                let policy = loadPolicy(process.cwd());
+                const env = args.environment || "dev";
+                if (args.environment)
+                    policy = applyEnvironment(policy, args.environment);
+                const result = await checkPackage(validatedName, process.cwd(), { policy });
+                return {
+                    content: [{
+                            type: "text",
+                            text: JSON.stringify({
+                                packageName: result.name,
+                                verdict: result.verdict,
+                                healthScore: result.healthScore,
+                                scoreExplanation: result.scoreExplanation || null,
+                                ruleMatches: result.reasons || [],
+                                appliedPolicy: {
+                                    environment: env,
+                                    minHealthScore: policy.minHealthScore,
+                                    warnHealthScore: policy.warnHealthScore,
+                                    securityMode: policy.securityMode,
+                                    failOn: policy.failOn,
+                                    blockDeprecated: policy.blockDeprecated,
+                                },
+                                securityEvidence: {
+                                    hasProvenance: result.hasProvenance || false,
+                                    integrityCheck: result.integrityCheck || "missing",
+                                    vulnerabilityIds: result.evidence?.vulnerabilityIds || [],
+                                    evidenceUrls: (result.evidence?.vulnerabilityIds || []).map((id) => `https://osv.dev/vulnerability/${id}`),
+                                    typosquatCandidates: result.evidence?.typosquatCandidates || [],
+                                },
+                                alternatives: (result.alternatives || []).map((alt) => typeof alt === "string" ? alt : (alt.replacement || alt.name)),
+                            }, null, 2),
+                        }],
+                };
+            }
+            catch (err) {
+                return {
+                    isError: true,
+                    content: [{ type: "text", text: JSON.stringify({ code: "EXPLAIN_FAILED", message: err instanceof Error ? err.message : String(err) }, null, 2) }],
                 };
             }
         })());

@@ -128,10 +128,11 @@ async function withConcurrency(tasks, limit) {
 /**
  * Fetch health data for a single package from npm registry.
  */
-export async function fetchPackageHealth(packageName, projectPath, useCache) {
-    // Check cache first
+export async function fetchPackageHealth(packageName, projectPath, useCache, targetVersion = null) {
+    // Check cache first (scoped by version if specific version requested)
+    const cacheKey = targetVersion ? `health:${targetVersion}` : 'health';
     if (useCache) {
-        const cached = getCached(projectPath, packageName, 'health');
+        const cached = getCached(projectPath, packageName, cacheKey) || (targetVersion ? null : getCached(projectPath, packageName, 'health'));
         if (cached) {
             return { ...cached, fromCache: true };
         }
@@ -183,21 +184,31 @@ export async function fetchPackageHealth(packageName, projectPath, useCache) {
     const lastPublish = registryData.time?.modified || null;
     const maintainers = registryData.maintainers || [];
     const latestVersion = registryData['dist-tags']?.latest;
-    const latestMeta = latestVersion ? registryData.versions?.[latestVersion] : null;
+    const resolvedVersion = (targetVersion && registryData.versions?.[targetVersion])
+        ? targetVersion
+        : latestVersion;
+    const versionMeta = resolvedVersion ? registryData.versions?.[resolvedVersion] : (latestVersion ? registryData.versions?.[latestVersion] : null);
     const monthlyDownloads = downloadsResult.data?.downloads || 0;
-    const deprecated = registryData.versions?.[latestVersion]?.deprecated || null;
-    const advisoryResult = await fetchOsvAdvisories(packageName, latestVersion);
+    const deprecated = versionMeta?.deprecated || null;
+    const advisoryResult = await fetchOsvAdvisories(packageName, resolvedVersion);
     const typosquatCandidates = findTyposquatCandidates(packageName);
-    // Install scripts
+    // Install scripts — all hooks that execute arbitrary code during install lifecycle.
+    // Includes preinstall (runs before install), install, postinstall, prepare (runs on
+    // npm install for local packages), prepack, and preuninstall/postuninstall (run on remove).
+    // OSV advisories confirm real-world exfiltration via preinstall and postinstall hooks.
     const installScripts = [];
-    if (latestMeta?.scripts) {
-        for (const scriptName of ['preinstall', 'install', 'postinstall']) {
-            if (latestMeta.scripts[scriptName])
+    if (versionMeta?.scripts) {
+        for (const scriptName of [
+            'preinstall', 'install', 'postinstall',
+            'prepare', 'prepack', 'postpack',
+            'preuninstall', 'postuninstall',
+        ]) {
+            if (versionMeta.scripts[scriptName])
                 installScripts.push(scriptName);
         }
     }
     // TypeScript types
-    let hasTypes = !!(latestMeta?.types || latestMeta?.typings);
+    let hasTypes = !!(versionMeta?.types || versionMeta?.typings);
     let hasExternalTypes = false;
     if (!hasTypes && !packageName.startsWith('@types/')) {
         const typesName = `@types/${packageName.replace('@', '').replace('/', '__')}`;
@@ -280,12 +291,64 @@ export async function fetchPackageHealth(packageName, projectPath, useCache) {
     if (typosquatCandidates.length > 0) {
         flags.push({ type: 'warning', label: `Name resembles ${typosquatCandidates.join(', ')}` });
     }
-    const unpackedSize = latestMeta?.dist?.unpackedSize || 0;
-    const dependencyCount = Object.keys(latestMeta?.dependencies || {}).length;
+    const unpackedSize = versionMeta?.dist?.unpackedSize || latestMeta?.dist?.unpackedSize || 0;
+    const dependencyCount = Object.keys(versionMeta?.dependencies || latestMeta?.dependencies || {}).length;
+    // ── Score explanation ──────────────────────────────────────────────────────
+    // Human-readable breakdown so agents and UIs can justify a decision without
+    // re-running the evaluation. Each component describes what was measured and
+    // the band it fell into.
+    const scoreExplanation = {
+        components: [
+            {
+                name: 'lastPublish',
+                weight: 0.35,
+                rawValue: scores.lastPublish,
+                contribution: Math.round(scores.lastPublish * 0.35),
+                summary: lastPublish
+                    ? (() => { const { months } = timeSince(lastPublish); return months < 6 ? 'Published within 6 months (active)' : months < 12 ? 'Published within 12 months' : months < 24 ? 'Not published in 12–24 months' : 'Not published in 2+ years (stale)'; })()
+                    : 'No publish date available',
+            },
+            {
+                name: 'downloads',
+                weight: 0.25,
+                rawValue: scores.downloads,
+                contribution: Math.round(scores.downloads * 0.25),
+                summary: monthlyDownloads > 1_000_000 ? 'Very high adoption (>1M/month)' :
+                    monthlyDownloads > 100_000 ? 'High adoption (>100K/month)' :
+                        monthlyDownloads > 10_000 ? 'Moderate adoption (>10K/month)' :
+                            monthlyDownloads > 1_000 ? 'Low adoption (>1K/month)' :
+                                'Very low adoption (<1K/month)',
+            },
+            {
+                name: 'maintainers',
+                weight: 0.20,
+                rawValue: scores.maintainers,
+                contribution: Math.round(scores.maintainers * 0.20),
+                summary: maintainers.length > 3 ? `Well-maintained (${maintainers.length} maintainers)` :
+                    maintainers.length >= 2 ? `Jointly maintained (${maintainers.length} maintainers)` :
+                        maintainers.length === 1 ? 'Single-maintainer risk' :
+                            'No maintainers listed',
+            },
+            {
+                name: 'types',
+                weight: 0.20,
+                rawValue: scores.types,
+                contribution: Math.round(scores.types * 0.20),
+                summary: hasTypes ? 'Bundled TypeScript types' :
+                    hasExternalTypes ? '@types/* package available' :
+                        'No TypeScript types found',
+            },
+        ],
+        deprecatedCap: !!deprecated,
+        finalScore: totalScore,
+    };
     const result = {
         name: packageName,
+        version: resolvedVersion || null,
+        targetVersion: targetVersion || null,
         score: totalScore,
         scores,
+        scoreExplanation,
         flags,
         deprecated: !!deprecated,
         lastPublish: lastPublish ? timeSince(lastPublish).text : 'unknown',
@@ -296,8 +359,8 @@ export async function fetchPackageHealth(packageName, projectPath, useCache) {
         installScripts,
         unpackedSize,
         dependencyCount,
-        hasProvenance: Boolean(latestMeta?.dist?.attestations?.provenance || latestMeta?.dist?.provenance || latestMeta?.publishConfig?.provenance),
-        integrityCheck: latestMeta?.dist?.integrity ? 'present' : 'missing',
+        hasProvenance: Boolean(versionMeta?.dist?.attestations?.provenance || versionMeta?.dist?.provenance || versionMeta?.publishConfig?.provenance || latestMeta?.dist?.attestations?.provenance),
+        integrityCheck: (versionMeta?.dist?.integrity || latestMeta?.dist?.integrity) ? 'present' : 'missing',
         advisoryStatus: advisoryResult.status,
         vulnerabilityIds: advisoryResult.vulnerabilities.map(item => item.id).filter(Boolean),
         typosquatCandidates,
