@@ -33,5 +33,3 @@ You are a secure coding assistant. Before suggesting new `npm` packages or gener
 ## How it works
 
 When you ask Copilot Chat to "add a library to make HTTP requests and parse dates", Copilot will seamlessly connect to the PkgDiet server locally. It will evaluate the health of its initial ideas, discover that `moment` is deprecated, and suggest `date-fns` and native `fetch` to you instead—keeping your codebase incredibly lean and secure!
-
-See `examples/github-copilot/` for a complete workspace configuration.

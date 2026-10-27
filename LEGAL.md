@@ -8,8 +8,8 @@ compliance, financial, or procurement advice.
 ## Product boundary
 
 The supported 2.0.1 release surface is `pkgdiet`, `@pkgdiet/core`, and
-`@pkgdiet/mcp`. The Dashboard, GitHub App, AWS adapter, and AI-tool packages
-are experimental prototypes and are not supported production services.
+`@pkgdiet/mcp`. The GitHub App and AI-tool packages are experimental
+prototypes and are not supported production services.
 
 PkgDiet provides advisory results only. It does not guarantee that a package is
 safe, secure, lawful, compatible, free of vulnerabilities, or fit for a

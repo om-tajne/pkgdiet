@@ -29,7 +29,7 @@ function readFile(rel) {
 
 function tryHelp(args) {
   try {
-    return execSync(`node packages/cli/dist/cli.js ${args}`, {
+    return execSync(`node packages/cli/build/cli.js ${args}`, {
       cwd: ROOT, encoding: 'utf8', timeout: 10000,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -47,7 +47,7 @@ for (const pkg of PUBLISHABLE) {
 
 // ── 2. No pkgdiet@latest in security-sensitive source or dist ──────────────
 
-for (const f of ['packages/cli/src/agentSetup.js', 'packages/cli/dist/agentSetup.js']) {
+for (const f of ['packages/cli/src/agentSetup.js', 'packages/cli/build/agentSetup.js']) {
   const content = readFile(f);
   if (!content) { warn(`${f} not found — skipping`); continue; }
   content.includes('pkgdiet@latest')
@@ -70,7 +70,6 @@ const README_FILES = [
   'packages/core/README.md',
   'packages/mcp/README.md',
   'packages/cli/README.md',
-  'packages/vscode/README.md',
 ];
 
 for (const rel of README_FILES) {
@@ -112,15 +111,15 @@ for (const rel of DOC_FILES) {
 }
 pass('Windsurf MCP claim check complete');
 
-// ── 5. No Dashboard or GitHub App support claim ────────────────────────────
+// ── 5. No GitHub App support claim ─────────────────────────────────────────
 
-const EXPERIMENTAL_FORBIDDEN = /\b(dashboard|github.?app)\b.{0,40}\b(supported|released|production)/i;
+const EXPERIMENTAL_FORBIDDEN = /\bgithub.?app\b.{0,40}\b(supported|released|production)/i;
 
 for (const rel of README_FILES) {
   const content = readFile(rel);
   if (!content) continue;
   const match = content.match(EXPERIMENTAL_FORBIDDEN);
-  if (match) warn(`${rel}: may claim Dashboard/GitHub App as supported → "${match[0]}"`);
+  if (match) warn(`${rel}: may claim GitHub App as supported → "${match[0]}"`);
 }
 pass('Experimental app claim check complete');
 
@@ -220,7 +219,7 @@ pass('Canonical facts check complete');
 
 // ── 9. No dist files contain pkgdiet@latest ───────────────────────────────
 
-const DIST_DIRS = ['packages/cli/dist', 'packages/core/dist', 'packages/mcp/dist'];
+const DIST_DIRS = ['packages/cli/build', 'packages/core/dist', 'packages/mcp/dist'];
 for (const dir of DIST_DIRS) {
   const abs = path.join(ROOT, dir);
   if (!fs.existsSync(abs)) { warn(`${dir} not found — run build first`); continue; }
@@ -277,7 +276,6 @@ const rootReadme   = readFile('README.md') || '';
 const mcpReadme    = readFile('packages/mcp/README.md') || '';
 const cliReadme    = readFile('packages/cli/README.md') || '';
 const coreReadme   = readFile('packages/core/README.md') || '';
-const vscodeReadme = readFile('packages/vscode/README.md') || '';
 
 // No placeholder remains
 for (const [rel, content] of [['README.md', rootReadme], ['packages/mcp/README.md', mcpReadme]]) {
@@ -314,16 +312,7 @@ rootHasUrl && mcpHasUrl
   ? pass('Root README and MCP README use the same Glama listing URL')
   : warn('Root README and MCP README do not share Glama listing URL — verify consistency');
 
-// ── 14. VS Code does not claim Marketplace publication ─────────────────────
-// Only flag affirmative claims — "published to the Marketplace", "available on Marketplace".
-// The disclaimer "not yet published" must NOT be flagged.
-
-const marketplaceClaim = /(?<!not\s+(?:yet\s+)?)\bpublished\s+(?:to|on)\s+(?:the\s+)?(?:VS\s+Code\s+)?Marketplace/i;
-marketplaceClaim.test(vscodeReadme)
-  ? fail('packages/vscode/README.md: claims Marketplace publication — extension is internal beta')
-  : pass('packages/vscode/README.md: no Marketplace publication claim');
-
-// ── 15. npm badges use correct package names ───────────────────────────────
+// ── 14. npm badges use correct package names ───────────────────────────────
 
 const NPM_BADGE_CHECKS = [
   { file: 'README.md',                    content: rootReadme,   pkg: 'pkgdiet' },

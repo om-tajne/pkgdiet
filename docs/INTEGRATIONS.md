@@ -107,5 +107,4 @@ npx pkgdiet@2.0.1 agent-setup --agent claude-desktop
 | Integration | Status |
 |---|---|
 | GitHub App (webhook-based PR gate) | 🧪 Experimental |
-| Dashboard | 🧪 Experimental |
 | Docker deployment | 🧪 Experimental |

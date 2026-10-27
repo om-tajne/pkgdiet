@@ -51,7 +51,7 @@ _No changes yet._
 
 ### Changed
 - Improved ecosystem distribution, documentation accuracy, and integration examples.
-- Marked @pkgdiet/ai-tool and GitHub App/Dashboard as experimental and private.
+- Marked @pkgdiet/ai-tool and GitHub App as experimental and private.
 - Prepared Smithery and Glama registry metadata.
 - Pinned all documentation and templates to 2.0.1.
 
@@ -66,7 +66,7 @@ This release covers the supported npm packages:
 - `@pkgdiet/mcp@2.0.0`
 - `pkgdiet@2.0.0`
 
-The GitHub App, Dashboard, and Docker deployment are **experimental** and are not part of this release.
+The GitHub App and Docker deployment are **experimental** and are not part of this release.
 
 ---
 
@@ -122,7 +122,6 @@ The following fields in the `run()` result object have been renamed. Old names n
 - `docs/MCP.md` — tool parameters, response schemas, error codes, per-client setup.
 - `docs/CI.md` — GitHub Action, CLI options, exit codes.
 - `docs/ARCHITECTURE.md` — technical walkthrough.
-- `docs/VSCODE.md` — VS Code extension settings and limitations.
 - `docs/INTEGRATIONS.md` — tested client support matrix.
 - `CONTRIBUTING.md` — contributor setup and guidelines.
 - `SECURITY.md` — GitHub Security Advisories private reporting link.
@@ -146,7 +145,7 @@ The following fields in the `run()` result object have been renamed. Old names n
 
 ### Security
 
-- Package names are validated at every entrypoint (CLI, MCP, VS Code) before any network call.
+- Package names are validated at every supported entrypoint (CLI and MCP) before any network call.
 - SECURITY.md now uses GitHub private vulnerability reporting — no invented email address.
 - CI actions pinned to full commit SHAs.
 - Publishing uses OIDC Trusted Publishing — no long-lived `NPM_TOKEN` secret required.

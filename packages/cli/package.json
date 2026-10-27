@@ -4,11 +4,11 @@
   "mcpName": "io.github.om-tajne/pkgdiet",
   "type": "module",
   "bin": {
-    "pkgdiet": "dist/cli.js"
+    "pkgdiet": "build/cli.js"
   },
-  "main": "dist/cli.js",
+  "main": "build/cli.js",
   "files": [
-    "dist"
+    "build"
   ],
   "scripts": {
     "build": "tsc -b"

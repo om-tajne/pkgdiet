@@ -15,14 +15,10 @@ Supported (v2.0.1):
   pkgdiet         — CLI
   GitHub Action   — om-tajne/pkgdiet@v2
 
-Internal beta:
-  pkgdiet-vscode  — VS Code extension (not published to Marketplace)
-
 Experimental (not part of v2.0.1 release):
   @pkgdiet/ai-tool    — framework SDK adapters (LangChain, Vercel AI, OpenAI, Anthropic)
                         private: true — must not be published until stable API, docs, tests
   apps/github-app     — webhook handler (Node.js, Hono, Prisma)
-  apps/dashboard      — Next.js admin interface
   Docker deployment   — docker-compose.yml for experimental apps
 ```
 
@@ -45,16 +41,13 @@ pkgdiet/
 │   ├── INTEGRATIONS.md           ← agent support matrix
 │   ├── MCP.md                    ← MCP tools reference
 │   ├── POLICY.md                 ← .pkgdietrc.json schema
-│   └── VSCODE.md                 ← VS Code extension
 ├── packages/
 │   ├── core/                     ← @pkgdiet/core
 │   ├── mcp/                      ← @pkgdiet/mcp
 │   ├── cli/                      ← pkgdiet
-│   ├── vscode/                   ← pkgdiet-vscode (private)
 │   └── ai-tool/                  ← @pkgdiet/ai-tool (private: true — experimental)
 └── apps/
-    ├── github-app/               ← experimental
-    └── dashboard/                ← experimental
+    └── github-app/               ← experimental
 ```
 
 ---
@@ -269,7 +262,7 @@ Constants: $0.008/min (GitHub Actions Linux runner), 150 ms/dep overhead, 50 KB/
 
 ---
 
-## CLI Commands (from compiled `dist/cli.js`)
+## CLI Commands (from compiled `build/cli.js`)
 
 | Command | Description |
 |---|---|

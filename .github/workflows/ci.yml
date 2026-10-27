@@ -73,7 +73,7 @@ jobs:
         run: node --test packages/core/tests/checker.unit.test.js
 
       - name: CLI smoke test — help
-        run: node packages/cli/dist/cli.js --help
+        run: node packages/cli/build/cli.js --help
 
       - name: CLI smoke test — check valid package (deterministic offline fixture)
         # Runs against a zero-dep fixture; does NOT hit live registry in this step.
@@ -81,7 +81,7 @@ jobs:
         env:
           PKGDIET_NO_NETWORK: '1'
         run: |
-          node packages/cli/dist/cli.js check react --json 2>/dev/null | \
+          node packages/cli/build/cli.js check react --json 2>/dev/null | \
             node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); \
                      if(!d.verdict) { console.error('No verdict field'); process.exit(1); } \
                      console.log('Verdict:', d.verdict);"

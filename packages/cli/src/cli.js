@@ -556,7 +556,7 @@ program
   .option('--json', 'Output as JSON for scripting')
   .addHelpText('after', `
 Generates ready-to-submit PR title, description, and file contents.
-The generated workflow always runs in dry-run (report-only) mode — 
+The generated workflow always runs in dry-run (report-only) mode —
 never blocks CI, so reviewers have zero reason to reject it.
 
 Examples:

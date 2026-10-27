@@ -1,8 +1,0 @@
-{
-  "github.copilot.mcp.external.servers": {
-    "pkgdiet": {
-      "command": "npx",
-      "args": ["-y", "pkgdiet", "mcp"]
-    }
-  }
-}

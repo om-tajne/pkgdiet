@@ -16,7 +16,7 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const CLI_ENTRY = join(__dirname, "..", "..", "cli", "dist", "cli.js");
+const CLI_ENTRY = join(__dirname, "..", "..", "cli", "build", "cli.js");
 
 /**
  * Run a batch of JSON-RPC requests against the MCP server via stdio.
