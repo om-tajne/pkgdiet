@@ -18,8 +18,6 @@ Supported (v2.0.1):
 Experimental (not part of v2.0.1 release):
   @pkgdiet/ai-tool    — framework SDK adapters (LangChain, Vercel AI, OpenAI, Anthropic)
                         private: true — must not be published until stable API, docs, tests
-  apps/github-app     — webhook handler (Node.js, Hono, Prisma)
-  Docker deployment   — docker-compose.yml for experimental apps
 ```
 
 ---
@@ -28,7 +26,7 @@ Experimental (not part of v2.0.1 release):
 
 ```
 pkgdiet/
-├── package.json                  ← workspaces: ["packages/*"] only — apps/* excluded
+├── package.json                  ← workspaces: packages/*
 ├── package-lock.json             ← committed; required for npm ci
 ├── tsconfig.base.json
 ├── action.yml                    ← GitHub composite action
@@ -46,8 +44,6 @@ pkgdiet/
 │   ├── mcp/                      ← @pkgdiet/mcp
 │   ├── cli/                      ← pkgdiet
 │   └── ai-tool/                  ← @pkgdiet/ai-tool (private: true — experimental)
-└── apps/
-    └── github-app/               ← experimental
 ```
 
 ---

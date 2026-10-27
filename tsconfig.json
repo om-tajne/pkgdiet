@@ -3,7 +3,6 @@
   "references": [
     { "path": "packages/core" },
     { "path": "packages/mcp" },
-    { "path": "packages/cli" },
-    { "path": "apps/github-app" }
+    { "path": "packages/cli" }
   ]
 }

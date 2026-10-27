@@ -40,4 +40,4 @@ The supported security surface is the npm-published packages:
 - `@pkgdiet/core`
 - `@pkgdiet/mcp`
 
-The GitHub App (`apps/github-app`) is experimental and not part of the supported release.
+The supported security surface does not include any hosted PkgDiet service.

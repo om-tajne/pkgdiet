@@ -111,19 +111,7 @@ for (const rel of DOC_FILES) {
 }
 pass('Windsurf MCP claim check complete');
 
-// ── 5. No GitHub App support claim ─────────────────────────────────────────
-
-const EXPERIMENTAL_FORBIDDEN = /\bgithub.?app\b.{0,40}\b(supported|released|production)/i;
-
-for (const rel of README_FILES) {
-  const content = readFile(rel);
-  if (!content) continue;
-  const match = content.match(EXPERIMENTAL_FORBIDDEN);
-  if (match) warn(`${rel}: may claim GitHub App as supported → "${match[0]}"`);
-}
-pass('Experimental app claim check complete');
-
-// ── 6. All four MCP tool names appear in MCP docs ─────────────────────────
+// ── 5. All four MCP tool names appear in MCP docs ─────────────────────────
 
 const MCP_TOOLS = ['check_dependency', 'check_dependencies', 'suggest_alternative', 'get_policy'];
 const mcpDoc = readFile('docs/MCP.md') || '';

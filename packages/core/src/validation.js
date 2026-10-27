@@ -1,7 +1,7 @@
 /**
  * PkgDiet — Input Validation
  *
- * Validates package names at every entrypoint (CLI, MCP, VS Code, GitHub App).
+ * Validates package names at every supported entrypoint (CLI and MCP).
  * Package names are treated as untrusted input regardless of source.
  * Never pass package names through exec/execSync or shell strings.
  */

@@ -104,7 +104,4 @@ npx pkgdiet@2.0.1 agent-setup --agent claude-desktop
 
 ## Experimental integrations
 
-| Integration | Status |
-|---|---|
-| GitHub App (webhook-based PR gate) | 🧪 Experimental |
-| Docker deployment | 🧪 Experimental |
+`@pkgdiet/ai-tool` contains private framework adapters for LangChain, Vercel AI SDK, OpenAI, and Anthropic. It is not part of the supported release surface.

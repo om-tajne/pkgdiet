@@ -1,7 +1,8 @@
 /**
  * PkgDiet — Policy Engine Types
  *
- * These types describe the policy layer system used by the GitHub App.
+ * These types describe the policy layer system for consumers that need a
+ * typed representation of the runtime policy.
  * The runtime policy evaluation is performed by policy.js (the authoritative source).
  *
  * Supported ignoreRules formats (both are tested in policy.js isIgnored()):

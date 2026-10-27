@@ -3,7 +3,7 @@
 
 PkgDiet 2.0.1 evolves PkgDiet from a dependency-analysis CLI into a local-first, repository-owned dependency policy workflow for JavaScript and TypeScript projects. It helps developers and compatible AI coding agents evaluate candidate npm dependencies before they are introduced, then independently verifies dependency changes in pull-request CI.
 
-PkgDiet returns structured `ALLOW`, `WARN`, `BLOCK`, or `UNKNOWN` decisions based on repository policy and available package metadata. PkgDiet complements vulnerability scanning, lockfile integrity controls, code review, and broader software-supply-chain security practices; it does not replace them.
+PkgDiet returns structured `ALLOW`, `WARN`, or `BLOCK` package decisions based on repository policy and available package metadata. A registry outage becomes `WARN` in fail-open mode and `BLOCK` in fail-closed mode. The CI gate may additionally report `UNKNOWN` only as an internal evaluation-error placeholder, not as a normal package-policy decision. PkgDiet complements vulnerability scanning, lockfile integrity controls, code review, and broader software-supply-chain security practices; it does not replace them.
 
 ---
 
@@ -22,64 +22,50 @@ The heart of PkgDiet is the `.pkgdietrc.json` file. This repository-owned config
 ### 2.1 The Precedence Ladder
 When evaluating a package, rules are resolved in a strict order:
 1. **Built-in Defaults** (e.g., default actions for configured health, size, and metadata signals).
-2. **Root Configuration** (e.g., `minHealthScore`, `maxPackageSizeKB`).
+2. **Root Configuration** (e.g., `minHealthScore`, `maxPackageSizeBytes`).
 3. **Environment Overlays** (`environments.ci` overrides root).
-4. **Scoped Exceptions** (Applicable package-specific, time-limited, reason-code-scoped exceptions).
-5. **CLI Flags** (In CI mode, CLI flags can only tighten a policy, never weaken it).
+4. **Ignore rules** (`ignoreRules` can explicitly approve a package).
+5. **CLI Flags** (for example, the CI command can select an environment and failure threshold).
 
 ### 2.2 Configuration Vocabulary
 The following is the canonical configuration structure for a `.pkgdietrc.json` policy:
 
 ```json
 {
-  "version": 1,
+  "policyVersion": 1,
   "minHealthScore": 70,
-  "lowHealthAction": "warn",
-  "maxPackageSizeKB": 5000,
-  "oversizeAction": "warn",
+  "warnHealthScore": 80,
+  "maxPackageSizeBytes": 5242880,
   "blockDeprecated": true,
+  "blockInstallScripts": false,
+  "securityMode": "fail-closed",
   "blockedPackages": [
     "request",
     "moment"
   ],
-  "exceptions": {
-    "legacy-package": {
-      "reason": "Required during migration",
-      "expiresAt": "2026-12-31T23:59:59Z",
-      "allow": [
-        "PACKAGE_DEPRECATED",
-        "LOW_HEALTH"
-      ]
-    }
-  },
+  "allowedPackages": [],
+  "ignoreRules": [],
   "environments": {
     "ci": {
-      "oversizeAction": "block",
-      "failOn": [
-        "BLOCK",
-        "UNKNOWN"
-      ]
+      "minHealthScore": 80,
+      "failOn": "BLOCK"
     }
   }
 }
 ```
 
-### 2.3 Strict Exception Scoping
-Exceptions in 2.0.1 require explicit bounding:
-* **Targeted Bypasses:** An exception must specify an `allow` array containing exact error codes (e.g., `["PACKAGE_DEPRECATED", "LOW_HEALTH"]`).
-* **Unbypassable Codes:** An exception cannot bypass critical system failures. A hallucinated package returning `PACKAGE_NOT_FOUND` will be blocked. A network failure returning `REGISTRY_UNAVAILABLE` will map to `UNKNOWN`.
-* **Expiration:** Exceptions utilize the `expiresAt` ISO date string. Once expired, the engine silently ignores the exception.
+### 2.3 Exceptions and failure modes
+`allowedPackages` and `ignoreRules` are explicit local exceptions. An unavailable registry does not produce a fourth verdict: it returns `WARN` when `securityMode` is `fail-open` and `BLOCK` when it is `fail-closed`. A public package name that is not found is blocked; a scoped name mapped to a private registry in `.npmrc` is allowed.
 
 ---
 
 ## 3. Data Models & Verdicts
-Every time a package is evaluated, the core engine deterministically returns one of four verdicts inside a `PackageDecision` object.
+Every normal package evaluation returns one of three verdicts inside a `PackageDecision` object. The CI gate reserves `UNKNOWN` for an unexpected evaluation error.
 
-### 3.1 The Four Verdicts
+### 3.1 Verdicts
 * **`ALLOW`**: Package meets all criteria.
-* **`WARN`**: Package violates a soft threshold (e.g., `lowHealthAction: "warn"`). Informs the developer/agent but allows progression.
+* **`WARN`**: Package violates a soft threshold or registry verification is unavailable under fail-open mode. Informs the developer/agent but allows progression.
 * **`BLOCK`**: Package violates a hard threshold (e.g., `blockedPackages`, `PACKAGE_NOT_FOUND`).
-* **`UNKNOWN`**: The registry timed out or network access failed (`REGISTRY_UNAVAILABLE`).
 
 ---
 
@@ -87,8 +73,12 @@ Every time a package is evaluated, the core engine deterministically returns one
 The Model Context Protocol integration (`npx pkgdiet mcp`) connects MCP-compatible AI coding agents to your local policy.
 
 ### 4.1 Exposed Tools
-1. **`check_dependency`**: Evaluates a package against local policy and returns a structured decision for a compatible agent to interpret. When the verdict is `BLOCK`, the recommended agent behavior is to avoid installation, explain the policy reasons, and propose an alternative or request human direction. MCP guidance is not enforcement; pull-request CI independently verifies the final dependency change.
-2. **`suggest_alternative`**: Queries PkgDiet's curated dataset to return lighter, maintained alternatives.
+1. **`check_dependency`**: Evaluates one package against local policy.
+2. **`check_dependencies`**: Evaluates up to 50 package names with bounded concurrency.
+3. **`suggest_alternative`**: Queries the curated replacement dataset.
+4. **`get_policy`**: Returns the effective local policy and validation result.
+
+MCP guidance is read-only and advisory; the CI gate independently verifies dependency changes.
 
 ### 4.2 Registries
 The repository includes manifests (`server.json`, `glama.json`, `smithery.yaml`) intended for submission or compatibility with relevant MCP directories, subject to each directory’s validation and publication process.
@@ -96,13 +86,13 @@ The repository includes manifests (`server.json`, `glama.json`, `smithery.yaml`)
 ---
 
 ## 5. CI: Pull Request Evaluation
-PkgDiet’s CI policy gate is designed to evaluate direct dependency declarations introduced or changed by a pull request. 
+PkgDiet’s CI policy gate is designed to evaluate newly added direct dependencies discovered from a pull request lockfile diff.
 
 ### 5.1 Direct Dependency Diffing
 It intentionally distinguishes explicitly requested dependencies from lockfile-only transitive changes. This focus reduces noise for policy decisions, while vulnerability and supply-chain scanners should continue to assess the full resolved dependency graph. PkgDiet acts as a merge-time verification backstop only when configured as a required protected-branch check.
 
 ### 5.2 The `failOn` Matrix
-By default, a package that triggers a `WARN` verdict exits with Code 0. If you configure `"failOn": ["BLOCK", "WARN"]` in your `environments.ci` block, the CI gate will map `WARN` directly to a policy failure state (Exit Code 1), signaling branch protection to block the merge.
+By default, a package that triggers a `WARN` verdict exits with Code 0. Set `"failOn": "WARN"` in an environment block to make warnings fail the CI gate.
 
 ---
 

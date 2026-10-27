@@ -9,7 +9,16 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-_No changes yet._
+### Removed
+
+- Removed the unsupported hosted integration, its deployment, schema, tests,
+  workspace reference, and package-lock entries. PkgDiet remains a local-first
+  CLI, MCP server, and GitHub Action.
+
+### Documentation
+
+- Aligned the root architecture guide with the implemented three-verdict model,
+  current policy schema, MCP tool set, and CI `failOn` configuration.
 
 ---
 
@@ -51,7 +60,7 @@ _No changes yet._
 
 ### Changed
 - Improved ecosystem distribution, documentation accuracy, and integration examples.
-- Marked @pkgdiet/ai-tool and GitHub App as experimental and private.
+- Marked @pkgdiet/ai-tool as experimental and private.
 - Prepared Smithery and Glama registry metadata.
 - Pinned all documentation and templates to 2.0.1.
 
@@ -66,7 +75,7 @@ This release covers the supported npm packages:
 - `@pkgdiet/mcp@2.0.0`
 - `pkgdiet@2.0.0`
 
-The GitHub App and Docker deployment are **experimental** and are not part of this release.
+No hosted deployment is part of this release.
 
 ---
 
