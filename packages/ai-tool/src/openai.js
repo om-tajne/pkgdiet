@@ -42,4 +42,5 @@ You have access to a tool called check_dependency.
 Before recommending or using any npm package, call check_dependency with the package name.
 If the verdict is BLOCK, do not recommend that package — use the suggested alternative.
 If the verdict is WARN, explain the trade-off and prefer the suggested alternative.
+If the verdict is ERROR, do not install or recommend the package until dependency verification succeeds.
 `;

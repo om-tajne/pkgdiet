@@ -83,7 +83,7 @@ export function createMcpServer() {
   // ── check_dependency ────────────────────────────────────────────────────────
   server.tool(
     "check_dependency",
-    "Evaluate a single npm package against the active PkgDiet policy to determine if it is safe, lightweight, and healthy to install. Use this read-only tool before proposing or installing any package. It returns a structured verdict (ALLOW, WARN, BLOCK), health score, cost impact, and security signals. It does not install packages, edit files, or modify the project. Always evaluate a package with this tool before recommending it.",
+    "Evaluate a single npm package against the active PkgDiet policy to determine if it is safe, lightweight, and healthy to install. Use this read-only tool before proposing or installing any package. It returns a structured verdict (ALLOW, WARN, BLOCK), health score, cost impact, and supply-chain evidence. A BLOCK is a successful policy decision and must not be bypassed; execution failures are returned as MCP tool errors. It does not install packages, edit files, or modify the project.",
     {
       packageName: z.string().min(1).max(214)
         .describe("The exact npm package name to evaluate, such as 'lodash', 'moment', or '@types/node'."),
@@ -139,6 +139,10 @@ export function createMcpServer() {
                 // MCP's public contract is an array of human-readable strings.
                 // Keep the policy engine's richer objects internal to core.
                 reasons:             (result.reasons || []).map((reason: any) => typeof reason === "string" ? reason : reason.message),
+                // Retain the engine's structured reason codes alongside the
+                // established human-readable `reasons` field. This is
+                // additive so existing MCP clients retain their contract.
+                reasonDetails:       result.reasons || [],
                 recommendation:      { action, primaryAlternative },
                 security:            {
                   registryVerified: !(result.reasons || []).some((reason: any) =>
@@ -152,6 +156,9 @@ export function createMcpServer() {
                 addedSizeBytes:      result.costEstimate?.addedSizeMB ? Math.round(result.costEstimate.addedSizeMB * 1024 * 1024) : 0,
                 costImpactPerMonthUsd: result.costEstimate?.monthlyCiCost100Builds || 0,
                 alternatives:        (result.alternatives || []).map((alt: any) => typeof alt === "string" ? alt : (alt.replacement || alt.name)),
+                flags:               result.flags || [],
+                evidence:            result.evidence || null,
+                certified:           result.certified || false,
               }, null, 2),
             }],
           };

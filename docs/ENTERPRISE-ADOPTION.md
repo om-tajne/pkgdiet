@@ -2,6 +2,8 @@
 
 PkgDiet gives organizations a single, transparent dependency-policy layer that can be enabled across supported AI clients and enforced independently in CI.
 
+For a repository-by-repository rollout, see the [onboarding guide](ONBOARDING.md).
+
 PkgDiet is ready for **enterprise adoption pilots** with transparent opt-in deployment, pinned versions, local policy, and CI enforcement. It does **not** silently modify AI clients, install background services, or intercept npm commands automatically. 
 
 ## Administrator Rollout Checklist

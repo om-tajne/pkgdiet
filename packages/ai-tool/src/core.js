@@ -8,15 +8,19 @@ import { execFileSync } from 'child_process';
 const PACKAGE_NAME_RE = /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/i;
 const ENVIRONMENTS = new Set(['dev', 'ci', 'prod']);
 
-function warningResult(packageName, reason) {
+function errorResult(packageName, code, message) {
   return {
     packageName,
-    verdict: 'WARN',
-    healthScore: -1,
-    reasons: [reason],
+    verdict: 'ERROR',
+    healthScore: null,
+    reasons: [{ code, message }],
     alternatives: [],
     addedSizeBytes: 0,
-    recommendation: null,
+    recommendation: 'STOP: Dependency verification failed. Do not install until PkgDiet is operational.',
+    evidence: null,
+    flags: [],
+    hasProvenance: false,
+    integrityCheck: 'missing',
   };
 }
 
@@ -33,10 +37,10 @@ export function createDependencyChecker(execute = execFileSync) {
     const env = options.environment || 'dev';
 
     if (!PACKAGE_NAME_RE.test(name)) {
-      return warningResult(name, 'PkgDiet could not check an invalid npm package name.');
+      return errorResult(name, 'INVALID_PACKAGE_NAME', 'PkgDiet could not check an invalid npm package name.');
     }
     if (!ENVIRONMENTS.has(env)) {
-      return warningResult(name, `PkgDiet does not support the "${env}" environment.`);
+      return errorResult(name, 'UNSUPPORTED_ENVIRONMENT', `PkgDiet does not support the "${env}" environment.`);
     }
 
     try {
@@ -48,17 +52,26 @@ export function createDependencyChecker(execute = execFileSync) {
         { encoding: 'utf8', timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] }
       );
       const result = JSON.parse(raw);
+      const pkg = result.packages?.[0] ?? result;
+      if (!pkg || typeof pkg !== 'object') {
+        return errorResult(name, 'CLI_INVALID_RESPONSE', 'PkgDiet returned an invalid verification response.');
+      }
       return {
-        packageName: name,
-        verdict: result.verdict ?? result.packages?.[0]?.verdict ?? 'UNKNOWN',
-        healthScore: result.healthScore ?? result.packages?.[0]?.healthScore ?? 0,
-        reasons: result.reasons ?? result.packages?.[0]?.reasons ?? [],
-        alternatives: result.alternatives ?? result.packages?.[0]?.alternatives ?? [],
-        addedSizeBytes: result.addedSizeBytes ?? result.packages?.[0]?.addedSizeBytes ?? 0,
-        recommendation: result.recommendation ?? result.packages?.[0]?.recommendation ?? null,
+        packageName: pkg.name ?? pkg.packageName ?? name,
+        verdict: pkg.verdict ?? 'UNKNOWN',
+        healthScore: pkg.healthScore ?? null,
+        reasons: pkg.reasons ?? [],
+        alternatives: pkg.alternatives ?? [],
+        addedSizeBytes: pkg.addedSizeBytes ?? Math.round((pkg.costEstimate?.addedSizeMB ?? 0) * 1024 * 1024),
+        recommendation: pkg.recommendation ?? null,
+        evidence: pkg.evidence ?? null,
+        flags: pkg.flags ?? [],
+        hasProvenance: pkg.hasProvenance ?? false,
+        integrityCheck: pkg.integrityCheck ?? 'missing',
+        certified: pkg.certified ?? false,
       };
     } catch {
-      return warningResult(name, 'PkgDiet could not run. Install it: npm install -g pkgdiet');
+      return errorResult(name, 'CLI_EXECUTION_FAILED', 'PkgDiet could not run. Check Node.js, npm, and registry access before retrying.');
     }
   };
 }
@@ -82,8 +95,8 @@ export function checkDependencies(packageNames, options = {}) {
 
 /** Human-readable description of what this tool does (for system prompts). */
 export const TOOL_DESCRIPTION = `Check an npm package for health, safety, and size before installing it.
-Returns ALLOW, WARN, or BLOCK verdict. For WARN/BLOCK, returns curated alternatives.
-Always call this before recommending or installing any npm package.`;
+Returns ALLOW, WARN, BLOCK, or ERROR verdict with structured reasons.
+Always call this before recommending or installing any npm package. If the verdict is BLOCK or ERROR, halt installation.`;
 
 export const INPUT_SCHEMA = {
   type: 'object',

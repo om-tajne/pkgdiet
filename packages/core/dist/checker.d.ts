@@ -16,24 +16,8 @@ export declare function checkPackage(packageSpec: any, projectPath?: string, opt
     flags: any[];
     hasProvenance: boolean;
     integrityCheck: string;
-} | {
-    name: any;
-    verdict: "ALLOW" | "BLOCK" | "WARN";
-    reasons: string[];
-    healthScore: any;
-    costEstimate: {
-        ciInstallTimeSeconds: number;
-        monthlyCiCost100Builds: number;
-        serverlessColdStartClass: string;
-        addedSizeMB: number;
-    };
-    alternatives: any[];
-    flags: any[];
-    efficiencyFlag: boolean;
-    hasProvenance: boolean;
-    integrityCheck: string;
+    evidence: any;
     certified: boolean;
-    evidence?: undefined;
 } | {
     name: any;
     verdict: "ALLOW" | "BLOCK" | "WARN";

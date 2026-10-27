@@ -105,3 +105,51 @@ npx pkgdiet@2.0.1 agent-setup --agent claude-desktop
 ## Experimental integrations
 
 `@pkgdiet/ai-tool` contains private framework adapters for LangChain, Vercel AI SDK, OpenAI, and Anthropic. It is not part of the supported release surface.
+
+---
+
+## Containerized execution (Docker)
+
+Use the containerized MCP server when isolating the Node.js runtime is useful.
+MCP uses standard input and output as its protocol channel, so run the container
+with `-i` and **without** `-t` (a pseudo-terminal).
+
+```text
+docker run --rm -i -v <absolute-project-path>:/workspace pkgdiet-mcp:2.0.1
+```
+
+- `-i` keeps standard input open for MCP requests.
+- `--rm` removes the container when the agent session ends.
+- `-v` mounts the project at `/workspace`, where PkgDiet reads policy files and
+  writes its local cache.
+
+### Client registration
+
+Translate the command above into the configuration format required by the
+specific client. Use an absolute project path, or only a workspace placeholder
+that the client officially supports.
+
+```json
+{
+  "mcpServers": {
+    "pkgdiet-mcp-docker": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "-v",
+        "/path/to/your/project:/workspace",
+        "pkgdiet-mcp:2.0.1"
+      ]
+    }
+  }
+}
+```
+
+On Windows, the exact volume argument depends on the client and shell. In JSON,
+backslashes must be escaped, for example:
+
+```json
+"C:\\path\\to\\project:/workspace"
+```

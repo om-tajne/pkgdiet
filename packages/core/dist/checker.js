@@ -6,6 +6,7 @@ import { recordCheckMetric } from './telemetry.js';
 // bundle because it imports the JSON dataset without path-specific loading.
 import { findAlternatives } from './alternatives.js';
 import { isScopeMappedInNpmrc } from './npmrc.js';
+import { setCached } from './cache.js';
 /**
  * Check whether a package name matches any internal prefix.
  */
@@ -40,6 +41,8 @@ function buildNotFoundResult(packageName, policy) {
             efficiencyFlag: false,
             hasProvenance: false,
             integrityCheck: 'missing',
+            evidence: null,
+            certified: false,
         };
     }
     // Standard 404 — potential hallucination
@@ -57,6 +60,8 @@ function buildNotFoundResult(packageName, policy) {
         efficiencyFlag: false,
         hasProvenance: false,
         integrityCheck: 'missing',
+        evidence: null,
+        certified: false,
     };
 }
 /**
@@ -85,6 +90,8 @@ function buildNetworkErrorResult(packageName, policy) {
         flags: [],
         hasProvenance: false,
         integrityCheck: 'missing',
+        evidence: null,
+        certified: false,
     };
 }
 export async function checkPackage(packageSpec, projectPath = process.cwd(), options = {}) {
@@ -121,6 +128,7 @@ export async function checkPackage(packageSpec, projectPath = process.cwd(), opt
             efficiencyFlag: false,
             hasProvenance: false,
             integrityCheck: 'missing',
+            evidence: null,
             certified: false,
         };
     }
@@ -140,12 +148,21 @@ export async function checkPackage(packageSpec, projectPath = process.cwd(), opt
                     efficiencyFlag: false,
                     hasProvenance: false,
                     integrityCheck: 'missing',
+                    evidence: null,
+                    certified: false,
                 };
             }
             return buildNotFoundResult(packageName, policy);
         }
         // Network error
         return buildNetworkErrorResult(packageName, policy);
+    }
+    // A successful single-package lookup should warm the same local cache used
+    // by batch audits. fetchPackageHealth deliberately owns fetching only;
+    // persisting here keeps a rejected or unavailable lookup out of the cache
+    // while preserving the cache module's TTL and atomic-write behavior.
+    if (!healthResult.fromCache) {
+        setCached(projectPath, packageName, 'health', healthResult);
     }
     // 2. Cost impact
     const sizeInfo = { unpackedSize: healthResult.unpackedSize };

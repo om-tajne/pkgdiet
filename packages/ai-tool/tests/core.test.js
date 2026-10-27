@@ -30,23 +30,50 @@ test('adapter rejects malformed package names without starting a process', () =>
 
   const result = check('react; rm -rf /');
 
-  assert.equal(result.verdict, 'WARN');
-  assert.match(result.reasons[0], /invalid npm package name/i);
+  assert.equal(result.verdict, 'ERROR');
+  assert.equal(result.reasons[0].code, 'INVALID_PACKAGE_NAME');
+  assert.match(result.reasons[0].message, /invalid npm package name/i);
   assert.equal(called, false);
 });
 
-test('adapter returns a safe warning when the CLI cannot run', () => {
+test('adapter returns a stop-state error when the CLI cannot run', () => {
   const check = createDependencyChecker(() => { throw new Error('npx unavailable'); });
   const result = check('react');
 
-  assert.equal(result.verdict, 'WARN');
-  assert.equal(result.healthScore, -1);
+  assert.equal(result.verdict, 'ERROR');
+  assert.equal(result.healthScore, null);
+  assert.equal(result.reasons[0].code, 'CLI_EXECUTION_FAILED');
+  assert.match(result.recommendation, /^STOP:/);
+});
+
+test('adapter preserves core supply-chain evidence on a policy verdict', () => {
+  const check = createDependencyChecker(() => JSON.stringify({
+    name: 'example-library',
+    verdict: 'BLOCK',
+    healthScore: 35,
+    reasons: [{ code: 'INSTALL_SCRIPTS', message: 'Package contains postinstall.' }],
+    flags: [{ type: 'warning', label: 'Install scripts (postinstall)' }],
+    costEstimate: { addedSizeMB: 1.5 },
+    evidence: { vulnerabilityIds: ['GHSA-example'] },
+    hasProvenance: true,
+    integrityCheck: 'present',
+    certified: false,
+  }));
+
+  const result = check('example-library');
+
+  assert.equal(result.verdict, 'BLOCK');
+  assert.deepEqual(result.reasons, [{ code: 'INSTALL_SCRIPTS', message: 'Package contains postinstall.' }]);
+  assert.deepEqual(result.evidence, { vulnerabilityIds: ['GHSA-example'] });
+  assert.equal(result.hasProvenance, true);
+  assert.equal(result.integrityCheck, 'present');
+  assert.equal(result.addedSizeBytes, Math.round(1.5 * 1024 * 1024));
 });
 
 test('adapter batch and framework exports retain a check_dependency contract', async () => {
   const results = await checkDependencies(['not a package']);
 
-  assert.equal(results[0].verdict, 'WARN');
+  assert.equal(results[0].verdict, 'ERROR');
   assert.equal(vercelTool.execute instanceof Function, true);
   assert.equal(pkgdietFunction.function.name, 'check_dependency');
   assert.equal(anthropicTool.name, 'check_dependency');

@@ -1,0 +1,17 @@
+.git
+.agents
+.cursor
+node_modules
+packages/*/node_modules
+packages/*/dist
+packages/*/build
+*.tsbuildinfo
+.pkgdiet-cache.json
+.pkgdiet-metrics.json
+qa-*
+temp-express
+test-*
+tmp-*
+docs
+social-preview.jpg
+logo.png

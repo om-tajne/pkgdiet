@@ -133,6 +133,14 @@ test("MCP — full protocol lifecycle covers all 4 tools", async () => {
     `check_dependency: expected WARN or BLOCK, got ${check.verdict}`);
   assert.ok(check.reasons.some(r => r.includes("SECURITY")),
     "check_dependency: reasons must warn about unverified registry entry");
+  assert.ok(Array.isArray(check.reasonDetails),
+    "check_dependency: structured reason details must be present");
+  assert.ok(Array.isArray(check.flags),
+    "check_dependency: supply-chain flags must be present");
+  assert.ok(Object.hasOwn(check, "evidence"),
+    "check_dependency: supply-chain evidence field must be present");
+  assert.equal(typeof check.certified, "boolean",
+    "check_dependency: certification state must be present");
 
   // ── suggest_alternative ───────────────────────────────────────────────────────
   const altRes = responses.find(r => r.id === 5);

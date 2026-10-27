@@ -1,20 +1,39 @@
 {
   "policyVersion": 1,
-  "minHealthScore": 70,
-  "warnHealthScore": 80,
+  "telemetry": false,
+  "minHealthScore": 60,
+  "warnHealthScore": 75,
+  "maxPackageSizeBytes": 10485760,
   "failOn": "BLOCK",
-  "securityMode": "fail-closed",
-  "blockedPackages": [],
-  "internalNamePrefixes": [],
+  "securityMode": "fail-open",
+  "blockDeprecated": true,
+  "blockInstallScripts": true,
+  "blockKnownVulnerabilities": true,
+  "blockTyposquats": true,
+  "blockOnLowHealth": false,
+  "blockedPackages": [
+    "left-pad",
+    "i-can-haz-express"
+  ],
+  "allowedPackages": [],
+  "internalNamePrefixes": [
+    "corp-",
+    "internal-",
+    "infra-",
+    "private-"
+  ],
   "ignoreRules": [],
   "environments": {
     "ci": {
-      "minHealthScore": 80,
+      "minHealthScore": 70,
+      "warnHealthScore": 80,
       "failOn": "BLOCK",
-      "securityMode": "fail-closed"
+      "securityMode": "fail-closed",
+      "blockOnLowHealth": true
     },
     "dev": {
       "minHealthScore": 60,
+      "warnHealthScore": 75,
       "failOn": "BLOCK",
       "securityMode": "fail-open"
     }
