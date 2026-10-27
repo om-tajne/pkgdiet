@@ -3,7 +3,65 @@
  * Calls `npx pkgdiet check <name> --json` and returns structured result.
  */
 
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
+
+const PACKAGE_NAME_RE = /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/i;
+const ENVIRONMENTS = new Set(['dev', 'ci', 'prod']);
+
+function warningResult(packageName, reason) {
+  return {
+    packageName,
+    verdict: 'WARN',
+    healthScore: -1,
+    reasons: [reason],
+    alternatives: [],
+    addedSizeBytes: 0,
+    recommendation: null,
+  };
+}
+
+/**
+ * Create a single-package checker. Exported to make the process boundary
+ * deterministic in tests without requiring a registry connection.
+ *
+ * @param {typeof execFileSync} execute
+ * @returns {(packageName: string, options?: { environment?: string }) => object}
+ */
+export function createDependencyChecker(execute = execFileSync) {
+  return function checkDependency(packageName, options = {}) {
+    const name = typeof packageName === 'string' ? packageName.trim().toLowerCase() : '';
+    const env = options.environment || 'dev';
+
+    if (!PACKAGE_NAME_RE.test(name)) {
+      return warningResult(name, 'PkgDiet could not check an invalid npm package name.');
+    }
+    if (!ENVIRONMENTS.has(env)) {
+      return warningResult(name, `PkgDiet does not support the "${env}" environment.`);
+    }
+
+    try {
+      // execFileSync deliberately receives an argument array, never a shell
+      // command string. Package names therefore cannot alter the command.
+      const raw = execute(
+        'npx',
+        ['-y', 'pkgdiet@2.0.1', 'check', name, '--json', '--env', env],
+        { encoding: 'utf8', timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] }
+      );
+      const result = JSON.parse(raw);
+      return {
+        packageName: name,
+        verdict: result.verdict ?? result.packages?.[0]?.verdict ?? 'UNKNOWN',
+        healthScore: result.healthScore ?? result.packages?.[0]?.healthScore ?? 0,
+        reasons: result.reasons ?? result.packages?.[0]?.reasons ?? [],
+        alternatives: result.alternatives ?? result.packages?.[0]?.alternatives ?? [],
+        addedSizeBytes: result.addedSizeBytes ?? result.packages?.[0]?.addedSizeBytes ?? 0,
+        recommendation: result.recommendation ?? result.packages?.[0]?.recommendation ?? null,
+      };
+    } catch {
+      return warningResult(name, 'PkgDiet could not run. Install it: npm install -g pkgdiet');
+    }
+  };
+}
 
 /**
  * Check a single npm package using the PkgDiet CLI.
@@ -11,38 +69,7 @@ import { execSync } from 'child_process';
  * @param {{ environment?: string }} [options]
  * @returns {{ verdict: string, healthScore: number, reasons: string[], alternatives: object[], addedSizeBytes: number }}
  */
-export function checkDependency(packageName, options = {}) {
-  const env = options.environment || 'dev';
-  const name = packageName.trim().toLowerCase();
-  try {
-    const raw = execSync(
-      `npx pkgdiet@2.0.1 check "${name}" --json --env ${env}`,
-      { encoding: 'utf8', timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] }
-    );
-    const result = JSON.parse(raw);
-    return {
-      packageName: name,
-      verdict: result.verdict ?? result.packages?.[0]?.verdict ?? 'UNKNOWN',
-      healthScore: result.healthScore ?? result.packages?.[0]?.healthScore ?? 0,
-      reasons: result.reasons ?? result.packages?.[0]?.reasons ?? [],
-      alternatives: result.alternatives ?? result.packages?.[0]?.alternatives ?? [],
-      addedSizeBytes: result.addedSizeBytes ?? result.packages?.[0]?.addedSizeBytes ?? 0,
-      recommendation: result.recommendation ?? result.packages?.[0]?.recommendation ?? null,
-    };
-  } catch (err) {
-    // If pkgdiet is not installed yet, return a safe WARN so the agent
-    // can still suggest installing pkgdiet rather than silently failing.
-    return {
-      packageName: name,
-      verdict: 'WARN',
-      healthScore: -1,
-      reasons: ['PkgDiet could not run. Install it: npm install -g pkgdiet'],
-      alternatives: [],
-      addedSizeBytes: 0,
-      recommendation: null,
-    };
-  }
-}
+export const checkDependency = createDependencyChecker();
 
 /**
  * Check multiple packages.

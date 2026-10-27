@@ -55,7 +55,7 @@ The following is the canonical configuration structure for a `.pkgdietrc.json` p
 ```
 
 ### 2.3 Exceptions and failure modes
-`allowedPackages` and `ignoreRules` are explicit local exceptions. An unavailable registry does not produce a fourth verdict: it returns `WARN` when `securityMode` is `fail-open` and `BLOCK` when it is `fail-closed`. A public package name that is not found is blocked; a scoped name mapped to a private registry in `.npmrc` is allowed.
+`allowedPackages` and `ignoreRules` are explicit local exceptions. A package must not appear in both `allowedPackages` and `blockedPackages`: validation rejects the conflict, and the runtime safely favors the explicit block if one reaches evaluation. An unavailable registry does not produce a fourth verdict: it returns `WARN` when `securityMode` is `fail-open` and `BLOCK` when it is `fail-closed`. A public package name that is not found is blocked; a scoped name mapped to a private registry in `.npmrc` is allowed.
 
 ---
 

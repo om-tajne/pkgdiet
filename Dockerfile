@@ -19,5 +19,8 @@ COPY packages/cli/ packages/cli/
 # Build packages
 RUN npm run build
 
+# Verify the freshly compiled CLI before making it the container entrypoint.
+RUN node packages/cli/build/cli.js --version
+
 # Set entrypoint
-ENTRYPOINT ["node", "packages/cli/dist/cli.js", "mcp"]
+ENTRYPOINT ["node", "packages/cli/build/cli.js", "mcp"]

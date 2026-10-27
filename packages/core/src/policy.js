@@ -135,7 +135,7 @@ export function validatePolicy(policy) {
     if (allowed.has(pkg)) {
       errors.push(
         `Package '${pkg}' is in both \`blockedPackages\` and \`allowedPackages\`. ` +
-        '`allowedPackages` wins — this effectively removes the block.'
+        '`blockedPackages` wins — remove the contradiction before relying on this policy.'
       );
     }
   }

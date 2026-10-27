@@ -60,17 +60,8 @@ jobs:
       - name: Install (clean)
         run: npm ci
 
-      - name: Build
-        run: npx tsc -b packages/core packages/mcp packages/cli
-
-      - name: Contract tests (core)
-        run: node --test packages/core/tests/run.contract.test.js
-
-      - name: Policy unit tests
-        run: node --test packages/core/tests/policy.unit.test.js
-
-      - name: Checker unit tests
-        run: node --test packages/core/tests/checker.unit.test.js
+      - name: Build and test
+        run: npm test
 
       - name: CLI smoke test — help
         run: node packages/cli/build/cli.js --help

@@ -111,7 +111,7 @@ export function validatePolicy(policy) {
     for (const pkg of blocked) {
         if (allowed.has(pkg)) {
             errors.push(`Package '${pkg}' is in both \`blockedPackages\` and \`allowedPackages\`. ` +
-                '`allowedPackages` wins — this effectively removes the block.');
+                '`blockedPackages` wins — remove the contradiction before relying on this policy.');
         }
     }
     // ── Warnings ─────────────────────────────────────────────────────────────────
@@ -243,8 +243,7 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
             }
             else {
                 finalReasons.push(r);
-                if (
-                    r.code === 'PACKAGE_DEPRECATED' ||
+                if (r.code === 'PACKAGE_DEPRECATED' ||
                     r.code === 'INSTALL_SCRIPTS' ||
                     r.code === 'KNOWN_VULNERABILITY' ||
                     r.code === 'PROVENANCE_REQUIRED' ||

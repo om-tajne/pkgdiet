@@ -5,9 +5,10 @@
  * @param {string}   projectPath  - Project root for policy loading
  * @param {boolean}  policyModified - Whether .pkgdietrc.json was touched in this PR
  * @param {string|null} envName  - Optional environment overlay (e.g. 'ci', 'dev')
+ * @param {object|null} policyOverride - Already-resolved policy from the caller
  * @returns {{ markdown: string, hasBlocks: boolean, hasWarns: boolean, results: object[] }}
  */
-export declare function runCiGate(packageNames: string[], projectPath?: string, policyModified?: boolean, envName?: string | null): {
+export declare function runCiGate(packageNames: string[], projectPath?: string, policyModified?: boolean, envName?: string | null, policyOverride?: object | null): {
     markdown: string;
     hasBlocks: boolean;
     hasWarns: boolean;

@@ -72,10 +72,7 @@ jobs:
           NODE
 
       - name: Run tests
-        run: |
-          node --test packages/core/tests/run.contract.test.js
-          node --test packages/core/tests/policy.unit.test.js
-          node --test packages/core/tests/checker.unit.test.js
+        run: npm test
 
       - name: Dry-run pack (inspect published file list)
         # Review output to confirm tarballs exclude: .env, .npmrc, node_modules, *.db,

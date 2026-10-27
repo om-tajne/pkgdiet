@@ -13,7 +13,7 @@
   },
   "files": ["src", "README.md", "LICENSE"],
   "scripts": {
-    "test": "echo \"No tests yet\""
+    "test": "node --test tests/core.test.js"
   },
   "peerDependencies": {
     "langchain": ">=0.1.0",

@@ -214,9 +214,16 @@ program
     .option('--base <ref>', 'Base git ref to compare against', 'HEAD~1')
     .option('--dry-run', 'Evaluate without enforcing — always exits 0')
     .option('--env <name>', 'Apply environment policy overlay (e.g. ci, dev, prod)')
+    .option('--fail-on <level>', 'Override policy failure threshold: BLOCK, WARN, or NONE')
+    .option('--sarif <file>', 'Write policy findings as a SARIF report')
+    .option('--json', 'Output machine-readable JSON')
     .action(async (options) => {
     const { runCiGate } = await import('@pkgdiet/core/dist/ci-gate.js');
-    if (options.dryRun) {
+    if (options.failOn && !['BLOCK', 'WARN', 'NONE'].includes(options.failOn)) {
+        console.error('ERROR INVALID_FAIL_ON: --fail-on must be BLOCK, WARN, or NONE.');
+        process.exit(2);
+    }
+    if (options.dryRun && !options.json) {
         console.log('⚠️  Running in --dry-run mode. Results are informational only; exit code will always be 0.\n');
     }
     // 1. Anti-tampering and base ref check
@@ -258,7 +265,9 @@ program
     const headDeps = getPackageJsonDeps('HEAD');
     const { loadPolicy, applyEnvironment } = await import('@pkgdiet/core/dist/policy.js');
     const { isPinnedVersion } = await import('@pkgdiet/core/dist/security.js');
-    const policy = options.env ? applyEnvironment(loadPolicy(process.cwd()), options.env) : loadPolicy(process.cwd());
+    let policy = options.env ? applyEnvironment(loadPolicy(process.cwd()), options.env) : loadPolicy(process.cwd());
+    if (options.failOn)
+        policy = { ...policy, failOn: options.failOn };
     const addedPackages = [];
     for (const [pkg, version] of Object.entries(headDeps)) {
         if (baseDeps[pkg] !== version) {
@@ -299,19 +308,30 @@ program
         }
     }
     if (addedPackages.length === 0) {
-        console.log(`✅ No new or updated dependencies found in package.json.`);
+        if (options.json) {
+            console.log(JSON.stringify({ status: 'SUCCESS', results: [], message: 'No new or updated dependencies found in package.json.' }, null, 2));
+        }
+        else {
+            console.log(`✅ No new or updated dependencies found in package.json.`);
+        }
         process.exit(0);
     }
-    console.log(`[PkgDiet] Found ${addedPackages.length} new/updated dependencies in package.json. Scanning...`);
-    if (options.env) {
+    if (!options.json)
+        console.log(`[PkgDiet] Found ${addedPackages.length} new/updated dependencies in package.json. Scanning...`);
+    if (options.env && !options.json) {
         console.log(`[PkgDiet] Using environment policy overlay: ${options.env}`);
     }
-    const result = await runCiGate(addedPackages, process.cwd(), policyModified, options.env || null);
+    const result = await runCiGate(addedPackages, process.cwd(), policyModified, options.env || null, policy);
     // Print fix suggestions for blocked packages
     const blocked = result.results.filter(r => r.verdict === 'BLOCK');
     const warned = result.results.filter(r => r.verdict === 'WARN');
-    console.log(result.markdown);
-    if (blocked.length > 0 || warned.length > 0) {
+    if (options.json) {
+        console.log(JSON.stringify({ status: result.status, results: result.results }, null, 2));
+    }
+    else {
+        console.log(result.markdown);
+    }
+    if (!options.json && (blocked.length > 0 || warned.length > 0)) {
         console.log('\n💡 Fix suggestions:');
         for (const r of [...blocked, ...warned]) {
             const suggestion = buildFixSuggestion(r.name, r);
@@ -325,11 +345,7 @@ program
         const sarif = { version: '2.1.0', $schema: 'https://json.schemastore.org/sarif-2.1.0.json', runs: [{ tool: { driver: { name: 'PkgDiet', rules: [] } }, results: result.results.filter(r => r.verdict !== 'ALLOW').map(r => ({ level: r.verdict === 'BLOCK' ? 'error' : 'warning', ruleId: r.reasons?.[0]?.code || 'PKGDIET_POLICY', message: { text: (r.reasons || []).map(x => typeof x === 'string' ? x : x.message).join(' ') }, locations: [{ physicalLocation: { artifactLocation: { uri: 'package.json' } } }] })) }] };
         fs.writeFileSync(options.sarif, JSON.stringify(sarif, null, 2));
     }
-    if (!options.dryRun || policyModified) {
-        if (policyModified) {
-            console.log('❌ PR Gate failed: Policy tampering detected.');
-            process.exit(1);
-        }
+    if (!options.dryRun) {
         if (result.status === 'ERROR') {
             console.log('❌ PR Gate execution error.');
             process.exit(2);

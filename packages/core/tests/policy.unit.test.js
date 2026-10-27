@@ -8,6 +8,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { validatePolicy, evaluatePolicy, applyEnvironment, DEFAULT_POLICY } from '../src/policy.js';
 
 // ── validatePolicy ─────────────────────────────────────────────────────────────
@@ -54,6 +55,12 @@ test('validatePolicy — same package in blocked and allowed is an error', () =>
   };
   const { errors } = validatePolicy(policy);
   assert.ok(errors.some(e => e.includes('bad-pkg') && e.includes('allowedPackages')));
+});
+
+test('starter policy template validates against the runtime schema', () => {
+  const template = JSON.parse(readFileSync(new URL('../../../templates/pkgdietrc-default.json', import.meta.url), 'utf8'));
+  const { errors } = validatePolicy({ ...DEFAULT_POLICY, ...template });
+  assert.deepEqual(errors, []);
 });
 
 test('validatePolicy — very low minHealthScore produces a warning', () => {
@@ -112,6 +119,12 @@ test('evaluatePolicy — explicitly allowed package bypasses all checks', () => 
   const { verdict, ignored } = evaluatePolicy('old-but-ok', badHealth, SMALL_SIZE, policy);
   assert.equal(verdict, 'ALLOW');
   assert.equal(ignored, true);
+});
+
+test('evaluatePolicy — an explicit block wins an invalid allow/block conflict', () => {
+  const policy = { ...DEFAULT_POLICY, blockedPackages: ['conflicted-pkg'], allowedPackages: ['conflicted-pkg'] };
+  const { verdict } = evaluatePolicy('conflicted-pkg', HEALTHY_PKG, SMALL_SIZE, policy);
+  assert.equal(verdict, 'BLOCK');
 });
 
 test('evaluatePolicy — package below minHealthScore is WARN by default', () => {

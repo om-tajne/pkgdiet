@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
@@ -19,6 +19,13 @@ function removeTempRepo() {
     retryDelay: 100,
   });
 }
+
+test('CI command exposes its documented machine-output and failure-threshold options', () => {
+  const help = execFileSync(process.execPath, [CLI_PATH, 'ci', '--help'], { encoding: 'utf8' });
+  assert.match(help, /--fail-on <level>/);
+  assert.match(help, /--sarif <file>/);
+  assert.match(help, /--json/);
+});
 
 test('E2E GitHub Actions PR Gate', async (t) => {
   // Clean up if exists
@@ -70,6 +77,13 @@ test('E2E GitHub Actions PR Gate', async (t) => {
     assert.match(err.stdout, /PR Gate failed: Policy violations detected/);
   }
   assert.ok(failed, 'CI gate should have exited with error for is-odd');
+
+  const sarifPath = join(TEMP_DIR, 'pkgdiet.sarif');
+  const reportOnly = run(`node "${CLI_PATH}" ci --base HEAD~1 --fail-on NONE --sarif "${sarifPath}" --json`);
+  const report = JSON.parse(reportOnly);
+  assert.equal(report.status, 'SUCCESS');
+  assert.equal(report.results[0].verdict, 'BLOCK');
+  assert.equal(JSON.parse(fs.readFileSync(sarifPath, 'utf8')).version, '2.1.0');
 
   // Step 3: Policy Tampering
   policy.failOn = 'WARN'; // modify policy

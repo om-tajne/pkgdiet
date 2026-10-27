@@ -146,16 +146,16 @@ Hard cap: deprecated packages score <= 15.
 1. `blockedPackages` includes name -> BLOCK (returns immediately)
 2. `allowedPackages` includes name -> ALLOW, ignored:true (returns immediately)
 3. Ignore rules noted for step 9
-4. score < minHealthScore -> BLOCK
+4. score < minHealthScore -> WARN by default; BLOCK when `blockOnLowHealth` is enabled
 5. score < warnHealthScore -> WARN
 6. deprecated + blockDeprecated -> BLOCK
-7. size > maxPackageSizeBytes -> WARN (never escalates to BLOCK)
+7. size > maxPackageSizeBytes -> WARN by default; BLOCK when `blockOnOversized` is enabled
 8. install scripts + blockInstallScripts -> BLOCK; else -> WARN
 9. If ignored and verdict != ALLOW -> override to ALLOW
 
 ### allowedPackages vs blockedPackages precedence
 
-`allowedPackages` wins — it is an explicit exception mechanism for packages that bypass all policy checks (e.g. known internal packages).
+`blockedPackages` wins. A package cannot safely be both explicitly allowed and explicitly blocked; `validatePolicy()` rejects that contradictory configuration before it can be relied on.
 
 `validatePolicy()` raises a **validation error** (not a warning) when the same package appears in both lists. Run `pkgdiet policy-check` after editing `.pkgdietrc.json`.
 
@@ -175,7 +175,7 @@ Execution sequence:
     - notFound + .npmrc scope -> ALLOW
     - notFound + internalNamePrefixes -> BLOCK (dependency confusion)
     - notFound (other) -> WARN (hallucination/typo)
-    - network error -> ALLOW (fail-open) or BLOCK (fail-closed)
+    - network error -> WARN (fail-open) or BLOCK (fail-closed)
 7.  estimateCostImpact()
 8.  evaluatePolicy()
 9.  Internal prefix + ALLOW -> WARN
