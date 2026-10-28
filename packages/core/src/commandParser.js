@@ -32,6 +32,8 @@ const FLAGS_WITH_VALUE = new Set([
   '--cwd',
 ]);
 
+const NOVEL_WRAPPERS = new Set(['env', 'cross-env', 'sudo', 'nohup', 'nice', 'time', 'command', 'builtin', 'exec']);
+
 /**
  * Tokenize a shell command string into words, preserving quotes and detecting expansions.
  *
@@ -223,14 +225,42 @@ function unwrapTokens(tokens) {
 
   const first = tokens[idx];
 
-  // 2. Wrappers: env, cross-env, sudo
-  if (first === 'env' || first === 'cross-env' || first === 'sudo') {
+  // 2. Wrappers: env, cross-env, sudo, nohup, nice, time, command, builtin, exec
+  if (NOVEL_WRAPPERS.has(first)) {
     idx++;
-    // Skip wrapper flags and assignments
-    while (idx < tokens.length && (tokens[idx].startsWith('-') || /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[idx]))) {
+    // Skip wrapper flags, values, and environment assignments until reaching a runner or package manager
+    while (
+      idx < tokens.length &&
+      !KNOWN_PACKAGE_MANAGERS.has(tokens[idx]) &&
+      !NOVEL_WRAPPERS.has(tokens[idx]) &&
+      tokens[idx] !== 'sh' &&
+      tokens[idx] !== 'bash' &&
+      tokens[idx] !== 'zsh' &&
+      tokens[idx] !== 'npx' &&
+      tokens[idx] !== 'pnpx' &&
+      tokens[idx] !== 'bunx' &&
+      tokens[idx] !== 'eval'
+    ) {
       idx++;
     }
     return unwrapTokens(tokens.slice(idx));
+  }
+
+  // 2b. xargs: dynamic invocation from stdin
+  if (first === 'xargs') {
+    return { unwrappedTokens: [], embeddedCommand: null, isAmbiguous: true, ambiguityReason: 'Dynamic xargs invocation from stdin' };
+  }
+
+  // 2c. Dynamic eval: eval "..." or eval '...'
+  if (first === 'eval') {
+    const remaining = tokens.slice(idx + 1).join(' ').trim();
+    if (!remaining) {
+      return { unwrappedTokens: [], embeddedCommand: null, isAmbiguous: true, ambiguityReason: 'Empty eval invocation' };
+    }
+    if (remaining.includes('$') || remaining.includes('`') || remaining.includes('|') || remaining.includes(';')) {
+      return { unwrappedTokens: [], embeddedCommand: null, isAmbiguous: true, ambiguityReason: 'Dynamic eval execution ($ or backticks or pipeline)' };
+    }
+    return { unwrappedTokens: [], embeddedCommand: remaining, isAmbiguous: false };
   }
 
   // 3. Shell subshells: sh -c "...", bash -c "...", zsh -c "..."
@@ -368,16 +398,26 @@ function parseSingleCommandTokens(rawTokens) {
     };
   }
 
-  // Check for shell expansions or wildcards in arguments
+  // Check for shell expansions, metacharacters, or invalid characters in package arguments
   for (const arg of positionalArgs) {
-    if (arg.includes('*') || arg.includes('?') || arg.includes('$')) {
+    if (
+      arg.includes('*') ||
+      arg.includes('?') ||
+      arg.includes('$') ||
+      arg.includes('`') ||
+      arg.includes(';') ||
+      arg.includes('&') ||
+      arg.includes('|') ||
+      arg.includes('\\') ||
+      !/^[a-zA-Z0-9@/._^~><=:+ -]+$/.test(arg)
+    ) {
       return {
         isInstall: true,
         packageManager: pm,
         verb,
         isBareInstall: false,
         isAmbiguous: true,
-        ambiguityReason: `Shell expansion or wildcard in package argument: '${arg}'`,
+        ambiguityReason: `Shell expansion or invalid character in package argument: '${arg}'`,
         packages: [],
         rawFlags,
       };
@@ -406,6 +446,80 @@ function parseSingleCommandTokens(rawTokens) {
 export function parseInstallCommands(commandString) {
   if (!commandString || typeof commandString !== 'string' || !commandString.trim()) {
     return [];
+  }
+
+  // 1. Base64-encoded command execution pipeline
+  if (/\b(?:base64\s+(?:-[A-Za-z]*d|--decode)|openssl\s+base64\s+-d)\b/i.test(commandString)) {
+    return [{
+      isInstall: true,
+      packageManager: null,
+      verb: null,
+      isBareInstall: false,
+      isAmbiguous: true,
+      ambiguityReason: 'Base64-encoded command execution pipeline',
+      packages: [],
+      rawFlags: [],
+    }];
+  }
+
+  // 2. Pipeline execution into shell interpreter: e.g. `... | bash`, `... | sh`, `... | zsh`
+  if (/\|\s*(?:sudo\s+)?(?:sh|bash|zsh|dash)\b/.test(commandString)) {
+    return [{
+      isInstall: true,
+      packageManager: null,
+      verb: null,
+      isBareInstall: false,
+      isAmbiguous: true,
+      ambiguityReason: 'Pipeline execution into shell interpreter (| sh/bash/zsh)',
+      packages: [],
+      rawFlags: [],
+    }];
+  }
+
+  // 3. Heredoc execution into shell interpreter: e.g. `bash << 'EOF'`, `sh <<< ...`
+  if (/(?:^|[;&|\s])(?:sh|bash|zsh|dash)\s+(?:<<|<<<)/.test(commandString) || /(?:<<|<<<)[\s\S]*?(?:npm|pnpm|yarn|bun)/.test(commandString)) {
+    return [{
+      isInstall: true,
+      packageManager: null,
+      verb: null,
+      isBareInstall: false,
+      isAmbiguous: true,
+      ambiguityReason: 'Heredoc shell invocation (<<)',
+      packages: [],
+      rawFlags: [],
+    }];
+  }
+
+  // 4. Shell function definition involving package managers or install verbs
+  if (/(?:^|[;\n\s])(?:function\s+[a-zA-Z0-9_-]+|[a-zA-Z0-9_-]+\s*\(\s*\))\s*\{/.test(commandString)) {
+    if (/(?:npm|pnpm|yarn|bun|install|add)\b/.test(commandString)) {
+      return [{
+        isInstall: true,
+        packageManager: null,
+        verb: null,
+        isBareInstall: false,
+        isAmbiguous: true,
+        ambiguityReason: 'Shell function definition',
+        packages: [],
+        rawFlags: [],
+      }];
+    }
+  }
+
+  // 5. Shell alias definition involving package managers or install verbs
+  if (/(?:^|[;\n\s])alias\s+[a-zA-Z0-9_-]+\s*=/.test(commandString)) {
+    if (/(?:npm|pnpm|yarn|bun|install|add)\b/.test(commandString)) {
+      return [{
+        isInstall: true,
+        packageManager: null,
+        verb: null,
+        isBareInstall: false,
+        isAmbiguous: true,
+        ambiguityReason: 'Shell alias definition',
+        packages: [],
+        rawFlags: [],
+      }];
+    }
   }
 
   const segments = splitCommandChains(commandString);

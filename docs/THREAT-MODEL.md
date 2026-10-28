@@ -89,18 +89,38 @@ PkgDiet is local-first. All AST scanning, lockfile diffing, and policy decisions
 
 ---
 
-## 4. Command Interception Architecture & Hardening Roadmap
+## 4. Command Interception Architecture & Fail-Closed Boundaries
 
-### Current Hook Capabilities
-For Claude Code (`.claude/hooks/pkgdiet-install-guard.sh`) and Codex (`.codex/hooks/pkgdiet-install-guard.mjs`):
-- Intercepts bash tool invocations before execution.
-- Matches `(npm|pnpm|yarn) (install|i|add)`.
-- Enforces pinned semver versions.
-- Calls `pkgdiet check --json` and blocks execution on failure.
+### 4.1 Parser Engine Capabilities (`@pkgdiet/core/src/commandParser.js`)
+For Claude Code (`.claude/hooks/pkgdiet-install-guard.sh`) and OpenAI Codex (`.codex/hooks/pkgdiet-install-guard.mjs`), PkgDiet replaces naive regular-expression matching with a dedicated parsing and normalization engine:
+- **Quote-Aware Tokenizer & Chain Splitter:** Parses arguments respecting single/double quotes, multiline line continuations (`\`), and control operators (`&&`, `||`, `;`, `|`, `&`).
+- **Recursive Wrapper Unwrapping:** Transparently peels process wrappers (`env`, `cross-env`, `sudo`, `nohup`, `nice`, `time`, `command`, `exec`), runner delegates (`npx`, `pnpm dlx`, `yarn dlx`, `bunx`, `npm exec`), subshells (`sh -c`, `bash -c`, `zsh -c`), and static `eval` invocations.
+- **Permissive Flag Normalization:** Discovers package manager verbs (`install`, `i`, `add`) and package specifications regardless of flag position (e.g. `npm -D i pkg@1.0.0`, `pnpm add --save-dev -w pkg@1.0.0`, `yarn add -W pkg@1.0.0`).
+- **Package Spec Syntax:** Extracts scoped names (`@scope/pkg`), pegged versions (`pkg@1.2.3`), and npm aliases (`my-alias@npm:lodash@4.17.21`).
+- **Argument Injection Defense:** Validates package specs against `^[a-zA-Z0-9@/._^~><=:+ -]+$`, immediately denying commands with shell metacharacters (`;`, `&`, `|`, `$`, `` ` ``, `\`, `>`, `<`).
 
-### Command Interception Hardening Principles
-To address shell syntax evasion, command parsing follows these guidelines:
-1. **Conservative Tokenization:** Rather than matching complex nested shell commands with fragile regular expressions, tokenize arguments using an allowlist of known package managers (`npm`, `pnpm`, `yarn`, `bun`).
-2. **Fail-Closed on Ambiguity:** If a command contains unresolvable dynamic substitutions (`$(...)`, backticks, `eval`, `sh -c`, `bash -c`), the guard must exit non-zero or prompt the user for explicit confirmation.
-3. **Prefix & Flag Normalization:** Strip flags before inspecting package arguments (e.g. `npm i -D pkg@1.0.0` or `pnpm add --save-dev pkg@1.0.0`).
-4. **CI Enforcement as Invariant:** No client-side shell hook is considered an unbypassable boundary. Branch-protected CI remains the sole invariant merge control.
+### 4.2 Fail-Closed Invariant on Ambiguity and Evasion
+> **Normative Declaration:** *Commands the parser cannot confidently analyze are denied (fail-closed), not that all theoretical evasion is detected.*
+
+PkgDiet automatically blocks execution and returns an explicit `deny` decision for:
+1. **Dynamic Expansions:** Command substitutions (`$(...)`, backticks `` `...` ``), environment variable references, or wildcards (`*`, `?`) in package arguments.
+2. **Obfuscated Pipelines & Decoders:** Pipeline execution into shell interpreters (`| sh`, `| bash`, `| zsh`, `| dash`), Base64 decoding pipelines (`base64 -d`, `base64 --decode`, `openssl base64 -d`), and dynamic stdin runners (`xargs`).
+3. **Heredocs & Aliases:** Heredocs fed into shell interpreters (`bash << 'EOF'`) and shell function or alias definitions (`alias i='npm i'`).
+4. **Bare Installs:** Unspecified package installs (`npm install`, `pnpm i`) driven entirely by `package.json`, requiring pinned specifications before installation.
+5. **Unpinned Installs:** Any package lacking an exact, pinned semver version (e.g. `lodash` or `axios@latest`).
+
+### 4.3 Fallback Degradation & Precision Boundaries
+If `@pkgdiet/core/dist/commandParser.js` cannot be loaded in the execution runtime (e.g., repository without installed dependencies):
+- The hook enters a **reduced-precision degraded mode**.
+- The fallback path extracts simple package names or fails closed immediately if any dynamic shell syntax (`$`, `` ` ``, `*`, `?`, `|`, `;`, `&`, `<`, `>`), unparseable verbs, bare installs, or unpinned packages are detected.
+- **Guarantee:** The fallback path **never** silently permits an unparsed or unverified installation. It either extracts and verifies clean pinned packages or fails closed with exit code 1.
+
+### 4.4 Hook Supply-Chain & Local-First Resolution
+Generated hook scripts eliminate enforcement-time network availability and integrity risks:
+1. **Local Resolution First:** Hooks check for local project binaries (`node_modules/pkgdiet/build/cli.js` or `node_modules/.bin/pkgdiet`) and execute directly with `node` (`shell: false`). This guarantees zero network round-trips to npm, identical behavior across Windows and POSIX, and zero shell argument interpolation risk.
+2. **Version-Pinned Fallback:** Only if local binaries are absent do hooks fall back to `npx -y pkgdiet@<version>`, where `<version>` is dynamically derived from the installed CLI package version rather than an unpinned `@latest` tag.
+
+### 4.5 Residual Shell Evasion Risk & CI Universal Merge Gate
+Because POSIX and Windows shell environments support arbitrary Turing-complete syntax (novel wrappers, custom binaries, dynamic file descriptor manipulation), no pre-tool hook can guarantee complete evasion prevention.
+- Client-side shell interception and MCP guidance are defensive guardrails against unintended or routine agent hallucinations.
+- **Universal Boundary:** Required GitHub CI status checks (`pkgdiet ci --base origin/main`) backed by branch protection remain the sole authoritative, tamper-resistant merge gate.

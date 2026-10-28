@@ -172,3 +172,87 @@ test('parseInstallCommands — non-install commands ignored', () => {
   assert.equal(parseInstallCommands('yarn lint')[0].isInstall, false);
   assert.equal(parseInstallCommands('')[0], undefined);
 });
+
+test('parseInstallCommands — novel wrappers, nested subshells, and static eval', () => {
+  // nohup
+  const r1 = parseInstallCommands('nohup npm i lodash@4.17.21')[0];
+  assert.equal(r1.isInstall, true);
+  assert.equal(r1.packages[0].name, 'lodash');
+
+  // nice -n 10
+  const r2 = parseInstallCommands('nice -n 10 pnpm add axios@1.6.0')[0];
+  assert.equal(r2.isInstall, true);
+  assert.equal(r2.packages[0].name, 'axios');
+
+  // command
+  const r3 = parseInstallCommands('command npm i debug@4.3.4')[0];
+  assert.equal(r3.isInstall, true);
+  assert.equal(r3.packages[0].name, 'debug');
+
+  // exec
+  const r4 = parseInstallCommands('exec bun add ms@2.1.3')[0];
+  assert.equal(r4.isInstall, true);
+  assert.equal(r4.packages[0].name, 'ms');
+
+  // nested subshells: sh -c -> bash -c -> npm i
+  const r5 = parseInstallCommands("sh -c \"bash -c 'npm i chalk@5.3.0'\"").find(c => c.isInstall);
+  assert.ok(r5);
+  assert.equal(r5.isInstall, true);
+  assert.equal(r5.packages[0].name, 'chalk');
+
+  // static eval
+  const r6 = parseInstallCommands('eval "npm i semver@7.5.4"')[0];
+  assert.equal(r6.isInstall, true);
+  assert.equal(r6.packages[0].name, 'semver');
+  assert.equal(r6.packages[0].isPinned, true);
+});
+
+test('parseInstallCommands — shell evasion attempts fail closed as ambiguous', () => {
+  // 1. Pipeline execution into shell interpreter
+  const r1 = parseInstallCommands('echo "npm i lodash" | bash')[0];
+  assert.equal(r1.isInstall, true);
+  assert.equal(r1.isAmbiguous, true);
+  assert.match(r1.ambiguityReason, /Pipeline execution into shell/i);
+
+  // 2. Base64 decoded pipeline into shell
+  const r2 = parseInstallCommands('echo bXBtIGkg... | base64 -d | sh')[0];
+  assert.equal(r2.isInstall, true);
+  assert.equal(r2.isAmbiguous, true);
+  assert.match(r2.ambiguityReason, /Base64/i);
+
+  // 3. Heredoc into shell interpreter
+  const r3 = parseInstallCommands('bash << "EOF"\nnpm i lodash\nEOF')[0];
+  assert.equal(r3.isInstall, true);
+  assert.equal(r3.isAmbiguous, true);
+  assert.match(r3.ambiguityReason, /Heredoc/i);
+
+  // 4. Shell function definition
+  const r4 = parseInstallCommands('install_deps() { npm i lodash; }')[0];
+  assert.equal(r4.isInstall, true);
+  assert.equal(r4.isAmbiguous, true);
+  assert.match(r4.ambiguityReason, /function definition/i);
+
+  // 5. Shell alias definition
+  const r5 = parseInstallCommands('alias i="npm i"')[0];
+  assert.equal(r5.isInstall, true);
+  assert.equal(r5.isAmbiguous, true);
+  assert.match(r5.ambiguityReason, /alias definition/i);
+
+  // 6. Dynamic xargs invocation
+  const r6 = parseInstallCommands('cat pkgs.txt | xargs npm i').find(c => c.isInstall);
+  assert.ok(r6);
+  assert.equal(r6.isInstall, true);
+  assert.equal(r6.isAmbiguous, true);
+  assert.match(r6.ambiguityReason, /xargs/i);
+
+  // 7. Dynamic eval with expansion
+  const r7 = parseInstallCommands('eval "npm i $(cat pkgs.txt)"')[0];
+  assert.equal(r7.isInstall, true);
+  assert.equal(r7.isAmbiguous, true);
+
+  // 8. Argument injection attempt in package spec
+  const r8 = parseInstallCommands('npm i "lodash; rm -rf /"')[0];
+  assert.equal(r8.isInstall, true);
+  assert.equal(r8.isAmbiguous, true);
+  assert.match(r8.ambiguityReason, /invalid character/i);
+});
