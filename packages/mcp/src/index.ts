@@ -370,7 +370,7 @@ export function createMcpServer() {
           const rawPolicy      = loadPolicy(process.cwd());
           const env            = args.environment || "dev";
           const effectivePolicy = applyEnvironment(rawPolicy, env);
-          const { errors, warnings } = validatePolicy(effectivePolicy);
+          const { errors, warnings, issues } = validatePolicy(effectivePolicy);
 
           return {
             content: [{
@@ -386,7 +386,7 @@ export function createMcpServer() {
                   warnHealthScore: effectivePolicy.warnHealthScore,
                   blockDeprecated: effectivePolicy.blockDeprecated,
                 },
-                validation: { valid: errors.length === 0, errors, warnings },
+                validation: { valid: errors.length === 0, errors, warnings, issues: issues || [] },
                 threatModel: {
                   reference: "docs/THREAT-MODEL.md",
                   notice: "MCP tool results are advisory guidance for AI coding agents. Only enforced CI checks backed by required branch protection constitute merge controls.",

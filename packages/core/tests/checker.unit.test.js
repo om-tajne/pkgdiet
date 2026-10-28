@@ -202,6 +202,60 @@ test('checker — PKGDIET_NO_NETWORK=1 makes zero outbound calls and returns off
   assert.ok(output.includes('OFFLINE_VERIFIED'), 'Expected offline execution without network calls');
 });
 
+test('checker — PKGDIET_NO_NETWORK=1 falls back to valid cache and marks uncached as skipped', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const code = `
+    import assert from 'node:assert/strict';
+    import { mkdtempSync, rmSync } from 'node:fs';
+    import { tmpdir } from 'node:os';
+    import { join } from 'node:path';
+
+    // Invariant: fetch MUST NOT be called in offline mode
+    globalThis.fetch = () => {
+      throw new Error('Outbound network call detected in offline mode!');
+    };
+
+    const tempDir = mkdtempSync(join(tmpdir(), 'pkgdiet-offline-cache-'));
+    try {
+      const { setCached } = await import('./packages/core/src/cache.js');
+      const { fetchPackageHealth } = await import('./packages/core/src/health.js');
+
+      // 1. Seed a valid cached package
+      const cachedData = {
+        name: 'cached-offline-pkg',
+        score: 94,
+        vulnerabilities: [],
+        osvChecked: true,
+        flags: []
+      };
+      setCached(tempDir, 'cached-offline-pkg', 'health', cachedData);
+
+      // 2. Fetch cached package offline -> returns cached metadata with fromCache: true
+      const hit = await fetchPackageHealth('cached-offline-pkg', tempDir, true);
+      assert.equal(hit.fromCache, true, 'Expected fromCache: true for seeded cached package');
+      assert.equal(hit.name, 'cached-offline-pkg');
+      assert.equal(hit.score, 94);
+      assert.equal(hit.osvChecked, true);
+
+      // 3. Fetch uncached package offline -> returns offline skipped result
+      const miss = await fetchPackageHealth('uncached-offline-pkg', tempDir, true);
+      assert.equal(miss.skipped, true, 'Expected skipped: true for uncached package');
+      assert.equal(miss.offline, true, 'Expected offline: true for uncached package');
+      assert.equal(miss.score, null, 'Expected null score for skipped health check');
+      assert.equal(miss.fromCache, undefined);
+
+      console.log('OFFLINE_CACHE_INVARIANT_VERIFIED');
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  `;
+  const output = execFileSync('node', ['--input-type=module', '-e', code], {
+    env: { ...process.env, PKGDIET_NO_NETWORK: '1' },
+    encoding: 'utf8',
+  });
+  assert.ok(output.includes('OFFLINE_CACHE_INVARIANT_VERIFIED'), 'Expected offline cache fallback invariant to hold');
+});
+
 test('telemetry — PKGDIET_TELEMETRY_DISABLED=1 disables metrics recording', async () => {
   const { isTelemetryEnabled } = await import('../src/telemetry.js');
   const policy = { telemetry: true };

@@ -87,11 +87,25 @@ export function applyEnvironment(policy, envName) {
 /**
  * Validate a policy object for errors (must fix) and warnings (should review).
  * @param {object} policy
- * @returns {{ errors: string[], warnings: string[] }}
+ * @param {object} policy
+ * @param {object} [options]
+ * @param {boolean} [options.structured=false] When true, returns structured issue objects for errors and warnings
+ * @returns {{ errors: (string|object)[], warnings: (string|object)[], issues: object[], structuredErrors: object[], structuredWarnings: object[] }}
  */
-export function validatePolicy(policy) {
+export function validatePolicy(policy, options = {}) {
   const errors = [];
   const warnings = [];
+  const issues = [];
+
+  function addError(message, meta = {}) {
+    errors.push(message);
+    issues.push({ severity: 'error', message, ...meta });
+  }
+
+  function addWarning(message, meta = {}) {
+    warnings.push(message);
+    issues.push({ severity: 'warning', message, ...meta });
+  }
 
   // ── Errors ──────────────────────────────────────────────────────────────────
 
@@ -99,14 +113,20 @@ export function validatePolicy(policy) {
     typeof policy.minHealthScore !== 'number' ||
     policy.minHealthScore < 0 || policy.minHealthScore > 100
   ) {
-    errors.push('`minHealthScore` must be a number between 0 and 100.');
+    addError('`minHealthScore` must be a number between 0 and 100.', {
+      code: 'INVALID_HEALTH_THRESHOLDS',
+      field: 'minHealthScore',
+    });
   }
 
   if (
     typeof policy.warnHealthScore !== 'number' ||
     policy.warnHealthScore < 0 || policy.warnHealthScore > 100
   ) {
-    errors.push('`warnHealthScore` must be a number between 0 and 100.');
+    addError('`warnHealthScore` must be a number between 0 and 100.', {
+      code: 'INVALID_HEALTH_THRESHOLDS',
+      field: 'warnHealthScore',
+    });
   }
 
   if (
@@ -114,18 +134,28 @@ export function validatePolicy(policy) {
     typeof policy.warnHealthScore === 'number' &&
     policy.warnHealthScore < policy.minHealthScore
   ) {
-    errors.push(
+    addError(
       `\`warnHealthScore\` (${policy.warnHealthScore}) is less than \`minHealthScore\` (${policy.minHealthScore}). ` +
-      'Thresholds are inverted — all warned packages would also be blocked.'
+      'Thresholds are inverted — all warned packages would also be blocked.',
+      {
+        code: 'INVALID_HEALTH_THRESHOLDS',
+        field: 'minHealthScore',
+      }
     );
   }
 
   if (!['BLOCK', 'WARN', 'NONE'].includes(policy.failOn)) {
-    errors.push('`failOn` must be "BLOCK", "WARN", or "NONE".');
+    addError('`failOn` must be "BLOCK", "WARN", or "NONE".', {
+      code: 'INVALID_FAIL_ON',
+      field: 'failOn',
+    });
   }
 
   if (!['fail-open', 'fail-closed'].includes(policy.securityMode)) {
-    errors.push('`securityMode` must be "fail-open" or "fail-closed".');
+    addError('`securityMode` must be "fail-open" or "fail-closed".', {
+      code: 'INVALID_SECURITY_MODE',
+      field: 'securityMode',
+    });
   }
 
   // Contradictory rules: same package in blocked AND allowed
@@ -133,9 +163,13 @@ export function validatePolicy(policy) {
   const allowed = new Set((policy.allowedPackages || []).map(p => typeof p === 'string' ? p : p?.package).filter(Boolean));
   for (const pkg of blocked) {
     if (allowed.has(pkg)) {
-      errors.push(
+      addError(
         `Package '${pkg}' is in both \`blockedPackages\` and \`allowedPackages\`. ` +
-        '`blockedPackages` wins — remove the contradiction before relying on this policy.'
+        '`blockedPackages` wins — remove the contradiction before relying on this policy.',
+        {
+          code: 'PACKAGE_RULE_CONFLICT',
+          package: pkg,
+        }
       );
     }
   }
@@ -144,24 +178,36 @@ export function validatePolicy(policy) {
 
   for (const item of policy.allowedPackages || []) {
     const pkg = typeof item === 'string' ? item : item?.package;
-    const reason = typeof item === 'object' ? item?.reason : null;
+    const rawReason = typeof item === 'object' && item ? item.reason : null;
+    const hasReason = typeof rawReason === 'string' && rawReason.trim().length > 0;
 
     if (item && typeof item === 'object' && item.expiresAt) {
       const expiry = new Date(item.expiresAt).getTime();
       if (!isNaN(expiry) && Date.now() > expiry) {
-        warnings.push(`\`allowedPackages\` entry for '${pkg}' expired on ${item.expiresAt}. It is no longer bypassing policy.`);
+        addWarning(`\`allowedPackages\` entry for '${pkg}' expired on ${item.expiresAt}. It is no longer bypassing policy.`, {
+          code: 'EXEMPTION_EXPIRED',
+          package: pkg,
+          expiresAt: item.expiresAt,
+        });
       }
     }
 
-    if (!reason || typeof reason !== 'string' || !reason.trim()) {
-      warnings.push(`\`allowedPackages\` entry for '${pkg}' has no documented reason. Add a \`reason\` explaining why this package bypasses policy.`);
+    if (!hasReason) {
+      addWarning(`\`allowedPackages\` entry for '${pkg}' has no documented reason. Add a \`reason\` explaining why this package bypasses policy.`, {
+        code: 'EXEMPTION_MISSING_REASON',
+        package: pkg,
+      });
     }
   }
 
   if (typeof policy.minHealthScore === 'number' && policy.minHealthScore < 20) {
-    warnings.push(
+    addWarning(
       `\`minHealthScore\` is ${policy.minHealthScore} (very lax). ` +
-      'Packages with a score this low are often deprecated or unmaintained.'
+      'Packages with a score this low are often deprecated or unmaintained.',
+      {
+        code: 'LAX_HEALTH_THRESHOLD',
+        field: 'minHealthScore',
+      }
     );
   }
 
@@ -169,30 +215,61 @@ export function validatePolicy(policy) {
     typeof policy.maxPackageSizeBytes === 'number' &&
     policy.maxPackageSizeBytes > 100_000_000
   ) {
-    warnings.push(
+    addWarning(
       `\`maxPackageSizeBytes\` is ${(policy.maxPackageSizeBytes / 1_000_000).toFixed(0)}MB (>100MB). ` +
-      'This effectively disables the size check.'
+      'This effectively disables the size check.',
+      {
+        code: 'HIGH_SIZE_LIMIT',
+        field: 'maxPackageSizeBytes',
+      }
     );
   }
 
   if (policy.blockDeprecated === false) {
-    warnings.push(
+    addWarning(
       '`blockDeprecated` is false. Deprecated packages will not be blocked — ' +
-      'this may expose your project to unmaintained dependencies.'
+      'this may expose your project to unmaintained dependencies.',
+      {
+        code: 'DEPRECATED_ALLOWED',
+        field: 'blockDeprecated',
+      }
     );
   }
 
   const knownEnvs = new Set(['ci', 'dev', 'prod', 'staging', 'test']);
   for (const envKey of Object.keys(policy.environments || {})) {
     if (!knownEnvs.has(envKey)) {
-      warnings.push(
+      addWarning(
         `Unknown environment key '${envKey}' in \`environments\`. ` +
-        'Known keys are: ci, dev, prod, staging, test. This may be a typo.'
+        'Known keys are: ci, dev, prod, staging, test. This may be a typo.',
+        {
+          code: 'UNKNOWN_ENVIRONMENT_KEY',
+          field: `environments.${envKey}`,
+        }
       );
     }
   }
 
-  return { errors, warnings };
+  const structuredErrors = issues.filter(i => i.severity === 'error');
+  const structuredWarnings = issues.filter(i => i.severity === 'warning');
+
+  if (options && options.structured === true) {
+    return {
+      errors: structuredErrors,
+      warnings: structuredWarnings,
+      issues,
+      structuredErrors,
+      structuredWarnings,
+    };
+  }
+
+  return {
+    errors,
+    warnings,
+    issues,
+    structuredErrors,
+    structuredWarnings,
+  };
 }
 
 // ── Policy evaluation helpers ──────────────────────────────────────────────────
@@ -211,13 +288,17 @@ function isPackageAllowed(packageName, allowedPackages) {
   for (const item of allowedPackages) {
     const name = typeof item === 'string' ? item : item?.package;
     if (name === packageName) {
+      const rawReason = typeof item === 'object' && item ? item.reason : null;
+      const trimmedReason = typeof rawReason === 'string' ? rawReason.trim() : null;
+      const normalizedReason = trimmedReason && trimmedReason.length > 0 ? trimmedReason : null;
+
       if (item && typeof item === 'object' && item.expiresAt) {
         const expiry = new Date(item.expiresAt).getTime();
         if (!isNaN(expiry) && Date.now() > expiry) {
-          return { allowed: false, expired: true, expiresAt: item.expiresAt, reason: item.reason };
+          return { allowed: false, expired: true, expiresAt: item.expiresAt, reason: normalizedReason };
         }
       }
-      return { allowed: true, reason: typeof item === 'object' ? item.reason : null };
+      return { allowed: true, reason: normalizedReason };
     }
   }
   return { allowed: false };
@@ -240,11 +321,17 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
     const msg = allowCheck.reason
       ? `Package is explicitly allowed in policy (${allowCheck.reason}).`
       : 'Package is explicitly allowed in policy.';
-    return { verdict: 'ALLOW', reasons: [{ code: 'PACKAGE_ALLOWED', message: msg }], ignored: true };
+    return {
+      verdict: 'ALLOW',
+      reasons: [{ code: 'PACKAGE_ALLOWED', message: msg, reason: allowCheck.reason }],
+      ignored: true,
+    };
   } else if (allowCheck.expired) {
     reasons.push({
       code: 'ALLOW_EXCEPTION_EXPIRED',
-      message: `Policy allow exception for '${packageName}' expired on ${allowCheck.expiresAt}. Evaluated normally.`
+      message: `Policy allow exception for '${packageName}' expired on ${allowCheck.expiresAt}. Evaluated normally.`,
+      reason: allowCheck.reason,
+      expiresAt: allowCheck.expiresAt,
     });
   }
 
