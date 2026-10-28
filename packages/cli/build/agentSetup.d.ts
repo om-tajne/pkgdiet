@@ -15,4 +15,6 @@ export declare function verifyAgents(cwd: any): ({
     configured: boolean;
     file: any;
 })[];
+export declare function generateCodexGuardScript(cliVersion?: string): string;
+export declare function generateClaudeCodeGuardScript(cliVersion?: string): string;
 export declare function setupAgents(agents: any, cwd: any, options?: {}): Promise<void>;
