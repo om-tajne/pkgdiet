@@ -68,7 +68,7 @@ export function createMcpServer() {
         version: "2.0.1",
     });
     // ── check_dependency ────────────────────────────────────────────────────────
-    server.tool("check_dependency", "Evaluate a single npm package against the active PkgDiet policy to determine if it is safe, lightweight, and healthy to install. Use this read-only tool before proposing or installing any package. It returns a structured verdict (ALLOW, WARN, BLOCK), health score, cost impact, and supply-chain evidence. A BLOCK is a successful policy decision and must not be bypassed; execution failures are returned as MCP tool errors. It does not install packages, edit files, or modify the project.", {
+    server.tool("check_dependency", "Evaluate a single npm package against the active PkgDiet policy to determine if it is safe, lightweight, and healthy to install. Use this read-only tool before proposing or installing any package. It returns a structured verdict (ALLOW, WARN, BLOCK), health score, cost impact, and supply-chain evidence. A BLOCK is a successful policy decision and must not be bypassed; execution failures are returned as MCP tool errors. It does not install packages, edit files, or modify the project.\n\nResponse fields:\n- verdict: ALLOW | WARN | BLOCK. Never bypass a BLOCK.\n- advisoryVerification.osvChecked: true = OSV security advisory feed confirmed (no CVEs, or CVEs listed in evidence). false = advisory feed was UNREACHABLE — this means CVE status is UNVERIFIED, not safe. Do not treat osvChecked:false as a clean security result.\n- advisoryVerification.osvErrorCode: reason the feed was unavailable (timeout, network_error, http_503, etc.) when osvChecked is false.\n- advisoryVerification.osvCheckedAt: ISO timestamp of the successful OSV check, or null if the check failed.\n- cacheProvenance.fromCache: true if npm metadata came from local cache rather than a live registry fetch.\n- cacheProvenance.cachedAt: ISO timestamp when the cached entry was originally fetched.\n- cacheProvenance.cacheAgeMs: age of the cache entry in milliseconds.", {
         packageName: z.string().min(1).max(214)
             .describe("The exact npm package name to evaluate, such as 'lodash', 'moment', or '@types/node'."),
         environment: z.enum(["dev", "prod", "ci", "test"]).default("dev")
@@ -146,6 +146,16 @@ export function createMcpServer() {
                                         (typeof reason === "string" ? reason : reason.code) === "REGISTRY_UNAVAILABLE_BLOCKED"),
                                     hasProvenance: result.hasProvenance || false,
                                     integrityCheck: result.integrityCheck || "missing",
+                                },
+                                advisoryVerification: {
+                                    osvChecked: result.osvChecked ?? null,
+                                    osvErrorCode: result.osvErrorCode ?? null,
+                                    osvCheckedAt: result.osvCheckedAt ?? null,
+                                },
+                                cacheProvenance: {
+                                    fromCache: result.fromCache ?? false,
+                                    cachedAt: result.cachedAt ?? null,
+                                    cacheAgeMs: result.cacheAgeMs ?? null,
                                 },
                                 policy: { source, policyVersion: policy.policyVersion || 1, environment: env },
                                 addedSizeBytes: result.costEstimate?.addedSizeMB ? Math.round(result.costEstimate.addedSizeMB * 1024 * 1024) : 0,

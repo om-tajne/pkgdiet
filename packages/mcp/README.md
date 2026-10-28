@@ -16,6 +16,7 @@ Exposes read-only tools that compatible AI clients can call before recommending 
 - `check_dependencies` evaluates up to 50 candidate packages in a bounded batch.
 - `suggest_alternative` returns curated replacement candidates.
 - `get_policy` returns the effective policy and validation result.
+- `explain_verdict` explains package verdicts with component health scores and evidence.
 
 See [the MCP guide](../../docs/MCP.md) for parameters and response schemas.
 

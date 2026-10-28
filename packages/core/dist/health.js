@@ -2,7 +2,7 @@
  * PkgDiet — Health Analyzer Module
  * Scores package health based on npm registry metadata.
  */
-import { getCached, batchSetCached } from './cache.js';
+import { getCached, getCachedWithMeta, batchSetCached } from './cache.js';
 import { timeSince } from './utils.js';
 import { findTyposquatCandidates } from './security.js';
 const NPM_REGISTRY = (process.env.PKGDIET_REGISTRY_URL || 'https://registry.npmjs.org').replace(/\/$/, '');
@@ -78,27 +78,96 @@ async function fetchWithRetry(url, retries = MAX_RETRIES) {
     }
     return { data: null, status: 'network_error' };
 }
+/**
+ * Fetch OSV advisories for a package@version.
+ *
+ * HTTP status semantics:
+ *   200        → osvChecked: true, parse vulns array (empty array = no known advisories)
+ *   404        → osvChecked: false, errorCode: 'http_404'
+ *                OSV's POST /v1/query does not distinguish "package unknown" from
+ *                "malformed request" via 404, so we cannot safely treat it as a
+ *                confirmed-clean result. Mark as unverified; policy escalates
+ *                per securityMode. Cache expiry will trigger a fresh attempt.
+ *   429 / 5xx  → transient; retried up to MAX_RETRIES times with exponential
+ *                backoff. The final response status is preserved in errorCode
+ *                (e.g. 'http_429' vs 'http_503') so callers can distinguish
+ *                rate-limit exhaustion from a service outage.
+ *   other 4xx  → non-retryable client error; mark unavailable with http_<status>
+ *   timeout    → mark unavailable with errorCode 'timeout' (not retried — already
+ *                waited FETCH_TIMEOUT_MS)
+ *   network    → mark unavailable with errorCode 'network_error' (not retried)
+ *   invalid JSON → mark unavailable with errorCode 'invalid_json'
+ *
+ * osvCheckedAt is set to the ISO timestamp of the successful OSV response only.
+ * It is null on every failure path so callers never mistake an error timestamp
+ * for a successful verification time.
+ *
+ * IMPORTANT: 'skipped' (PKGDIET_ADVISORIES=0 or no version resolved) is
+ * semantically different from 'unavailable'. Policy must never treat 'skipped'
+ * as an outage — it is an explicit opt-out or a missing-version condition.
+ */
 async function fetchOsvAdvisories(packageName, version) {
-    if (!ADVISORIES_ENABLED || !version)
-        return { status: 'skipped', vulnerabilities: [] };
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    try {
-        const response = await fetch(OSV_API, {
-            method: 'POST',
-            headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-            body: JSON.stringify({ package: { ecosystem: 'npm', name: packageName }, version }),
-            signal: controller.signal,
-        });
-        const data = response.ok ? await response.json() : null;
-        return { status: response.ok ? 'ok' : 'unavailable', vulnerabilities: data?.vulns || [] };
+    if (!ADVISORIES_ENABLED || !version) {
+        return { status: 'skipped', osvChecked: false, vulnerabilities: [], errorCode: null, osvCheckedAt: null };
     }
-    catch {
-        return { status: 'unavailable', vulnerabilities: [] };
+    const body = JSON.stringify({ package: { ecosystem: 'npm', name: packageName }, version });
+    let lastErrorCode = 'network_error';
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+        try {
+            const response = await fetch(OSV_API, {
+                method: 'POST',
+                headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+                body,
+                signal: controller.signal,
+            });
+            clearTimeout(timer);
+            // Transient server/rate errors — retry with backoff.
+            // Preserve the actual status in lastErrorCode so retry exhaustion
+            // reports 'http_429' vs 'http_503' accurately.
+            if ((response.status === 429 || response.status >= 500) && attempt < MAX_RETRIES) {
+                lastErrorCode = `http_${response.status}`;
+                const delay = RETRY_DELAY_MS * Math.pow(2, attempt);
+                await new Promise(r => setTimeout(r, delay));
+                continue;
+            }
+            // Any non-OK response (including 404 and other 4xx) is treated as unverified.
+            // We do not promote 404 to "confirmed clean" because OSV's API does not
+            // reliably distinguish "no record" from "malformed request" via 404.
+            if (!response.ok) {
+                return {
+                    status: 'unavailable',
+                    osvChecked: false,
+                    vulnerabilities: [],
+                    errorCode: `http_${response.status}`,
+                    osvCheckedAt: null,
+                };
+            }
+            let data;
+            try {
+                data = await response.json();
+            }
+            catch {
+                return { status: 'unavailable', osvChecked: false, vulnerabilities: [], errorCode: 'invalid_json', osvCheckedAt: null };
+            }
+            return {
+                status: 'ok',
+                osvChecked: true,
+                vulnerabilities: data?.vulns || [],
+                errorCode: null,
+                osvCheckedAt: new Date().toISOString(),
+            };
+        }
+        catch (err) {
+            clearTimeout(timer);
+            // Timeout and network errors are not retried.
+            const errorCode = err.name === 'AbortError' ? 'timeout' : 'network_error';
+            return { status: 'unavailable', osvChecked: false, vulnerabilities: [], errorCode, osvCheckedAt: null };
+        }
     }
-    finally {
-        clearTimeout(timer);
-    }
+    // Exhausted retries — report the last observed HTTP status class.
+    return { status: 'unavailable', osvChecked: false, vulnerabilities: [], errorCode: lastErrorCode, osvCheckedAt: null };
 }
 // ── Concurrency pool ──────────────────────────────────────────────────────────
 /**
@@ -132,9 +201,10 @@ export async function fetchPackageHealth(packageName, projectPath, useCache, tar
     // Check cache first (scoped by version if specific version requested)
     const cacheKey = targetVersion ? `health:${targetVersion}` : 'health';
     if (useCache) {
-        const cached = getCached(projectPath, packageName, cacheKey) || (targetVersion ? null : getCached(projectPath, packageName, 'health'));
-        if (cached) {
-            return { ...cached, fromCache: true };
+        const meta = getCachedWithMeta(projectPath, packageName, cacheKey) ||
+            (targetVersion ? null : getCachedWithMeta(projectPath, packageName, 'health'));
+        if (meta) {
+            return { ...meta.data, fromCache: true, cachedAt: meta.fetchedAt, cacheAgeMs: meta.ageMs };
         }
     }
     if (OFFLINE) {
@@ -285,8 +355,11 @@ export async function fetchPackageHealth(packageName, projectPath, useCache, tar
     if (installScripts.length > 0) {
         flags.push({ type: 'warning', label: `Install scripts (${installScripts.join(', ')})` });
     }
-    if (advisoryResult.vulnerabilities.length > 0) {
+    if (advisoryResult.osvChecked && advisoryResult.vulnerabilities.length > 0) {
         flags.push({ type: 'critical', label: `Known vulnerabilities (${advisoryResult.vulnerabilities.length})` });
+    }
+    else if (!advisoryResult.osvChecked && advisoryResult.status !== 'skipped') {
+        flags.push({ type: 'warning', label: `OSV advisory check unavailable (${advisoryResult.errorCode})` });
     }
     if (typosquatCandidates.length > 0) {
         flags.push({ type: 'warning', label: `Name resembles ${typosquatCandidates.join(', ')}` });
@@ -362,6 +435,9 @@ export async function fetchPackageHealth(packageName, projectPath, useCache, tar
         hasProvenance: Boolean(versionMeta?.dist?.attestations?.provenance || versionMeta?.dist?.provenance || versionMeta?.publishConfig?.provenance || latestMeta?.dist?.attestations?.provenance),
         integrityCheck: (versionMeta?.dist?.integrity || latestMeta?.dist?.integrity) ? 'present' : 'missing',
         advisoryStatus: advisoryResult.status,
+        osvChecked: advisoryResult.osvChecked,
+        osvErrorCode: advisoryResult.errorCode || null,
+        osvCheckedAt: advisoryResult.osvCheckedAt,
         vulnerabilityIds: advisoryResult.vulnerabilities.map(item => item.id).filter(Boolean),
         typosquatCandidates,
         skipped: false,

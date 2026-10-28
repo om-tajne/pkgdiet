@@ -293,6 +293,20 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
     });
   }
 
+  // OSV feed unavailable — treat distinctly from "no vulnerabilities found".
+  // fail-open: WARN with explicit OSV_UNAVAILABLE code so clients can surface it.
+  // fail-closed: BLOCK — cannot confirm absence of CVEs; never produce a silent clean pass.
+  if (pkgHealth?.osvChecked === false && pkgHealth?.advisoryStatus !== 'skipped') {
+    const failClosed = policy.securityMode === 'fail-closed';
+    verdict = failClosed ? 'BLOCK' : (verdict === 'BLOCK' ? 'BLOCK' : 'WARN');
+    reasons.push({
+      code: failClosed ? 'OSV_UNAVAILABLE_BLOCKED' : 'OSV_UNAVAILABLE',
+      message: failClosed
+        ? `SECURITY BLOCK: Vulnerability advisory feed (OSV) is unavailable (${pkgHealth.osvErrorCode || 'unknown'}). Cannot confirm absence of CVEs under fail-closed policy.`
+        : `SECURITY WARNING: Vulnerability advisory feed (OSV) is unavailable (${pkgHealth.osvErrorCode || 'unknown'}). CVE status is unconfirmed — review before installing.`,
+    });
+  }
+
   if (pkgHealth?.typosquatCandidates?.length > 0) {
     verdict = policy.blockTyposquats ? 'BLOCK' : (verdict === 'BLOCK' ? 'BLOCK' : 'WARN');
     reasons.push({
@@ -334,6 +348,7 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
           r.code === 'PACKAGE_DEPRECATED' ||
           r.code === 'INSTALL_SCRIPTS' ||
           r.code === 'KNOWN_VULNERABILITY' ||
+          r.code === 'OSV_UNAVAILABLE_BLOCKED' ||
           r.code === 'PROVENANCE_REQUIRED' ||
           r.code === 'INTEGRITY_REQUIRED' ||
           r.code === 'PINNED_VERSION_REQUIRED' ||

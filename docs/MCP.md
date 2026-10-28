@@ -58,9 +58,20 @@ Evaluate a single npm package against the active project policy.
 | `remediation.rationale` | Primary policy rationale string |
 | `remediation.evidenceUrls` | Array of direct URLs to OSV vulnerability records |
 | `scoreExplanation` | Itemized breakdown of component health scores and bands |
+| `advisoryVerification.osvChecked` | `true` if OSV API verified advisories; `false` if unreachable / unverified; `null` if skipped |
+| `advisoryVerification.osvErrorCode` | Failure code (`timeout`, `network_error`, `http_429`, `http_503`, `http_404`, etc.) when `osvChecked: false` |
+| `advisoryVerification.osvCheckedAt` | ISO timestamp of the successful advisory check, or `null` on failure/skipped |
+| `cacheProvenance.fromCache` | `true` if package metadata was served from `.pkgdiet-cache.json` |
+| `cacheProvenance.cachedAt` | ISO timestamp when the cache entry was originally written |
+| `cacheProvenance.cacheAgeMs` | Age of the cached entry in milliseconds |
 | `alternatives` | Array of curated replacement names |
 | `addedSizeBytes` | Estimated unpacked size in bytes (scenario-based estimate) |
 | `costImpactPerMonthUsd` | Estimated CI cost impact in USD (scenario-based estimate) |
+
+> **Security Verification Semantics:**
+> - **Absence of evidence is not evidence of absence.** If `advisoryVerification.osvChecked === false`, treat vulnerability status as **unknown/unverified**. Do **not** infer safety from an empty vulnerabilities list.
+> - When `osvChecked: false`, `osvCheckedAt` is strictly `null` to ensure failure timestamps are never confused with valid verification times.
+> - A cached entry with `osvChecked: false` continues to escalate under policy until the cache entry expires and a live check succeeds.
 
 > **Field name note:** The CLI (`pkgdiet check`) and the MCP tool use different field names. The MCP response uses `addedSizeBytes` and `costImpactPerMonthUsd`. Do not assume they match CLI output.
 >
@@ -85,6 +96,16 @@ Evaluate a single npm package against the active project policy.
     "registryVerified": true,
     "hasProvenance": false,
     "integrityCheck": "missing"
+  },
+  "advisoryVerification": {
+    "osvChecked": true,
+    "osvErrorCode": null,
+    "osvCheckedAt": "2026-10-28T17:30:00.000Z"
+  },
+  "cacheProvenance": {
+    "fromCache": false,
+    "cachedAt": null,
+    "cacheAgeMs": null
   },
   "policy": { "source": "local", "policyVersion": 1, "environment": "dev" },
   "addedSizeBytes": 4351066,

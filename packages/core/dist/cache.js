@@ -177,6 +177,40 @@ export function getCached(projectPath, packageName, key) {
     return entry[key];
 }
 /**
+ * Get a cached entry along with its provenance metadata (fetchedAt, ageMs).
+ * Returns null if the entry is missing, expired, or tampered with.
+ *
+ * @returns {{ data: object, fetchedAt: string, ageMs: number } | null}
+ */
+export function getCachedWithMeta(projectPath, packageName, key) {
+    const cache = loadCache(projectPath);
+    const entry = cache.entries[packageName];
+    if (!entry || !entry[key])
+        return null;
+    const fetchedAtMs = new Date(entry.fetchedAt).getTime();
+    const ageMs = Date.now() - fetchedAtMs;
+    if (ageMs > CACHE_TTL_MS) {
+        return null; // expired
+    }
+    // Registry and policy binding check
+    const currentRegistry = getRegistryUrl();
+    const currentPolicyVersion = getPolicyVersion(projectPath);
+    if (entry.registryUrl && entry.registryUrl !== currentRegistry) {
+        return null;
+    }
+    if (entry.policyVersion && entry.policyVersion !== currentPolicyVersion) {
+        return null;
+    }
+    // Tamper-resistance check
+    if (entry.checksum) {
+        const expected = computeChecksum(entry[key], entry.registryUrl || currentRegistry, entry.policyVersion || currentPolicyVersion);
+        if (expected && entry.checksum !== expected) {
+            return null;
+        }
+    }
+    return { data: entry[key], fetchedAt: entry.fetchedAt, ageMs };
+}
+/**
  * Set a cached entry.
  */
 export function setCached(projectPath, packageName, key, data) {
