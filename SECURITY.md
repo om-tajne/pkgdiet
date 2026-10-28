@@ -41,3 +41,15 @@ The supported security surface is the npm-published packages:
 - `@pkgdiet/mcp`
 
 The supported security surface does not include any hosted PkgDiet service.
+
+---
+
+## Security Invariants & Limitations
+
+- **Advisory vs. Enforcement:** MCP results are advisory; only enforced CI checks backed by required branch protection constitute merge controls.
+- **Analysis Scope:** PkgDiet is not a malware scanner, SAST tool, or complete software-composition-analysis (SCA) solution.
+- **Health vs. Security:** A high health score reflects maintenance recency and adoption, not guaranteed safety.
+- **Vulnerability Data:** OSV coverage is inherently incomplete; in `securityMode: "fail-closed"`, PkgDiet blocks when verification is unreachable.
+- **Cache Integrity:** Local cache integrity detects accidental corruption and unsophisticated modification, not an attacker with filesystem write access.
+
+See [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) for the complete threat model, data flow matrix, and residual risk analysis.
