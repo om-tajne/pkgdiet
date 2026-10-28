@@ -377,27 +377,13 @@ program
     fs.writeFileSync('pkgdiet-pr-comment.md', result.markdown);
     if (options.sarif) {
       const { validatePolicy } = await import('@pkgdiet/core/dist/policy.js');
+      const { buildSarifReport } = await import('@pkgdiet/core/dist/sarif.js');
       const policyValidation = validatePolicy(policy);
-      const policyResults = (policyValidation.issues || []).map(issue => ({
-        level: issue.severity === 'error' ? 'error' : 'warning',
-        ruleId: issue.code || 'PKGDIET_POLICY',
-        message: { text: issue.message },
-        locations: [{ physicalLocation: { artifactLocation: { uri: '.pkgdietrc.json' } } }]
-      }));
-      const dependencyResults = result.results.filter(r => r.verdict !== 'ALLOW').map(r => ({
-        level: r.verdict === 'BLOCK' ? 'error' : 'warning',
-        ruleId: r.reasons?.[0]?.code || 'PKGDIET_POLICY',
-        message: { text: (r.reasons || []).map(x => typeof x === 'string' ? x : x.message).join(' ') },
-        locations: [{ physicalLocation: { artifactLocation: { uri: 'package.json' } } }]
-      }));
-      const sarif = {
-        version: '2.1.0',
-        $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
-        runs: [{
-          tool: { driver: { name: 'PkgDiet', rules: [] } },
-          results: [...policyResults, ...dependencyResults]
-        }]
-      };
+      const sarif = buildSarifReport({
+        policyIssues: policyValidation.issues || [],
+        dependencyResults: result.results || [],
+        projectPath: process.cwd()
+      });
       fs.writeFileSync(options.sarif, JSON.stringify(sarif, null, 2));
     }
 
@@ -664,23 +650,11 @@ program
     const { errors, warnings, issues } = validatePolicy(policy);
 
     if (options.sarif) {
-      const sarif = {
-        version: '2.1.0',
-        $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
-        runs: [{
-          tool: { driver: { name: 'PkgDiet', rules: [] } },
-          results: (issues || []).map(issue => ({
-            level: issue.severity === 'error' ? 'error' : 'warning',
-            ruleId: issue.code || 'PKGDIET_POLICY',
-            message: { text: issue.message },
-            locations: [{
-              physicalLocation: {
-                artifactLocation: { uri: '.pkgdietrc.json' }
-              }
-            }]
-          }))
-        }]
-      };
+      const { buildSarifReport } = await import('@pkgdiet/core/dist/sarif.js');
+      const sarif = buildSarifReport({
+        policyIssues: issues || [],
+        projectPath: options.path || process.cwd()
+      });
       fs.writeFileSync(options.sarif, JSON.stringify(sarif, null, 2));
     }
 
