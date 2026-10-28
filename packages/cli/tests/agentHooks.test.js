@@ -134,7 +134,7 @@ test('agent hooks — degraded fallback mode fails closed when core parser is un
   // 2. Bare install fails closed
   await t.test('degraded mode blocks bare install fail-closed', () => {
     const res = runDegraded('npm install');
-    assert.equal(res.status, 1);
+    assert.equal(res.status, 0);
     const out = JSON.parse(res.stdout);
     assert.equal(out.hookSpecificOutput?.permissionDecision, 'deny');
     assert.match(out.hookSpecificOutput?.permissionDecisionReason, /bare install/i);
@@ -143,7 +143,7 @@ test('agent hooks — degraded fallback mode fails closed when core parser is un
   // 3. Unpinned install fails closed
   await t.test('degraded mode blocks unpinned install fail-closed', () => {
     const res = runDegraded('npm i lodash');
-    assert.equal(res.status, 1);
+    assert.equal(res.status, 0);
     const out = JSON.parse(res.stdout);
     assert.equal(out.hookSpecificOutput?.permissionDecision, 'deny');
     assert.match(out.hookSpecificOutput?.permissionDecisionReason, /unpinned install/i);
@@ -152,10 +152,114 @@ test('agent hooks — degraded fallback mode fails closed when core parser is un
   // 4. Dynamic expansion fails closed
   await t.test('degraded mode blocks dynamic shell syntax fail-closed', () => {
     const res = runDegraded('npm i $(cat pkgs.txt)');
-    assert.equal(res.status, 1);
+    assert.equal(res.status, 0);
     const out = JSON.parse(res.stdout);
     assert.equal(out.hookSpecificOutput?.permissionDecision, 'deny');
     assert.match(out.hookSpecificOutput?.permissionDecisionReason, /dynamic shell syntax/i);
+  });
+
+  // 5. Unpinned npm alias in degraded mode fails closed
+  await t.test('degraded mode blocks unpinned npm alias', () => {
+    const res = runDegraded('npm i my-alias@npm:lodash');
+    assert.equal(res.status, 0);
+    const out = JSON.parse(res.stdout);
+    assert.equal(out.hookSpecificOutput?.permissionDecision, 'deny');
+    assert.match(out.hookSpecificOutput?.permissionDecisionReason, /unpinned install of alias/i);
+  });
+
+  // 6. Local CLI unavailable fails closed without npx fallback
+  await t.test('fails closed when local CLI is not installed and npx fallback is disabled', () => {
+    const res = runDegraded('npm i lodash@4.17.21');
+    assert.equal(res.status, 0);
+    const out = JSON.parse(res.stdout);
+    assert.equal(out.hookSpecificOutput?.permissionDecision, 'deny');
+    assert.match(out.hookSpecificOutput?.permissionDecisionReason, /local PkgDiet CLI is not installed/i);
+  });
+
+  // Cleanup
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+test('agent hooks — Windows shell injection metacharacters rejected by SAFE_NAME_REGEX', () => {
+  const SAFE_NAME_REGEX = /^(@[a-zA-Z0-9_.-]+\/)?[a-zA-Z0-9_.-]+$/;
+
+  // Legitimate package names
+  assert.ok(SAFE_NAME_REGEX.test('lodash'));
+  assert.ok(SAFE_NAME_REGEX.test('@types/node'));
+  assert.ok(SAFE_NAME_REGEX.test('react-dom'));
+  assert.ok(SAFE_NAME_REGEX.test('debug.js'));
+
+  // Windows cmd.exe injection payloads
+  assert.equal(SAFE_NAME_REGEX.test('lodash&calc.exe'), false);
+  assert.equal(SAFE_NAME_REGEX.test('lodash&&calc.exe'), false);
+  assert.equal(SAFE_NAME_REGEX.test('lodash|dir'), false);
+  assert.equal(SAFE_NAME_REGEX.test('lodash^&calc'), false);
+  assert.equal(SAFE_NAME_REGEX.test('%PATH%'), false);
+  assert.equal(SAFE_NAME_REGEX.test('lodash>out.txt'), false);
+  assert.equal(SAFE_NAME_REGEX.test('lodash<in.txt'), false);
+  assert.equal(SAFE_NAME_REGEX.test('lodash"test'), false);
+  assert.equal(SAFE_NAME_REGEX.test("lodash'test"), false);
+  assert.equal(SAFE_NAME_REGEX.test('lodash;rm -rf'), false);
+  assert.equal(SAFE_NAME_REGEX.test('lodash `calc`'), false);
+  assert.equal(SAFE_NAME_REGEX.test('lodash $(calc)'), false);
+});
+
+test('agent hooks — Claude Code hook schema compatibility and execution contract', async (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pkgdiet-claude-test-'));
+  const scriptPath = path.join(tmpDir, 'guard-claude.mjs');
+
+  // Extract the node script from generateClaudeCodeGuardScript
+  const fullBashScript = generateClaudeCodeGuardScript('2.0.1');
+  const nodeStartMarker = 'node -e "\n';
+  const nodeEndMarker = '\n" 2>/dev/null';
+  const start = fullBashScript.indexOf(nodeStartMarker) + nodeStartMarker.length;
+  const end = fullBashScript.indexOf(nodeEndMarker);
+  const nodeScript = fullBashScript.slice(start, end).replace(/\\\$/g, '$');
+  fs.writeFileSync(scriptPath, nodeScript, 'utf8');
+
+  const runClaudeNode = (payload, rawStdin = null) => {
+    const stdinData = rawStdin !== null ? rawStdin : JSON.stringify(payload);
+    return spawnSync(process.execPath, [scriptPath], {
+      cwd: process.cwd(),
+      input: stdinData,
+      encoding: 'utf8',
+      env: { ...process.env, PKGDIET_NO_NETWORK: '1' },
+    });
+  };
+
+  // 1. Allowed command exits 0 with no block output
+  await t.test('Claude Code hook allows non-install tool calls', () => {
+    const res = runClaudeNode({ tool_name: 'Bash', input: { command: 'git status' }, cwd: process.cwd() });
+    assert.equal(res.status, 0);
+    assert.equal(res.stdout, '');
+  });
+
+  // 2. Denied command exits 1 with { decision: 'block', reason: string }
+  await t.test('Claude Code hook blocks unpinned installs with { decision: block } schema', () => {
+    const res = runClaudeNode({ tool_name: 'Bash', input: { command: 'npm i lodash' }, cwd: process.cwd() });
+    assert.equal(res.status, 1);
+    const out = JSON.parse(res.stdout);
+    assert.equal(out.decision, 'block');
+    assert.ok(typeof out.reason === 'string');
+    assert.match(out.reason, /unpinned/i);
+  });
+
+  // 3. Denied bare install exits 1 with { decision: 'block' }
+  await t.test('Claude Code hook blocks bare install with { decision: block } schema', () => {
+    const res = runClaudeNode({ tool_name: 'Bash', input: { command: 'npm install' }, cwd: process.cwd() });
+    assert.equal(res.status, 1);
+    const out = JSON.parse(res.stdout);
+    assert.equal(out.decision, 'block');
+    assert.match(out.reason, /bare install/i);
+  });
+
+  // 4. Malformed JSON input fails closed
+  await t.test('Claude Code hook fails closed on malformed JSON payload', () => {
+    const res = runClaudeNode(null, '{ broken json payload ');
+    assert.equal(res.status, 1);
+    const out = JSON.parse(res.stdout);
+    assert.equal(out.decision, 'block');
+    assert.match(out.reason, /malformed tool input JSON/i);
   });
 
   // Cleanup

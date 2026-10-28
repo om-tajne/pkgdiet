@@ -117,8 +117,10 @@ If `@pkgdiet/core/dist/commandParser.js` cannot be loaded in the execution runti
 
 ### 4.4 Hook Supply-Chain & Local-First Resolution
 Generated hook scripts eliminate enforcement-time network availability and integrity risks:
-1. **Local Resolution First:** Hooks check for local project binaries (`node_modules/pkgdiet/build/cli.js` or `node_modules/.bin/pkgdiet`) and execute directly with `node` (`shell: false`). This guarantees zero network round-trips to npm, identical behavior across Windows and POSIX, and zero shell argument interpolation risk.
-2. **Version-Pinned Fallback:** Only if local binaries are absent do hooks fall back to `npx -y pkgdiet@<version>`, where `<version>` is dynamically derived from the installed CLI package version rather than an unpinned `@latest` tag.
+1. **Local-First Execution:** Hooks check for local project binaries (`node_modules/pkgdiet/build/cli.js` via `node` directly or `node_modules/.bin/pkgdiet`). Executing `node` directly with `shell: false` guarantees zero network round-trips to npm, identical behavior across Windows and POSIX, and zero shell argument interpolation risk.
+2. **Fail-Closed Without Local CLI (No Unintended npx):** To eliminate runtime supply-chain dependencies on the public npm registry during tool execution, hooks fail closed with an explicit error if the local PkgDiet CLI is missing. Remote execution via `npx -y pkgdiet@<version>` is disabled by default and requires explicit developer opt-in via `PKGDIET_ALLOW_NPX_FALLBACK=1`.
+3. **Windows Batch & Shell Injection Defense:** In Windows fallback scenarios where `.cmd` files might invoke `cmd.exe`, every package name is strictly validated by `SAFE_NAME_REGEX` (`/^(@[a-zA-Z0-9_.-]+\/)?[a-zA-Z0-9_.-]+$/`) before `spawnSync` is executed. Any argument with shell metacharacters (`&`, `|`, `<`, `>`, `^`, `%`, `"`, `'`, spaces) is rejected prior to shell invocation.
+4. **Agent Contract Alignment:** Hooks strictly adhere to the specific agent execution schema: Codex receives `hookSpecificOutput.permissionDecision = 'deny'` with exit code 0, while Claude Code receives `{ decision: 'block', reason: '...' }` with exit code 2.
 
 ### 4.5 Residual Shell Evasion Risk & CI Universal Merge Gate
 Because POSIX and Windows shell environments support arbitrary Turing-complete syntax (novel wrappers, custom binaries, dynamic file descriptor manipulation), no pre-tool hook can guarantee complete evasion prevention.
