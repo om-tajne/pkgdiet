@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 export const SUPPORTED_AGENTS = ['codex', 'cursor', 'windsurf', 'cline', 'copilot', 'claude-code', 'claude-desktop', 'antigravity'];
+export const SAFE_NAME_REGEX = /^(@[a-zA-Z0-9_.-]+\/)?[a-zA-Z0-9_.-]+$/;
 // ── Enforcement modes ─────────────────────────────────────────────────────────
 // Each agent has a real enforcement mode, not just advisory rules:
 //
@@ -111,7 +112,7 @@ const runCheck = names => {
   return { status: 127, error: new Error('CLI_UNAVAILABLE'), stderr: 'Local PkgDiet CLI is not installed in node_modules' };
 };
 
-const SAFE_NAME_REGEX = /^(@[a-zA-Z0-9_.-]+\\/)?[a-zA-Z0-9_.-]+$/;
+const SAFE_NAME_REGEX = ${SAFE_NAME_REGEX.toString()};
 
 let parseInstallCommands;
 try {
@@ -157,7 +158,7 @@ if (!parseInstallCommands) {
   for (const arg of rawArgs) {
     // Check if npm alias: alias@npm:target@version
     if (arg.includes('@npm:')) {
-      const aliasMatch = arg.match(/^(@?[a-z0-9_.-]+(?:\\/[a-z0-9_.-]+)?)@npm:(@?[a-z0-9_.-]+(?:\\/[a-z0-9_.-]+)?)(?:@(v?\\d+\\.\\d+\\.\\d+.*))?$/i);
+      const aliasMatch = arg.match(/^(@?[a-zA-Z0-9_.-]+(?:\\/[a-zA-Z0-9_.-]+)?)@npm:(@?[a-zA-Z0-9_.-]+(?:\\/[a-zA-Z0-9_.-]+)?)(?:@(v?\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?.*))?$/i);
       if (!aliasMatch || !aliasMatch[3]) {
         deny('🔒 PkgDiet blocked unpinned install of alias ' + arg + ' [DEGRADED MODE]. Pin to an exact version.');
         process.exit(0);
@@ -248,6 +249,7 @@ set -euo pipefail
 
 INPUT=$(cat)
 
+STATUS=0
 RESULT=$(echo "$INPUT" | node -e "
 import fs from 'node:fs';
 import path from 'node:path';
@@ -255,7 +257,7 @@ import { spawnSync } from 'node:child_process';
 
 const block = reason => {
   process.stdout.write(JSON.stringify({ decision: 'block', reason }));
-  process.exit(1);
+  process.exit(2);
 };
 
 let input;
@@ -263,12 +265,12 @@ try {
   input = JSON.parse(fs.readFileSync(0, 'utf8'));
 } catch (err) {
   block('🔒 PkgDiet blocked execution: malformed tool input JSON.');
-  process.exit(1);
+  process.exit(2);
 }
 
 if (!input || typeof input !== 'object') {
   block('🔒 PkgDiet blocked execution: tool input must be a JSON object.');
-  process.exit(1);
+  process.exit(2);
 }
 
 const command = String(input?.input?.command || input?.tool_input?.command || '');
@@ -289,7 +291,7 @@ const runCheck = names => {
   return { status: 127, error: new Error('CLI_UNAVAILABLE'), stderr: 'Local PkgDiet CLI is not installed in node_modules' };
 };
 
-const SAFE_NAME_REGEX = /^(@[a-zA-Z0-9_.-]+\\/)?[a-zA-Z0-9_.-]+$/;
+const SAFE_NAME_REGEX = ${SAFE_NAME_REGEX.toString()};
 
 let parseInstallCommands;
 try {
@@ -314,35 +316,35 @@ if (!parseInstallCommands) {
 
   if (/[$*?|;&<>\x60]/.test(command)) {
     block('🔒 PkgDiet blocked install [DEGRADED MODE]: core parser unavailable and command contains dynamic shell syntax.');
-    process.exit(1);
+    process.exit(2);
   }
 
   const tokens = command.trim().split(/\\s+/);
   const verbIdx = tokens.findIndex(t => /^(?:install|i|add)$/.test(t));
   if (verbIdx === -1) {
     block('🔒 PkgDiet blocked install [DEGRADED MODE]: unable to parse install verb.');
-    process.exit(1);
+    process.exit(2);
   }
 
   const rawArgs = tokens.slice(verbIdx + 1).filter(t => !t.startsWith('-'));
   if (rawArgs.length === 0) {
     block('🔒 PkgDiet blocked bare install [DEGRADED MODE]. Pin to an exact version after PkgDiet approves it.');
-    process.exit(1);
+    process.exit(2);
   }
 
   const pkgNames = [];
   for (const arg of rawArgs) {
     // Check if npm alias: alias@npm:target@version
     if (arg.includes('@npm:')) {
-      const aliasMatch = arg.match(/^(@?[a-z0-9_.-]+(?:\\/[a-z0-9_.-]+)?)@npm:(@?[a-z0-9_.-]+(?:\\/[a-z0-9_.-]+)?)(?:@(v?\\d+\\.\\d+\\.\\d+.*))?$/i);
+      const aliasMatch = arg.match(/^(@?[a-zA-Z0-9_.-]+(?:\\/[a-zA-Z0-9_.-]+)?)@npm:(@?[a-zA-Z0-9_.-]+(?:\\/[a-zA-Z0-9_.-]+)?)(?:@(v?\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?.*))?$/i);
       if (!aliasMatch || !aliasMatch[3]) {
         block('🔒 PkgDiet blocked unpinned install of alias ' + arg + ' [DEGRADED MODE]. Pin to an exact version.');
-        process.exit(1);
+        process.exit(2);
       }
       const targetName = aliasMatch[2];
       if (!SAFE_NAME_REGEX.test(targetName)) {
         block('🔒 PkgDiet blocked unsafe package name: ' + targetName);
-        process.exit(1);
+        process.exit(2);
       }
       pkgNames.push(targetName);
       continue;
@@ -351,12 +353,12 @@ if (!parseInstallCommands) {
     const atIdx = arg.lastIndexOf('@');
     if (atIdx <= 0 || !/^v?\\d+\\.\\d+\\.\\d+/.test(arg.slice(atIdx + 1))) {
       block('🔒 PkgDiet blocked unpinned install of ' + arg + ' [DEGRADED MODE]. Pin to an exact version.');
-      process.exit(1);
+      process.exit(2);
     }
     const name = arg.slice(0, atIdx);
     if (!SAFE_NAME_REGEX.test(name)) {
       block('🔒 PkgDiet blocked unsafe package name: ' + name);
-      process.exit(1);
+      process.exit(2);
     }
     pkgNames.push(name);
   }
@@ -368,7 +370,7 @@ if (!parseInstallCommands) {
     } else {
       block('🔒 PkgDiet blocked install [DEGRADED MODE]: failed policy check.');
     }
-    process.exit(1);
+    process.exit(2);
   }
   process.exit(0);
 }
@@ -379,25 +381,25 @@ for (const cmd of cmds) {
 
   if (cmd.isAmbiguous) {
     block('🔒 PkgDiet blocked ambiguous install command: ' + (cmd.ambiguityReason || 'dynamic syntax'));
-    process.exit(1);
+    process.exit(2);
   }
 
   if (cmd.isBareInstall) {
     block('🔒 PkgDiet blocked bare install without package names. Pin to an exact version.');
-    process.exit(1);
+    process.exit(2);
   }
 
   const unpinned = cmd.packages.filter(p => !p.isPinned);
   if (unpinned.length > 0) {
     block('🔒 PkgDiet blocked unpinned install of ' + unpinned.map(p => p.raw).join(', '));
-    process.exit(1);
+    process.exit(2);
   }
 
   const names = cmd.packages.map(p => p.aliasOf || p.name);
   for (const name of names) {
     if (!SAFE_NAME_REGEX.test(name)) {
       block('🔒 PkgDiet blocked unsafe package name: ' + name);
-      process.exit(1);
+      process.exit(2);
     }
   }
 
@@ -409,15 +411,19 @@ for (const cmd of cmds) {
       } else {
         block('🔒 PkgDiet blocked this install: packages failed policy.');
       }
-      process.exit(1);
+      process.exit(2);
     }
   }
 }
 process.exit(0);
-" 2>/dev/null || echo '{"decision":"block","reason":"🔒 PkgDiet guard execution failed"}')
+" 2>/dev/null) || STATUS=$?
 
-if [ -n "$RESULT" ] && echo "$RESULT" | grep -q '"decision":"block"'; then
-  echo "$RESULT"
+if [ "$STATUS" -ne 0 ] || ([ -n "$RESULT" ] && echo "$RESULT" | grep -q '"decision":"block"'); then
+  if [ -n "$RESULT" ]; then
+    echo "$RESULT"
+  else
+    echo '{"decision":"block","reason":"🔒 PkgDiet guard execution failed"}'
+  fi
   exit 2
 fi
 `;

@@ -1,4 +1,5 @@
 export declare const SUPPORTED_AGENTS: string[];
+export declare const SAFE_NAME_REGEX: RegExp;
 export declare function verifyAgents(cwd: any): ({
     agent: string;
     configured: boolean;
