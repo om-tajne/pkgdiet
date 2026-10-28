@@ -248,3 +248,54 @@ test('allowedPackages — expired entry no longer allows low health package', ()
   assert.equal(res.verdict, 'BLOCK');
   assert.ok(res.reasons.some(r => r.code === 'ALLOW_EXCEPTION_EXPIRED'));
 });
+
+// ── Audit traceability for allowedPackages exemptions ─────────────────────────
+
+test('validatePolicy — expiring exemption without reason produces an audit warning', () => {
+  const policy = {
+    ...DEFAULT_POLICY,
+    allowedPackages: [
+      { package: 'audit-pkg', expiresAt: '2099-01-01' } // active expiry, missing reason
+    ]
+  };
+  const { warnings } = validatePolicy(policy);
+  const reasonWarns = warnings.filter(w => w.includes('has no documented reason'));
+  assert.equal(reasonWarns.length, 1, 'Expected exactly one audit warning for missing reason');
+  assert.ok(reasonWarns[0].includes('audit-pkg'));
+});
+
+test('validatePolicy — empty or whitespace-only reason produces an audit warning', () => {
+  for (const invalidReason of ['', '   ', null, undefined, 123]) {
+    const policy = {
+      ...DEFAULT_POLICY,
+      allowedPackages: [
+        { package: 'test-pkg', reason: invalidReason }
+      ]
+    };
+    const { warnings } = validatePolicy(policy);
+    assert.ok(
+      warnings.some(w => w.includes('has no documented reason') && w.includes('test-pkg')),
+      `Expected reason warning for invalid reason: ${JSON.stringify(invalidReason)}`
+    );
+  }
+});
+
+test('validatePolicy — bare string exemption produces an audit warning', () => {
+  const policy = {
+    ...DEFAULT_POLICY,
+    allowedPackages: ['bare-string-pkg']
+  };
+  const { warnings } = validatePolicy(policy);
+  assert.ok(warnings.some(w => w.includes('bare-string-pkg') && w.includes('has no documented reason')));
+});
+
+test('validatePolicy — valid exemption with reason produces no exemption warnings', () => {
+  const policy = {
+    ...DEFAULT_POLICY,
+    allowedPackages: [
+      { package: 'valid-pkg', reason: 'SEC-104: Approved legacy exception', expiresAt: '2099-01-01' }
+    ]
+  };
+  const { warnings } = validatePolicy(policy);
+  assert.equal(warnings.filter(w => w.includes('allowedPackages')).length, 0);
+});

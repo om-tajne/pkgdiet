@@ -134,6 +134,9 @@ test("MCP — full protocol lifecycle covers all 4 tools", async () => {
   assert.equal(typeof policy.validation.valid, "boolean", "get_policy: validation.valid must be boolean");
   assert.ok(Array.isArray(policy.validation.errors),   "get_policy: validation.errors must be array");
   assert.ok(Array.isArray(policy.validation.warnings), "get_policy: validation.warnings must be array");
+  assert.ok(policy.threatModel,                        "get_policy: threatModel must be present");
+  assert.equal(policy.threatModel.reference,          "docs/THREAT-MODEL.md");
+  assert.match(policy.threatModel.notice,             /advisory guidance/i);
 
   // ── check_dependency ─────────────────────────────────────────────────────────
   const checkRes = responses.find(r => r.id === 4);

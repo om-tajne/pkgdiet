@@ -181,3 +181,36 @@ test('findTyposquatCandidates — detects expanded corpus and semantic typosquat
   const c3 = findTyposquatCandidates('cross-envs');
   assert.ok(c3.includes('cross-env'), `expected cross-env in ${c3}`);
 });
+
+// ── Offline & Telemetry Invariant Tests ───────────────────────────────────────
+
+test('checker — PKGDIET_NO_NETWORK=1 makes zero outbound calls and returns offline skipped state', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const code = `
+    import assert from 'node:assert/strict';
+    globalThis.fetch = () => { throw new Error('Outbound network call detected in offline mode!'); };
+    const { fetchPackageHealth } = await import('./packages/core/src/health.js');
+    const res = await fetchPackageHealth('react', process.cwd(), false);
+    assert.equal(res.skipped, true);
+    assert.equal(res.offline, true);
+    console.log('OFFLINE_VERIFIED');
+  `;
+  const output = execFileSync('node', ['--input-type=module', '-e', code], {
+    env: { ...process.env, PKGDIET_NO_NETWORK: '1' },
+    encoding: 'utf8',
+  });
+  assert.ok(output.includes('OFFLINE_VERIFIED'), 'Expected offline execution without network calls');
+});
+
+test('telemetry — PKGDIET_TELEMETRY_DISABLED=1 disables metrics recording', async () => {
+  const { isTelemetryEnabled } = await import('../src/telemetry.js');
+  const policy = { telemetry: true };
+  const prev = process.env.PKGDIET_TELEMETRY_DISABLED;
+  try {
+    process.env.PKGDIET_TELEMETRY_DISABLED = '1';
+    assert.equal(isTelemetryEnabled(policy), false, 'Telemetry should be disabled when env var is set');
+  } finally {
+    if (prev !== undefined) process.env.PKGDIET_TELEMETRY_DISABLED = prev;
+    else delete process.env.PKGDIET_TELEMETRY_DISABLED;
+  }
+});

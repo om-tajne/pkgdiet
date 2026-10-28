@@ -144,14 +144,17 @@ export function validatePolicy(policy) {
 
   for (const item of policy.allowedPackages || []) {
     const pkg = typeof item === 'string' ? item : item?.package;
+    const reason = typeof item === 'object' ? item?.reason : null;
+
     if (item && typeof item === 'object' && item.expiresAt) {
       const expiry = new Date(item.expiresAt).getTime();
       if (!isNaN(expiry) && Date.now() > expiry) {
         warnings.push(`\`allowedPackages\` entry for '${pkg}' expired on ${item.expiresAt}. It is no longer bypassing policy.`);
       }
-      if (!item.reason || typeof item.reason !== 'string' || !item.reason.trim()) {
-        warnings.push(`\`allowedPackages\` entry for '${pkg}' has an expiry date (${item.expiresAt}) but no documented reason. Add a reason for audit traceability.`);
-      }
+    }
+
+    if (!reason || typeof reason !== 'string' || !reason.trim()) {
+      warnings.push(`\`allowedPackages\` entry for '${pkg}' has no documented reason. Add a \`reason\` explaining why this package bypasses policy.`);
     }
   }
 
