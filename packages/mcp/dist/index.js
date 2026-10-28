@@ -343,6 +343,10 @@ export function createMcpServer() {
                                     blockDeprecated: effectivePolicy.blockDeprecated,
                                 },
                                 validation: { valid: errors.length === 0, errors, warnings },
+                                threatModel: {
+                                    reference: "docs/THREAT-MODEL.md",
+                                    notice: "MCP tool results are advisory guidance for AI coding agents. Only enforced CI checks backed by required branch protection constitute merge controls.",
+                                },
                             }, null, 2),
                         }],
                 };

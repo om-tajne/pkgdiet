@@ -149,6 +149,9 @@ export function validatePolicy(policy) {
       if (!isNaN(expiry) && Date.now() > expiry) {
         warnings.push(`\`allowedPackages\` entry for '${pkg}' expired on ${item.expiresAt}. It is no longer bypassing policy.`);
       }
+      if (!item.reason || typeof item.reason !== 'string' || !item.reason.trim()) {
+        warnings.push(`\`allowedPackages\` entry for '${pkg}' has an expiry date (${item.expiresAt}) but no documented reason. Add a reason for audit traceability.`);
+      }
     }
   }
 

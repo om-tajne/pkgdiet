@@ -31,9 +31,10 @@ PkgDiet is local-first. All AST scanning, lockfile diffing, and policy decisions
 | `https://registry.npmjs.org/<name>` | `GET` | Package name in URL path | `name + registryUrl + policyVersion` (TTL: 24h) | Registry network error or 5xx returns `WARN` (`fail-open`) or `BLOCK` (`fail-closed`). An outage **never** implies `PACKAGE_NOT_FOUND`. | `PKGDIET_NO_NETWORK=1` |
 | `https://api.npmjs.org/downloads/point/last-month/<name>` | `GET` | Package name in URL path | `name + registryUrl + policyVersion` (TTL: 24h) | Missing download stats degrade the health score confidence; they **never** alter a security block or trigger hallucination warnings. | `PKGDIET_NO_NETWORK=1` |
 | `https://api.osv.dev/v1/query` | `POST` | Package name & resolved semver in JSON body | `name + version + registryUrl + policyVersion` (TTL: 24h) | Preserves `osvChecked: false` and `osvErrorCode`. Escalates to `OSV_UNAVAILABLE` (`WARN` under `fail-open`) or `OSV_UNAVAILABLE_BLOCKED` (`BLOCK` under `fail-closed`). | `PKGDIET_ADVISORIES=0` or `PKGDIET_NO_NETWORK=1` |
-| **Local Workspace** | Local FS | None. Only reads `package.json`, lockfiles, and `.pkgdietrc.json`. Writes `.pkgdiet-cache.json` and `.pkgdiet-metrics.json`. | Atomic file rename | File corruption renames cache to `.corrupt.<timestamp>` and starts fresh. | `PKGDIET_TELEMETRY_DISABLED=1` |
+| **Local Cache** | Local FS | None. Reads and writes `.pkgdiet-cache.json` only. | Atomic temp-file write + rename | File corruption renames cache to `.corrupt.<timestamp>` and starts fresh. | N/A (local operations) |
+| **Local Metrics** | Local FS | None. Appends run timestamps and durations to `.pkgdiet-metrics.json`. | Run metrics | Non-fatal write errors are silently skipped. Metrics are never uploaded. | `PKGDIET_TELEMETRY_DISABLED=1` |
 
-> **Privacy Guarantee:** No source code, project structure, file contents, git commit messages, repository credentials, or environment tokens are ever transmitted across network boundaries.
+> **Privacy Guarantee:** PkgDiet's documented network integrations transmit only package identifiers and resolved versions; no source code, repository metadata, credentials, or environment variables are included in those requests. All cache and metrics files remain local.
 
 ---
 
