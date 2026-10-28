@@ -34,22 +34,50 @@ export declare function loadPolicy(projectPath: any): any;
  */
 export declare function applyEnvironment(policy: any, envName: any): any;
 /**
- * Validate a policy object for errors (must fix) and warnings (should review).
- * @param {object} policy
- * @param {object} policy
- * @param {object} [options]
- * @param {boolean} [options.structured=false] When true, returns structured issue objects for errors and warnings
- * @returns {{ errors: (string|object)[], warnings: (string|object)[], issues: object[], structuredErrors: object[], structuredWarnings: object[] }}
+ * Stabilized diagnostic codes emitted by policy validation and evaluation.
+ * @readonly
+ * @enum {string}
  */
-export declare function validatePolicy(policy: object, options?: {
-    structured?: boolean;
-}): {
-    errors: (string | object)[];
-    warnings: (string | object)[];
-    issues: object[];
-    structuredErrors: object[];
-    structuredWarnings: object[];
+export declare const POLICY_DIAGNOSTIC_CODES: Readonly<{
+    INVALID_HEALTH_THRESHOLDS: "INVALID_HEALTH_THRESHOLDS";
+    INVALID_FAIL_ON: "INVALID_FAIL_ON";
+    INVALID_SECURITY_MODE: "INVALID_SECURITY_MODE";
+    PACKAGE_RULE_CONFLICT: "PACKAGE_RULE_CONFLICT";
+    EXEMPTION_MISSING_REASON: "EXEMPTION_MISSING_REASON";
+    EXEMPTION_EXPIRED: "EXEMPTION_EXPIRED";
+    LAX_HEALTH_THRESHOLD: "LAX_HEALTH_THRESHOLD";
+    HIGH_SIZE_LIMIT: "HIGH_SIZE_LIMIT";
+    DEPRECATED_ALLOWED: "DEPRECATED_ALLOWED";
+    UNKNOWN_ENVIRONMENT_KEY: "UNKNOWN_ENVIRONMENT_KEY";
+}>;
+export type PolicyIssue = {
+    severity: 'error' | 'warning';
+    code: string;
+    message: string;
+    package?: string;
+    field?: string;
+    expiresAt?: string;
 };
+export type ValidationResultDefault = {
+    errors: string[];
+    warnings: string[];
+    issues: PolicyIssue[];
+    structuredErrors: PolicyIssue[];
+    structuredWarnings: PolicyIssue[];
+};
+export type ValidationResultStructured = {
+    errors: PolicyIssue[];
+    warnings: PolicyIssue[];
+    issues: PolicyIssue[];
+    structuredErrors: PolicyIssue[];
+    structuredWarnings: PolicyIssue[];
+};
+export declare function validatePolicy(policy: object, options: {
+    structured: true;
+}): ValidationResultStructured;
+export declare function validatePolicy(policy: object, options?: {
+    structured?: false;
+}): ValidationResultDefault;
 /**
  * Evaluate a package against policy.
  * @returns {{ verdict: 'ALLOW'|'WARN'|'BLOCK', reasons: string[], ignored: boolean }}

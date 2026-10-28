@@ -11,6 +11,7 @@
  * }
  */
 import './alternatives.js';
+export { loadPolicy, validatePolicy, evaluatePolicy, applyEnvironment, DEFAULT_POLICY, POLICY_DIAGNOSTIC_CODES } from './policy.js';
 /**
  * Run a full dependency audit for a project.
  *
