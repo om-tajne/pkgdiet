@@ -36,11 +36,19 @@ export declare function applyEnvironment(policy: any, envName: any): any;
 /**
  * Validate a policy object for errors (must fix) and warnings (should review).
  * @param {object} policy
- * @returns {{ errors: string[], warnings: string[] }}
+ * @param {object} policy
+ * @param {object} [options]
+ * @param {boolean} [options.structured=false] When true, returns structured issue objects for errors and warnings
+ * @returns {{ errors: (string|object)[], warnings: (string|object)[], issues: object[], structuredErrors: object[], structuredWarnings: object[] }}
  */
-export declare function validatePolicy(policy: object): {
-    errors: string[];
-    warnings: string[];
+export declare function validatePolicy(policy: object, options?: {
+    structured?: boolean;
+}): {
+    errors: (string | object)[];
+    warnings: (string | object)[];
+    issues: object[];
+    structuredErrors: object[];
+    structuredWarnings: object[];
 };
 /**
  * Evaluate a package against policy.
