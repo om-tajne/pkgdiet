@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { validatePolicy, evaluatePolicy, applyEnvironment, DEFAULT_POLICY } from '../src/policy.js';
+import { validatePolicy, evaluatePolicy, applyEnvironment, DEFAULT_POLICY, POLICY_DIAGNOSTIC_CODES } from '../src/policy.js';
 
 // ── validatePolicy ─────────────────────────────────────────────────────────────
 
@@ -370,4 +370,21 @@ test('evaluatePolicy — whitespace-only exemption reason normalizes to null', (
   assert.equal(res.verdict, 'ALLOW');
   assert.equal(res.reasons[0].reason, null);
   assert.equal(res.reasons[0].message, 'Package is explicitly allowed in policy.');
+});
+
+test('POLICY_DIAGNOSTIC_CODES — contract surface is frozen and matches known schema', () => {
+  assert.ok(Object.isFrozen(POLICY_DIAGNOSTIC_CODES), 'POLICY_DIAGNOSTIC_CODES must be frozen');
+  const expectedCodes = {
+    INVALID_HEALTH_THRESHOLDS: 'INVALID_HEALTH_THRESHOLDS',
+    INVALID_FAIL_ON: 'INVALID_FAIL_ON',
+    INVALID_SECURITY_MODE: 'INVALID_SECURITY_MODE',
+    PACKAGE_RULE_CONFLICT: 'PACKAGE_RULE_CONFLICT',
+    EXEMPTION_MISSING_REASON: 'EXEMPTION_MISSING_REASON',
+    EXEMPTION_EXPIRED: 'EXEMPTION_EXPIRED',
+    LAX_HEALTH_THRESHOLD: 'LAX_HEALTH_THRESHOLD',
+    HIGH_SIZE_LIMIT: 'HIGH_SIZE_LIMIT',
+    DEPRECATED_ALLOWED: 'DEPRECATED_ALLOWED',
+    UNKNOWN_ENVIRONMENT_KEY: 'UNKNOWN_ENVIRONMENT_KEY',
+  };
+  assert.deepEqual({ ...POLICY_DIAGNOSTIC_CODES }, expectedCodes);
 });

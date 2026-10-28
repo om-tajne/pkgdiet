@@ -244,6 +244,27 @@ test('checker — PKGDIET_NO_NETWORK=1 falls back to valid cache and marks uncac
       assert.equal(miss.score, null, 'Expected null score for skipped health check');
       assert.equal(miss.fromCache, undefined);
 
+      // 4. Stale cache entry (older than TTL) must NOT be returned in offline mode
+      const { readFileSync, writeFileSync } = await import('node:fs');
+      const cachePath = join(tempDir, '.pkgdiet-cache.json');
+      const cacheContent = JSON.parse(readFileSync(cachePath, 'utf8'));
+      cacheContent.entries['stale-offline-pkg'] = {
+        fetchedAt: new Date(Date.now() - 48 * 3600 * 1000).toISOString(), // 48h old (TTL is 24h)
+        health: {
+          name: 'stale-offline-pkg',
+          score: 88,
+          vulnerabilities: [],
+          osvChecked: true,
+        }
+      };
+      writeFileSync(cachePath, JSON.stringify(cacheContent, null, 2), 'utf8');
+
+      const staleHit = await fetchPackageHealth('stale-offline-pkg', tempDir, true);
+      assert.equal(staleHit.fromCache, undefined, 'Stale cache entry must not be returned with fromCache');
+      assert.equal(staleHit.skipped, true, 'Stale cache entry in offline mode must return skipped: true');
+      assert.equal(staleHit.offline, true, 'Stale cache entry in offline mode must return offline: true');
+      assert.equal(staleHit.score, null, 'Stale cache entry in offline mode must have score: null');
+
       console.log('OFFLINE_CACHE_INVARIANT_VERIFIED');
     } finally {
       rmSync(tempDir, { recursive: true, force: true });

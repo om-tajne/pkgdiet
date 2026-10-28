@@ -85,12 +85,71 @@ export function applyEnvironment(policy, envName) {
 }
 
 /**
+ * Stabilized diagnostic codes emitted by policy validation and evaluation.
+ * @readonly
+ * @enum {string}
+ */
+export const POLICY_DIAGNOSTIC_CODES = Object.freeze({
+  // Policy configuration errors (must fix)
+  INVALID_HEALTH_THRESHOLDS: 'INVALID_HEALTH_THRESHOLDS',
+  INVALID_FAIL_ON: 'INVALID_FAIL_ON',
+  INVALID_SECURITY_MODE: 'INVALID_SECURITY_MODE',
+  PACKAGE_RULE_CONFLICT: 'PACKAGE_RULE_CONFLICT',
+
+  // Policy configuration warnings (should review)
+  EXEMPTION_MISSING_REASON: 'EXEMPTION_MISSING_REASON',
+  EXEMPTION_EXPIRED: 'EXEMPTION_EXPIRED',
+  LAX_HEALTH_THRESHOLD: 'LAX_HEALTH_THRESHOLD',
+  HIGH_SIZE_LIMIT: 'HIGH_SIZE_LIMIT',
+  DEPRECATED_ALLOWED: 'DEPRECATED_ALLOWED',
+  UNKNOWN_ENVIRONMENT_KEY: 'UNKNOWN_ENVIRONMENT_KEY',
+});
+
+/**
+ * @typedef {Object} PolicyIssue
+ * @property {'error'|'warning'} severity
+ * @property {string} code
+ * @property {string} message
+ * @property {string} [package]
+ * @property {string} [field]
+ * @property {string} [expiresAt]
+ */
+
+/**
+ * @typedef {Object} ValidationResultDefault
+ * @property {string[]} errors
+ * @property {string[]} warnings
+ * @property {PolicyIssue[]} issues
+ * @property {PolicyIssue[]} structuredErrors
+ * @property {PolicyIssue[]} structuredWarnings
+ */
+
+/**
+ * @typedef {Object} ValidationResultStructured
+ * @property {PolicyIssue[]} errors
+ * @property {PolicyIssue[]} warnings
+ * @property {PolicyIssue[]} issues
+ * @property {PolicyIssue[]} structuredErrors
+ * @property {PolicyIssue[]} structuredWarnings
+ */
+
+/**
  * Validate a policy object for errors (must fix) and warnings (should review).
+ * @overload
  * @param {object} policy
+ * @param {{ structured: true }} options
+ * @returns {ValidationResultStructured}
+ */
+/**
+ * @overload
  * @param {object} policy
- * @param {object} [options]
- * @param {boolean} [options.structured=false] When true, returns structured issue objects for errors and warnings
- * @returns {{ errors: (string|object)[], warnings: (string|object)[], issues: object[], structuredErrors: object[], structuredWarnings: object[] }}
+ * @param {{ structured?: false }} [options]
+ * @returns {ValidationResultDefault}
+ */
+/**
+ * @param {object} policy
+ * @param {{ structured?: boolean }} [options]
+ * @returns {ValidationResultDefault | ValidationResultStructured}
  */
 export function validatePolicy(policy, options = {}) {
   const errors = [];
@@ -114,7 +173,7 @@ export function validatePolicy(policy, options = {}) {
     policy.minHealthScore < 0 || policy.minHealthScore > 100
   ) {
     addError('`minHealthScore` must be a number between 0 and 100.', {
-      code: 'INVALID_HEALTH_THRESHOLDS',
+      code: POLICY_DIAGNOSTIC_CODES.INVALID_HEALTH_THRESHOLDS,
       field: 'minHealthScore',
     });
   }
@@ -124,7 +183,7 @@ export function validatePolicy(policy, options = {}) {
     policy.warnHealthScore < 0 || policy.warnHealthScore > 100
   ) {
     addError('`warnHealthScore` must be a number between 0 and 100.', {
-      code: 'INVALID_HEALTH_THRESHOLDS',
+      code: POLICY_DIAGNOSTIC_CODES.INVALID_HEALTH_THRESHOLDS,
       field: 'warnHealthScore',
     });
   }
@@ -138,7 +197,7 @@ export function validatePolicy(policy, options = {}) {
       `\`warnHealthScore\` (${policy.warnHealthScore}) is less than \`minHealthScore\` (${policy.minHealthScore}). ` +
       'Thresholds are inverted — all warned packages would also be blocked.',
       {
-        code: 'INVALID_HEALTH_THRESHOLDS',
+        code: POLICY_DIAGNOSTIC_CODES.INVALID_HEALTH_THRESHOLDS,
         field: 'minHealthScore',
       }
     );
@@ -146,14 +205,14 @@ export function validatePolicy(policy, options = {}) {
 
   if (!['BLOCK', 'WARN', 'NONE'].includes(policy.failOn)) {
     addError('`failOn` must be "BLOCK", "WARN", or "NONE".', {
-      code: 'INVALID_FAIL_ON',
+      code: POLICY_DIAGNOSTIC_CODES.INVALID_FAIL_ON,
       field: 'failOn',
     });
   }
 
   if (!['fail-open', 'fail-closed'].includes(policy.securityMode)) {
     addError('`securityMode` must be "fail-open" or "fail-closed".', {
-      code: 'INVALID_SECURITY_MODE',
+      code: POLICY_DIAGNOSTIC_CODES.INVALID_SECURITY_MODE,
       field: 'securityMode',
     });
   }
@@ -167,7 +226,7 @@ export function validatePolicy(policy, options = {}) {
         `Package '${pkg}' is in both \`blockedPackages\` and \`allowedPackages\`. ` +
         '`blockedPackages` wins — remove the contradiction before relying on this policy.',
         {
-          code: 'PACKAGE_RULE_CONFLICT',
+          code: POLICY_DIAGNOSTIC_CODES.PACKAGE_RULE_CONFLICT,
           package: pkg,
         }
       );
@@ -185,7 +244,7 @@ export function validatePolicy(policy, options = {}) {
       const expiry = new Date(item.expiresAt).getTime();
       if (!isNaN(expiry) && Date.now() > expiry) {
         addWarning(`\`allowedPackages\` entry for '${pkg}' expired on ${item.expiresAt}. It is no longer bypassing policy.`, {
-          code: 'EXEMPTION_EXPIRED',
+          code: POLICY_DIAGNOSTIC_CODES.EXEMPTION_EXPIRED,
           package: pkg,
           expiresAt: item.expiresAt,
         });
@@ -194,7 +253,7 @@ export function validatePolicy(policy, options = {}) {
 
     if (!hasReason) {
       addWarning(`\`allowedPackages\` entry for '${pkg}' has no documented reason. Add a \`reason\` explaining why this package bypasses policy.`, {
-        code: 'EXEMPTION_MISSING_REASON',
+        code: POLICY_DIAGNOSTIC_CODES.EXEMPTION_MISSING_REASON,
         package: pkg,
       });
     }
@@ -205,7 +264,7 @@ export function validatePolicy(policy, options = {}) {
       `\`minHealthScore\` is ${policy.minHealthScore} (very lax). ` +
       'Packages with a score this low are often deprecated or unmaintained.',
       {
-        code: 'LAX_HEALTH_THRESHOLD',
+        code: POLICY_DIAGNOSTIC_CODES.LAX_HEALTH_THRESHOLD,
         field: 'minHealthScore',
       }
     );
@@ -219,7 +278,7 @@ export function validatePolicy(policy, options = {}) {
       `\`maxPackageSizeBytes\` is ${(policy.maxPackageSizeBytes / 1_000_000).toFixed(0)}MB (>100MB). ` +
       'This effectively disables the size check.',
       {
-        code: 'HIGH_SIZE_LIMIT',
+        code: POLICY_DIAGNOSTIC_CODES.HIGH_SIZE_LIMIT,
         field: 'maxPackageSizeBytes',
       }
     );
@@ -230,7 +289,7 @@ export function validatePolicy(policy, options = {}) {
       '`blockDeprecated` is false. Deprecated packages will not be blocked — ' +
       'this may expose your project to unmaintained dependencies.',
       {
-        code: 'DEPRECATED_ALLOWED',
+        code: POLICY_DIAGNOSTIC_CODES.DEPRECATED_ALLOWED,
         field: 'blockDeprecated',
       }
     );
@@ -243,7 +302,7 @@ export function validatePolicy(policy, options = {}) {
         `Unknown environment key '${envKey}' in \`environments\`. ` +
         'Known keys are: ci, dev, prod, staging, test. This may be a typo.',
         {
-          code: 'UNKNOWN_ENVIRONMENT_KEY',
+          code: POLICY_DIAGNOSTIC_CODES.UNKNOWN_ENVIRONMENT_KEY,
           field: `environments.${envKey}`,
         }
       );
