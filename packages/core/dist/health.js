@@ -254,10 +254,11 @@ export async function fetchPackageHealth(packageName, projectPath, useCache, tar
     const lastPublish = registryData.time?.modified || null;
     const maintainers = registryData.maintainers || [];
     const latestVersion = registryData['dist-tags']?.latest;
+    const latestMeta = latestVersion ? registryData.versions?.[latestVersion] : null;
     const resolvedVersion = (targetVersion && registryData.versions?.[targetVersion])
         ? targetVersion
         : latestVersion;
-    const versionMeta = resolvedVersion ? registryData.versions?.[resolvedVersion] : (latestVersion ? registryData.versions?.[latestVersion] : null);
+    const versionMeta = resolvedVersion ? registryData.versions?.[resolvedVersion] : latestMeta;
     const monthlyDownloads = downloadsResult.data?.downloads || 0;
     const deprecated = versionMeta?.deprecated || null;
     const advisoryResult = await fetchOsvAdvisories(packageName, resolvedVersion);

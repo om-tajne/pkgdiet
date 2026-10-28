@@ -18,6 +18,8 @@ import { analyzeSize } from './size.js';
 import './alternatives.js'; // Trigger ESM file loader setup for CLI/Node
 import { loadPolicy } from './policy.js';
 export { loadPolicy, validatePolicy, evaluatePolicy, applyEnvironment, DEFAULT_POLICY, POLICY_DIAGNOSTIC_CODES } from './policy.js';
+export { parseInstallCommands, splitCommandChains, tokenizeShellCommand, parsePackageSpec } from './commandParser.js';
+export { buildSarifReport, SARIF_RULES } from './sarif.js';
 // ── Normalizers ───────────────────────────────────────────────────────────────
 /**
  * Accepts anything analyzeHealth() might return and guarantees an array.
