@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
-import { generateCodexGuardScript, generateClaudeCodeGuardScript } from '../src/agentSetup.js';
+import { generateCodexGuardScript, generateClaudeCodeGuardScript, SAFE_NAME_REGEX } from '../src/agentSetup.js';
 
 test('agent hooks — end-to-end execution of Codex PreToolUse guard script', async (t) => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pkgdiet-hook-test-'));
@@ -131,8 +131,8 @@ test('agent hooks — degraded fallback mode fails closed when core parser is un
     assert.equal(res.status, 0);
   });
 
-  // 2. Bare install fails closed
-  await t.test('degraded mode blocks bare install fail-closed', () => {
+  // 2. Bare install denied via structured permission decision
+  await t.test('degraded mode denies bare install via structured permission decision', () => {
     const res = runDegraded('npm install');
     assert.equal(res.status, 0);
     const out = JSON.parse(res.stdout);
@@ -140,8 +140,8 @@ test('agent hooks — degraded fallback mode fails closed when core parser is un
     assert.match(out.hookSpecificOutput?.permissionDecisionReason, /bare install/i);
   });
 
-  // 3. Unpinned install fails closed
-  await t.test('degraded mode blocks unpinned install fail-closed', () => {
+  // 3. Unpinned install denied via structured permission decision
+  await t.test('degraded mode denies unpinned install via structured permission decision', () => {
     const res = runDegraded('npm i lodash');
     assert.equal(res.status, 0);
     const out = JSON.parse(res.stdout);
@@ -149,8 +149,8 @@ test('agent hooks — degraded fallback mode fails closed when core parser is un
     assert.match(out.hookSpecificOutput?.permissionDecisionReason, /unpinned install/i);
   });
 
-  // 4. Dynamic expansion fails closed
-  await t.test('degraded mode blocks dynamic shell syntax fail-closed', () => {
+  // 4. Dynamic expansion denied via structured permission decision
+  await t.test('degraded mode denies dynamic shell syntax via structured permission decision', () => {
     const res = runDegraded('npm i $(cat pkgs.txt)');
     assert.equal(res.status, 0);
     const out = JSON.parse(res.stdout);
@@ -158,8 +158,8 @@ test('agent hooks — degraded fallback mode fails closed when core parser is un
     assert.match(out.hookSpecificOutput?.permissionDecisionReason, /dynamic shell syntax/i);
   });
 
-  // 5. Unpinned npm alias in degraded mode fails closed
-  await t.test('degraded mode blocks unpinned npm alias', () => {
+  // 5. Unpinned npm alias in degraded mode denied via structured permission decision
+  await t.test('degraded mode denies unpinned npm alias via structured permission decision', () => {
     const res = runDegraded('npm i my-alias@npm:lodash');
     assert.equal(res.status, 0);
     const out = JSON.parse(res.stdout);
@@ -167,8 +167,8 @@ test('agent hooks — degraded fallback mode fails closed when core parser is un
     assert.match(out.hookSpecificOutput?.permissionDecisionReason, /unpinned install of alias/i);
   });
 
-  // 6. Local CLI unavailable fails closed without npx fallback
-  await t.test('fails closed when local CLI is not installed and npx fallback is disabled', () => {
+  // 6. Local CLI unavailable denied via structured permission decision without npx fallback
+  await t.test('denies via structured permission decision when local CLI is not installed and npx fallback is disabled', () => {
     const res = runDegraded('npm i lodash@4.17.21');
     assert.equal(res.status, 0);
     const out = JSON.parse(res.stdout);
@@ -181,7 +181,11 @@ test('agent hooks — degraded fallback mode fails closed when core parser is un
 });
 
 test('agent hooks — Windows shell injection metacharacters rejected by SAFE_NAME_REGEX', () => {
-  const SAFE_NAME_REGEX = /^(@[a-zA-Z0-9_.-]+\/)?[a-zA-Z0-9_.-]+$/;
+  // Verify generated scripts embed the exact exported regex
+  const codexScript = generateCodexGuardScript('2.0.1');
+  const claudeScript = generateClaudeCodeGuardScript('2.0.1');
+  assert.ok(codexScript.includes(SAFE_NAME_REGEX.toString()), 'Codex script must embed exact SAFE_NAME_REGEX');
+  assert.ok(claudeScript.includes(SAFE_NAME_REGEX.toString()), 'Claude Code script must embed exact SAFE_NAME_REGEX');
 
   // Legitimate package names
   assert.ok(SAFE_NAME_REGEX.test('lodash'));
@@ -234,35 +238,98 @@ test('agent hooks — Claude Code hook schema compatibility and execution contra
     assert.equal(res.stdout, '');
   });
 
-  // 2. Denied command exits 1 with { decision: 'block', reason: string }
-  await t.test('Claude Code hook blocks unpinned installs with { decision: block } schema', () => {
+  // 2. Denied command exits 2 with { decision: 'block', reason: string }
+  await t.test('Claude Code hook blocks unpinned installs with { decision: block } schema (exit code 2)', () => {
     const res = runClaudeNode({ tool_name: 'Bash', input: { command: 'npm i lodash' }, cwd: process.cwd() });
-    assert.equal(res.status, 1);
+    assert.equal(res.status, 2);
     const out = JSON.parse(res.stdout);
     assert.equal(out.decision, 'block');
     assert.ok(typeof out.reason === 'string');
     assert.match(out.reason, /unpinned/i);
   });
 
-  // 3. Denied bare install exits 1 with { decision: 'block' }
-  await t.test('Claude Code hook blocks bare install with { decision: block } schema', () => {
+  // 3. Denied bare install exits 2 with { decision: 'block' }
+  await t.test('Claude Code hook blocks bare install with { decision: block } schema (exit code 2)', () => {
     const res = runClaudeNode({ tool_name: 'Bash', input: { command: 'npm install' }, cwd: process.cwd() });
-    assert.equal(res.status, 1);
+    assert.equal(res.status, 2);
     const out = JSON.parse(res.stdout);
     assert.equal(out.decision, 'block');
     assert.match(out.reason, /bare install/i);
   });
 
-  // 4. Malformed JSON input fails closed
-  await t.test('Claude Code hook fails closed on malformed JSON payload', () => {
+  // 4. Malformed JSON input fails closed (exit code 2)
+  await t.test('Claude Code hook fails closed on malformed JSON payload (exit code 2)', () => {
     const res = runClaudeNode(null, '{ broken json payload ');
-    assert.equal(res.status, 1);
+    assert.equal(res.status, 2);
     const out = JSON.parse(res.stdout);
     assert.equal(out.decision, 'block');
     assert.match(out.reason, /malformed tool input JSON/i);
   });
 
   // Cleanup
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+test('agent hooks — real documented Claude Code and Codex runtime payload fixtures', async (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pkgdiet-fixtures-test-'));
+  const codexScriptPath = path.join(tmpDir, 'guard-codex.mjs');
+  const claudeScriptPath = path.join(tmpDir, 'guard-claude.mjs');
+
+  fs.writeFileSync(codexScriptPath, generateCodexGuardScript('2.0.1'), 'utf8');
+
+  const fullBash = generateClaudeCodeGuardScript('2.0.1');
+  const nodeStart = 'node -e "\n';
+  const nodeEnd = '\n" 2>/dev/null';
+  const s = fullBash.indexOf(nodeStart) + nodeStart.length;
+  const e = fullBash.indexOf(nodeEnd);
+  fs.writeFileSync(claudeScriptPath, fullBash.slice(s, e).replace(/\\\$/g, '$'), 'utf8');
+
+  // Real OpenAI Codex PreToolUse hook payload fixture
+  const codexFixture = {
+    hookSpecificInput: {
+      hookEventName: 'PreToolUse',
+    },
+    tool_name: 'Bash',
+    tool_input: {
+      command: 'npm i -D axios',
+    },
+    cwd: process.cwd(),
+  };
+
+  const codexRes = spawnSync(process.execPath, [codexScriptPath], {
+    cwd: process.cwd(),
+    input: JSON.stringify(codexFixture),
+    encoding: 'utf8',
+    env: { ...process.env, PKGDIET_NO_NETWORK: '1' },
+  });
+  assert.equal(codexRes.status, 0);
+  const codexOut = JSON.parse(codexRes.stdout);
+  assert.equal(codexOut.hookSpecificOutput?.permissionDecision, 'deny');
+  assert.match(codexOut.hookSpecificOutput?.permissionDecisionReason, /unpinned install/i);
+
+  // Real Claude Code PreToolUse hook payload fixture
+  const claudeFixture = {
+    tool_name: 'Bash',
+    tool_input: {
+      command: 'npm i -D axios',
+    },
+    input: {
+      command: 'npm i -D axios',
+    },
+    cwd: process.cwd(),
+  };
+
+  const claudeRes = spawnSync(process.execPath, [claudeScriptPath], {
+    cwd: process.cwd(),
+    input: JSON.stringify(claudeFixture),
+    encoding: 'utf8',
+    env: { ...process.env, PKGDIET_NO_NETWORK: '1' },
+  });
+  assert.equal(claudeRes.status, 2);
+  const claudeOut = JSON.parse(claudeRes.stdout);
+  assert.equal(claudeOut.decision, 'block');
+  assert.match(claudeOut.reason, /unpinned install/i);
+
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 

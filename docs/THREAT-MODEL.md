@@ -113,7 +113,7 @@ PkgDiet automatically blocks execution and returns an explicit `deny` decision f
 If `@pkgdiet/core/dist/commandParser.js` cannot be loaded in the execution runtime (e.g., repository without installed dependencies):
 - The hook enters a **reduced-precision degraded mode**.
 - The fallback path extracts simple package names or fails closed immediately if any dynamic shell syntax (`$`, `` ` ``, `*`, `?`, `|`, `;`, `&`, `<`, `>`), unparseable verbs, bare installs, or unpinned packages are detected.
-- **Guarantee:** The fallback path **never** silently permits an unparsed or unverified installation. It either extracts and verifies clean pinned packages or fails closed with exit code 1.
+- **Guarantee:** The fallback path **never** silently permits an unparsed or unverified installation. It either extracts and verifies clean pinned packages or fails closed with structured denial (exit code 2 for Claude Code, structured `permissionDecision: 'deny'` with exit code 0 for Codex).
 
 ### 4.4 Hook Supply-Chain & Local-First Resolution
 Generated hook scripts eliminate enforcement-time network availability and integrity risks:
