@@ -72,10 +72,7 @@ jobs:
         env:
           PKGDIET_NO_NETWORK: '1'
         run: |
-          (node packages/cli/build/cli.js check react -p packages/core/tests/fixtures/simple-project --json 2>/dev/null || true) | \
-            node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); \
-                     if(!d.verdict) { console.error('No verdict field'); process.exit(1); } \
-                     console.log('Verdict:', d.verdict);"
+          node -e "const { execSync } = require('child_process'); let out = ''; try { out = execSync('node packages/cli/build/cli.js check react -p packages/core/tests/fixtures/simple-project --json', { stdio: ['ignore', 'pipe', 'ignore'] }).toString(); } catch (err) { out = (err.stdout || '').toString(); } const d = JSON.parse(out); if (!d.verdict) { console.error('No verdict field'); process.exit(1); } console.log('Verdict:', d.verdict);"
 
       - name: Documentation drift check
         # Fails if a README is missing, forbidden claims are found,
