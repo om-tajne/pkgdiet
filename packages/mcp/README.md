@@ -5,7 +5,7 @@
 
 <p align="left">
   <!-- NPM & Usage Stats -->
-  <a href="https://www.npmjs.com/package/@pkgdiet/mcp"><img src="https://img.shields.io/npm/v/%40pkgdiet%2Fmcp.svg?style=flat-square&color=cb3837" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/@pkgdiet/mcp"><img src="https://img.shields.io/npm/v/%40pkgdiet%2Fmcp.svg?style=flat-square&color=brightgreen" alt="npm version"></a>
   <a href="https://www.npmjs.com/package/@pkgdiet/mcp"><img src="https://img.shields.io/npm/dm/%40pkgdiet%2Fmcp.svg?style=flat-square&color=blue" alt="npm downloads"></a>
   <a href="https://github.com/om-tajne/pkgdiet"><img src="https://img.shields.io/badge/Audited_by-PkgDiet-success.svg?style=flat-square" alt="Audited by PkgDiet"></a>
   <br>
