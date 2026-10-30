@@ -12,6 +12,17 @@
  */
 export declare function getCached(projectPath: any, packageName: any, key: any): any;
 /**
+ * Get a cached entry along with its provenance metadata (fetchedAt, ageMs).
+ * Returns null if the entry is missing, expired, or tampered with.
+ *
+ * @returns {{ data: object, fetchedAt: string, ageMs: number } | null}
+ */
+export declare function getCachedWithMeta(projectPath: any, packageName: any, key: any): {
+    data: object;
+    fetchedAt: string;
+    ageMs: number;
+} | null;
+/**
  * Set a cached entry.
  */
 export declare function setCached(projectPath: any, packageName: any, key: any, data: any): void;

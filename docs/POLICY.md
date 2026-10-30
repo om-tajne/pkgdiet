@@ -141,6 +141,35 @@ The overlay merges on top of the base policy. Any key in the overlay overrides t
 
 ---
 
+## Security Verification and `securityMode`
+
+The `securityMode` setting controls how PkgDiet handles unavailability of external verification feeds (npm registry and the OSV.dev vulnerability database):
+
+| Feed Unreachable | `securityMode: "fail-open"` (default) | `securityMode: "fail-closed"` |
+|---|---|---|
+| **npm Registry** | `WARN` (`REGISTRY_UNAVAILABLE`) | `BLOCK` (`REGISTRY_UNAVAILABLE_BLOCKED`) |
+| **OSV Advisory Feed** | `WARN` (`OSV_UNAVAILABLE`) | `BLOCK` (`OSV_UNAVAILABLE_BLOCKED`) |
+
+> **Absence of evidence is never treated as evidence of absence:**
+> When OSV cannot be reached (due to network timeout, HTTP errors, rate-limiting, or ambiguous status codes), PkgDiet returns `osvChecked: false`. A package is **never** assumed to be free of vulnerabilities unless OSV explicitly returns a 200 response with zero advisories.
+
+### Advisory & Failure Codes
+
+| Reason Code | Verdict | Description |
+|---|---|---|
+| `OSV_UNAVAILABLE` | `WARN` | The OSV.dev advisory service could not be reached under `fail-open` policy. CVE status is unconfirmed. |
+| `OSV_UNAVAILABLE_BLOCKED` | `BLOCK` | The OSV.dev advisory service could not be reached under `fail-closed` policy. Installation blocked because CVE status cannot be verified. |
+| `KNOWN_VULNERABILITY` | `BLOCK` or `WARN` | Package has one or more known security advisories on OSV.dev. Blocked by default when `blockKnownVulnerabilities` is `true`. |
+| `REGISTRY_UNAVAILABLE` | `WARN` | npm registry could not be reached under `fail-open`. |
+| `REGISTRY_UNAVAILABLE_BLOCKED` | `BLOCK` | npm registry could not be reached under `fail-closed`. |
+| `PACKAGE_NOT_FOUND` | `BLOCK` | Package was not found on the registry (potential hallucination or typo). |
+| `DEPENDENCY_CONFUSION` | `BLOCK` | Package matches `internalNamePrefixes` but is missing from registry or improperly configured. |
+| `PACKAGE_DEPRECATED` | `BLOCK` | Package is marked deprecated on npm and `blockDeprecated: true`. |
+| `INSTALL_SCRIPTS` | `BLOCK` or `WARN` | Package contains lifecycle scripts (`preinstall`, `postinstall`, etc.). |
+| `POSSIBLE_TYPOSQUAT` | `BLOCK` or `WARN` | Package name is suspiciously close to a high-profile package. |
+
+---
+
 ## Committing policy
 
 Commit `.pkgdietrc.json` to version control so all team members and CI use the same policy. Add `.pkgdiet-cache.json` and `.pkgdiet-metrics.json` to `.gitignore`.

@@ -83,7 +83,18 @@ test('E2E GitHub Actions PR Gate', async (t) => {
   const report = JSON.parse(reportOnly);
   assert.equal(report.status, 'SUCCESS');
   assert.equal(report.results[0].verdict, 'BLOCK');
-  assert.equal(JSON.parse(fs.readFileSync(sarifPath, 'utf8')).version, '2.1.0');
+  const sarifData = JSON.parse(fs.readFileSync(sarifPath, 'utf8'));
+  assert.equal(sarifData.version, '2.1.0');
+  const blockFinding = sarifData.runs[0].results.find(r => r.ruleId === 'PACKAGE_BLOCKED');
+  assert.ok(blockFinding, 'SARIF report must map blocked package with ruleId PACKAGE_BLOCKED');
+  assert.equal(blockFinding.level, 'error');
+  assert.equal(blockFinding.locations[0].physicalLocation.artifactLocation.uri, 'package.json');
+
+  const policySarifPath = join(TEMP_DIR, 'policy-check.sarif');
+  run(`node "${CLI_PATH}" policy-check --sarif "${policySarifPath}"`);
+  const policySarif = JSON.parse(fs.readFileSync(policySarifPath, 'utf8'));
+  assert.equal(policySarif.version, '2.1.0');
+  assert.ok(Array.isArray(policySarif.runs[0].results));
 
   // Step 3: Policy Tampering
   policy.failOn = 'WARN'; // modify policy

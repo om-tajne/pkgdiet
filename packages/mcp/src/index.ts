@@ -83,7 +83,7 @@ export function createMcpServer() {
   // ── check_dependency ────────────────────────────────────────────────────────
   server.tool(
     "check_dependency",
-    "Evaluate a single npm package against the active PkgDiet policy to determine if it is safe, lightweight, and healthy to install. Use this read-only tool before proposing or installing any package. It returns a structured verdict (ALLOW, WARN, BLOCK), health score, cost impact, and supply-chain evidence. A BLOCK is a successful policy decision and must not be bypassed; execution failures are returned as MCP tool errors. It does not install packages, edit files, or modify the project.",
+    "Evaluate a single npm package against the active PkgDiet policy to determine if it is safe, lightweight, and healthy to install. Use this read-only tool before proposing or installing any package. It returns a structured verdict (ALLOW, WARN, BLOCK), health score, cost impact, and supply-chain evidence. A BLOCK is a successful policy decision and must not be bypassed; execution failures are returned as MCP tool errors. It does not install packages, edit files, or modify the project.\n\nResponse fields:\n- verdict: ALLOW | WARN | BLOCK. Never bypass a BLOCK.\n- advisoryVerification.osvChecked: true = OSV security advisory feed confirmed (no CVEs, or CVEs listed in evidence). false = advisory feed was UNREACHABLE — this means CVE status is UNVERIFIED, not safe. Do not treat osvChecked:false as a clean security result.\n- advisoryVerification.osvErrorCode: reason the feed was unavailable (timeout, network_error, http_503, etc.) when osvChecked is false.\n- advisoryVerification.osvCheckedAt: ISO timestamp of the successful OSV check, or null if the check failed.\n- cacheProvenance.fromCache: true if npm metadata came from local cache rather than a live registry fetch.\n- cacheProvenance.cachedAt: ISO timestamp when the cached entry was originally fetched.\n- cacheProvenance.cacheAgeMs: age of the cache entry in milliseconds.",
     {
       packageName: z.string().min(1).max(214)
         .describe("The exact npm package name to evaluate, such as 'lodash', 'moment', or '@types/node'."),
@@ -126,6 +126,20 @@ export function createMcpServer() {
           if (result.verdict === "BLOCK") action = "block";
           else if (result.verdict === "WARN") action = primaryAlternative ? "replace" : "review";
 
+          const remediation = {
+            action,
+            replacement: primaryAlternative,
+            command: primaryAlternative
+              ? `npm uninstall ${result.name} && npm install ${primaryAlternative}`
+              : result.verdict === "BLOCK"
+                ? null
+                : `npm install ${result.name}`,
+            rationale: (result.reasons || [])[0]
+              ? (typeof result.reasons[0] === "string" ? result.reasons[0] : result.reasons[0].message)
+              : "Package meets repository dependency policy.",
+            evidenceUrls: ((result.evidence as any)?.vulnerabilityIds || []).map((id: string) => `https://osv.dev/vulnerability/${id}`),
+          };
+
           return {
             content: [{
               type: "text" as const,
@@ -136,6 +150,7 @@ export function createMcpServer() {
                 // Do not fabricate a perfect score when the registry could
                 // not be verified; null lets clients distinguish uncertainty.
                 healthScore:         result.healthScore,
+                scoreExplanation:    (result as any).scoreExplanation || null,
                 // MCP's public contract is an array of human-readable strings.
                 // Keep the policy engine's richer objects internal to core.
                 reasons:             (result.reasons || []).map((reason: any) => typeof reason === "string" ? reason : reason.message),
@@ -144,6 +159,7 @@ export function createMcpServer() {
                 // additive so existing MCP clients retain their contract.
                 reasonDetails:       result.reasons || [],
                 recommendation:      { action, primaryAlternative },
+                remediation,
                 security:            {
                   registryVerified: !(result.reasons || []).some((reason: any) =>
                     (typeof reason === "string" ? reason : reason.code) === "REGISTRY_UNAVAILABLE" ||
@@ -151,6 +167,16 @@ export function createMcpServer() {
                   ),
                   hasProvenance: result.hasProvenance || false,
                   integrityCheck: result.integrityCheck || "missing",
+                },
+                advisoryVerification: {
+                  osvChecked:   (result as any).osvChecked ?? null,
+                  osvErrorCode: (result as any).osvErrorCode ?? null,
+                  osvCheckedAt: (result as any).osvCheckedAt ?? null,
+                },
+                cacheProvenance: {
+                  fromCache:  (result as any).fromCache ?? false,
+                  cachedAt:   (result as any).cachedAt ?? null,
+                  cacheAgeMs: (result as any).cacheAgeMs ?? null,
                 },
                 policy:              { source, policyVersion: policy.policyVersion || 1, environment: env },
                 addedSizeBytes:      result.costEstimate?.addedSizeMB ? Math.round(result.costEstimate.addedSizeMB * 1024 * 1024) : 0,
@@ -344,7 +370,7 @@ export function createMcpServer() {
           const rawPolicy      = loadPolicy(process.cwd());
           const env            = args.environment || "dev";
           const effectivePolicy = applyEnvironment(rawPolicy, env);
-          const { errors, warnings } = validatePolicy(effectivePolicy);
+          const { errors, warnings, issues } = validatePolicy(effectivePolicy);
 
           return {
             content: [{
@@ -360,7 +386,11 @@ export function createMcpServer() {
                   warnHealthScore: effectivePolicy.warnHealthScore,
                   blockDeprecated: effectivePolicy.blockDeprecated,
                 },
-                validation: { valid: errors.length === 0, errors, warnings },
+                validation: { valid: errors.length === 0, errors, warnings, issues: issues || [] },
+                threatModel: {
+                  reference: "docs/THREAT-MODEL.md",
+                  notice: "MCP tool results are advisory guidance for AI coding agents. Only enforced CI checks backed by required branch protection constitute merge controls.",
+                },
               }, null, 2),
             }],
           };
@@ -368,6 +398,75 @@ export function createMcpServer() {
           return {
             isError: true,
             content: [{ type: "text" as const, text: JSON.stringify({ code: "POLICY_FAILED", message: err instanceof Error ? err.message : String(err) }, null, 2) }],
+          };
+        }
+      })());
+    }
+  );
+
+  // ── explain_verdict ──────────────────────────────────────────────────────────
+  server.tool(
+    "explain_verdict",
+    "Retrieve an in-depth explanation of a package verdict, including detailed component health scores, matched policy rules, OSV vulnerability URLs, and evidence justification. Use this tool when an agent or developer needs to explain why a package was WARNED or BLOCKED without hallucinating.",
+    {
+      packageName: z.string().min(1).max(214)
+        .describe("The npm package name to explain (e.g. 'moment', 'request', 'lodash')."),
+      environment: z.enum(["dev", "prod", "ci", "test"]).default("dev")
+        .describe("The target environment to evaluate policy for. Defaults to 'dev'."),
+    },
+    async (args) => {
+      if (!checkRateLimit()) return RATE_EXCEEDED_RESPONSE;
+
+      return withToolTimeout((async () => {
+        let validatedName: string;
+        try {
+          validatedName = assertPackageName(args.packageName);
+        } catch (err) {
+          return {
+            isError: true,
+            content: [{ type: "text" as const, text: JSON.stringify({ code: "INVALID_INPUT", message: err instanceof Error ? err.message : String(err) }) }],
+          };
+        }
+
+        try {
+          let policy = loadPolicy(process.cwd());
+          const env = args.environment || "dev";
+          if (args.environment) policy = applyEnvironment(policy, args.environment);
+
+          const result: any = await checkPackage(validatedName, process.cwd(), { policy });
+
+          return {
+            content: [{
+              type: "text" as const,
+              text: JSON.stringify({
+                packageName:      result.name,
+                verdict:          result.verdict,
+                healthScore:      result.healthScore,
+                scoreExplanation: result.scoreExplanation || null,
+                ruleMatches:      result.reasons || [],
+                appliedPolicy: {
+                  environment:     env,
+                  minHealthScore:  policy.minHealthScore,
+                  warnHealthScore: policy.warnHealthScore,
+                  securityMode:    policy.securityMode,
+                  failOn:          policy.failOn,
+                  blockDeprecated: policy.blockDeprecated,
+                },
+                securityEvidence: {
+                  hasProvenance:       result.hasProvenance || false,
+                  integrityCheck:      result.integrityCheck || "missing",
+                  vulnerabilityIds:    result.evidence?.vulnerabilityIds || [],
+                  evidenceUrls:        (result.evidence?.vulnerabilityIds || []).map((id: string) => `https://osv.dev/vulnerability/${id}`),
+                  typosquatCandidates: result.evidence?.typosquatCandidates || [],
+                },
+                alternatives: (result.alternatives || []).map((alt: any) => typeof alt === "string" ? alt : (alt.replacement || alt.name)),
+              }, null, 2),
+            }],
+          };
+        } catch (err) {
+          return {
+            isError: true,
+            content: [{ type: "text" as const, text: JSON.stringify({ code: "EXPLAIN_FAILED", message: err instanceof Error ? err.message : String(err) }, null, 2) }],
           };
         }
       })());

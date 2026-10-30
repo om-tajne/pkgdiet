@@ -17,6 +17,7 @@ qa-final.json
 # packages/*/package-lock.json
 .pkgdiet-metrics.json
 test-diff.js
+test-mcp.js
 test-drift/
 tmp-app*.log
 *.vsix
@@ -51,3 +52,6 @@ apps/*/prisma/generated/
 .DS_Store
 Thumbs.db
 *.swp
+
+# Test artifacts
+packages/core/tests/fixtures/e2e-temp-repo/

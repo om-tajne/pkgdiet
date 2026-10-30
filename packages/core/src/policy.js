@@ -85,13 +85,86 @@ export function applyEnvironment(policy, envName) {
 }
 
 /**
- * Validate a policy object for errors (must fix) and warnings (should review).
- * @param {object} policy
- * @returns {{ errors: string[], warnings: string[] }}
+ * Stabilized diagnostic codes emitted by policy validation and evaluation.
+ * @readonly
+ * @enum {string}
  */
-export function validatePolicy(policy) {
+export const POLICY_DIAGNOSTIC_CODES = Object.freeze({
+  // Policy configuration errors (must fix)
+  INVALID_HEALTH_THRESHOLDS: 'INVALID_HEALTH_THRESHOLDS',
+  INVALID_FAIL_ON: 'INVALID_FAIL_ON',
+  INVALID_SECURITY_MODE: 'INVALID_SECURITY_MODE',
+  PACKAGE_RULE_CONFLICT: 'PACKAGE_RULE_CONFLICT',
+
+  // Policy configuration warnings (should review)
+  EXEMPTION_MISSING_REASON: 'EXEMPTION_MISSING_REASON',
+  EXEMPTION_EXPIRED: 'EXEMPTION_EXPIRED',
+  LAX_HEALTH_THRESHOLD: 'LAX_HEALTH_THRESHOLD',
+  HIGH_SIZE_LIMIT: 'HIGH_SIZE_LIMIT',
+  DEPRECATED_ALLOWED: 'DEPRECATED_ALLOWED',
+  UNKNOWN_ENVIRONMENT_KEY: 'UNKNOWN_ENVIRONMENT_KEY',
+});
+
+/**
+ * @typedef {Object} PolicyIssue
+ * @property {'error'|'warning'} severity
+ * @property {string} code
+ * @property {string} message
+ * @property {string} [package]
+ * @property {string} [field]
+ * @property {string} [expiresAt]
+ */
+
+/**
+ * @typedef {Object} ValidationResultDefault
+ * @property {string[]} errors
+ * @property {string[]} warnings
+ * @property {PolicyIssue[]} issues
+ * @property {PolicyIssue[]} structuredErrors
+ * @property {PolicyIssue[]} structuredWarnings
+ */
+
+/**
+ * @typedef {Object} ValidationResultStructured
+ * @property {PolicyIssue[]} errors
+ * @property {PolicyIssue[]} warnings
+ * @property {PolicyIssue[]} issues
+ * @property {PolicyIssue[]} structuredErrors
+ * @property {PolicyIssue[]} structuredWarnings
+ */
+
+/**
+ * Validate a policy object for errors (must fix) and warnings (should review).
+ * @overload
+ * @param {object} policy
+ * @param {{ structured: true }} options
+ * @returns {ValidationResultStructured}
+ */
+/**
+ * @overload
+ * @param {object} policy
+ * @param {{ structured?: false }} [options]
+ * @returns {ValidationResultDefault}
+ */
+/**
+ * @param {object} policy
+ * @param {{ structured?: boolean }} [options]
+ * @returns {ValidationResultDefault | ValidationResultStructured}
+ */
+export function validatePolicy(policy, options = {}) {
   const errors = [];
   const warnings = [];
+  const issues = [];
+
+  function addError(message, meta = {}) {
+    errors.push(message);
+    issues.push({ severity: 'error', message, ...meta });
+  }
+
+  function addWarning(message, meta = {}) {
+    warnings.push(message);
+    issues.push({ severity: 'warning', message, ...meta });
+  }
 
   // ── Errors ──────────────────────────────────────────────────────────────────
 
@@ -99,14 +172,20 @@ export function validatePolicy(policy) {
     typeof policy.minHealthScore !== 'number' ||
     policy.minHealthScore < 0 || policy.minHealthScore > 100
   ) {
-    errors.push('`minHealthScore` must be a number between 0 and 100.');
+    addError('`minHealthScore` must be a number between 0 and 100.', {
+      code: POLICY_DIAGNOSTIC_CODES.INVALID_HEALTH_THRESHOLDS,
+      field: 'minHealthScore',
+    });
   }
 
   if (
     typeof policy.warnHealthScore !== 'number' ||
     policy.warnHealthScore < 0 || policy.warnHealthScore > 100
   ) {
-    errors.push('`warnHealthScore` must be a number between 0 and 100.');
+    addError('`warnHealthScore` must be a number between 0 and 100.', {
+      code: POLICY_DIAGNOSTIC_CODES.INVALID_HEALTH_THRESHOLDS,
+      field: 'warnHealthScore',
+    });
   }
 
   if (
@@ -114,38 +193,80 @@ export function validatePolicy(policy) {
     typeof policy.warnHealthScore === 'number' &&
     policy.warnHealthScore < policy.minHealthScore
   ) {
-    errors.push(
+    addError(
       `\`warnHealthScore\` (${policy.warnHealthScore}) is less than \`minHealthScore\` (${policy.minHealthScore}). ` +
-      'Thresholds are inverted — all warned packages would also be blocked.'
+      'Thresholds are inverted — all warned packages would also be blocked.',
+      {
+        code: POLICY_DIAGNOSTIC_CODES.INVALID_HEALTH_THRESHOLDS,
+        field: 'minHealthScore',
+      }
     );
   }
 
   if (!['BLOCK', 'WARN', 'NONE'].includes(policy.failOn)) {
-    errors.push('`failOn` must be "BLOCK", "WARN", or "NONE".');
+    addError('`failOn` must be "BLOCK", "WARN", or "NONE".', {
+      code: POLICY_DIAGNOSTIC_CODES.INVALID_FAIL_ON,
+      field: 'failOn',
+    });
   }
 
   if (!['fail-open', 'fail-closed'].includes(policy.securityMode)) {
-    errors.push('`securityMode` must be "fail-open" or "fail-closed".');
+    addError('`securityMode` must be "fail-open" or "fail-closed".', {
+      code: POLICY_DIAGNOSTIC_CODES.INVALID_SECURITY_MODE,
+      field: 'securityMode',
+    });
   }
 
   // Contradictory rules: same package in blocked AND allowed
   const blocked = new Set(policy.blockedPackages || []);
-  const allowed = new Set(policy.allowedPackages || []);
+  const allowed = new Set((policy.allowedPackages || []).map(p => typeof p === 'string' ? p : p?.package).filter(Boolean));
   for (const pkg of blocked) {
     if (allowed.has(pkg)) {
-      errors.push(
+      addError(
         `Package '${pkg}' is in both \`blockedPackages\` and \`allowedPackages\`. ` +
-        '`blockedPackages` wins — remove the contradiction before relying on this policy.'
+        '`blockedPackages` wins — remove the contradiction before relying on this policy.',
+        {
+          code: POLICY_DIAGNOSTIC_CODES.PACKAGE_RULE_CONFLICT,
+          package: pkg,
+        }
       );
     }
   }
 
   // ── Warnings ─────────────────────────────────────────────────────────────────
 
+  for (const item of policy.allowedPackages || []) {
+    const pkg = typeof item === 'string' ? item : item?.package;
+    const rawReason = typeof item === 'object' && item ? item.reason : null;
+    const hasReason = typeof rawReason === 'string' && rawReason.trim().length > 0;
+
+    if (item && typeof item === 'object' && item.expiresAt) {
+      const expiry = new Date(item.expiresAt).getTime();
+      if (!isNaN(expiry) && Date.now() > expiry) {
+        addWarning(`\`allowedPackages\` entry for '${pkg}' expired on ${item.expiresAt}. It is no longer bypassing policy.`, {
+          code: POLICY_DIAGNOSTIC_CODES.EXEMPTION_EXPIRED,
+          package: pkg,
+          expiresAt: item.expiresAt,
+        });
+      }
+    }
+
+    if (!hasReason) {
+      addWarning(`\`allowedPackages\` entry for '${pkg}' has no documented reason. Add a \`reason\` explaining why this package bypasses policy.`, {
+        code: POLICY_DIAGNOSTIC_CODES.EXEMPTION_MISSING_REASON,
+        package: pkg,
+      });
+    }
+  }
+
   if (typeof policy.minHealthScore === 'number' && policy.minHealthScore < 20) {
-    warnings.push(
+    addWarning(
       `\`minHealthScore\` is ${policy.minHealthScore} (very lax). ` +
-      'Packages with a score this low are often deprecated or unmaintained.'
+      'Packages with a score this low are often deprecated or unmaintained.',
+      {
+        code: POLICY_DIAGNOSTIC_CODES.LAX_HEALTH_THRESHOLD,
+        field: 'minHealthScore',
+      }
     );
   }
 
@@ -153,30 +274,61 @@ export function validatePolicy(policy) {
     typeof policy.maxPackageSizeBytes === 'number' &&
     policy.maxPackageSizeBytes > 100_000_000
   ) {
-    warnings.push(
+    addWarning(
       `\`maxPackageSizeBytes\` is ${(policy.maxPackageSizeBytes / 1_000_000).toFixed(0)}MB (>100MB). ` +
-      'This effectively disables the size check.'
+      'This effectively disables the size check.',
+      {
+        code: POLICY_DIAGNOSTIC_CODES.HIGH_SIZE_LIMIT,
+        field: 'maxPackageSizeBytes',
+      }
     );
   }
 
   if (policy.blockDeprecated === false) {
-    warnings.push(
+    addWarning(
       '`blockDeprecated` is false. Deprecated packages will not be blocked — ' +
-      'this may expose your project to unmaintained dependencies.'
+      'this may expose your project to unmaintained dependencies.',
+      {
+        code: POLICY_DIAGNOSTIC_CODES.DEPRECATED_ALLOWED,
+        field: 'blockDeprecated',
+      }
     );
   }
 
   const knownEnvs = new Set(['ci', 'dev', 'prod', 'staging', 'test']);
   for (const envKey of Object.keys(policy.environments || {})) {
     if (!knownEnvs.has(envKey)) {
-      warnings.push(
+      addWarning(
         `Unknown environment key '${envKey}' in \`environments\`. ` +
-        'Known keys are: ci, dev, prod, staging, test. This may be a typo.'
+        'Known keys are: ci, dev, prod, staging, test. This may be a typo.',
+        {
+          code: POLICY_DIAGNOSTIC_CODES.UNKNOWN_ENVIRONMENT_KEY,
+          field: `environments.${envKey}`,
+        }
       );
     }
   }
 
-  return { errors, warnings };
+  const structuredErrors = issues.filter(i => i.severity === 'error');
+  const structuredWarnings = issues.filter(i => i.severity === 'warning');
+
+  if (options && options.structured === true) {
+    return {
+      errors: structuredErrors,
+      warnings: structuredWarnings,
+      issues,
+      structuredErrors,
+      structuredWarnings,
+    };
+  }
+
+  return {
+    errors,
+    warnings,
+    issues,
+    structuredErrors,
+    structuredWarnings,
+  };
 }
 
 // ── Policy evaluation helpers ──────────────────────────────────────────────────
@@ -188,6 +340,27 @@ function isIgnored(packageName, ignoreRules) {
     if (rule && rule.package) return rule.package === packageName;
     return false;
   });
+}
+
+function isPackageAllowed(packageName, allowedPackages) {
+  if (!allowedPackages || !Array.isArray(allowedPackages)) return { allowed: false };
+  for (const item of allowedPackages) {
+    const name = typeof item === 'string' ? item : item?.package;
+    if (name === packageName) {
+      const rawReason = typeof item === 'object' && item ? item.reason : null;
+      const trimmedReason = typeof rawReason === 'string' ? rawReason.trim() : null;
+      const normalizedReason = trimmedReason && trimmedReason.length > 0 ? trimmedReason : null;
+
+      if (item && typeof item === 'object' && item.expiresAt) {
+        const expiry = new Date(item.expiresAt).getTime();
+        if (!isNaN(expiry) && Date.now() > expiry) {
+          return { allowed: false, expired: true, expiresAt: item.expiresAt, reason: normalizedReason };
+        }
+      }
+      return { allowed: true, reason: normalizedReason };
+    }
+  }
+  return { allowed: false };
 }
 
 /**
@@ -202,8 +375,23 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
   if ((policy.blockedPackages || []).includes(packageName)) {
     return { verdict: 'BLOCK', reasons: [{ code: 'PACKAGE_BLOCKED', message: 'Package is explicitly blocked in policy.' }], ignored: false };
   }
-  if ((policy.allowedPackages || []).includes(packageName)) {
-    return { verdict: 'ALLOW', reasons: [{ code: 'PACKAGE_ALLOWED', message: 'Package is explicitly allowed in policy.' }], ignored: true };
+  const allowCheck = isPackageAllowed(packageName, policy.allowedPackages);
+  if (allowCheck.allowed) {
+    const msg = allowCheck.reason
+      ? `Package is explicitly allowed in policy (${allowCheck.reason}).`
+      : 'Package is explicitly allowed in policy.';
+    return {
+      verdict: 'ALLOW',
+      reasons: [{ code: 'PACKAGE_ALLOWED', message: msg, reason: allowCheck.reason }],
+      ignored: true,
+    };
+  } else if (allowCheck.expired) {
+    reasons.push({
+      code: 'ALLOW_EXCEPTION_EXPIRED',
+      message: `Policy allow exception for '${packageName}' expired on ${allowCheck.expiresAt}. Evaluated normally.`,
+      reason: allowCheck.reason,
+      expiresAt: allowCheck.expiresAt,
+    });
   }
 
   // 2. Ignore rules
@@ -257,6 +445,20 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
     });
   }
 
+  // OSV feed unavailable — treat distinctly from "no vulnerabilities found".
+  // fail-open: WARN with explicit OSV_UNAVAILABLE code so clients can surface it.
+  // fail-closed: BLOCK — cannot confirm absence of CVEs; never produce a silent clean pass.
+  if (pkgHealth?.osvChecked === false && pkgHealth?.advisoryStatus !== 'skipped') {
+    const failClosed = policy.securityMode === 'fail-closed';
+    verdict = failClosed ? 'BLOCK' : (verdict === 'BLOCK' ? 'BLOCK' : 'WARN');
+    reasons.push({
+      code: failClosed ? 'OSV_UNAVAILABLE_BLOCKED' : 'OSV_UNAVAILABLE',
+      message: failClosed
+        ? `SECURITY BLOCK: Vulnerability advisory feed (OSV) is unavailable (${pkgHealth.osvErrorCode || 'unknown'}). Cannot confirm absence of CVEs under fail-closed policy.`
+        : `SECURITY WARNING: Vulnerability advisory feed (OSV) is unavailable (${pkgHealth.osvErrorCode || 'unknown'}). CVE status is unconfirmed — review before installing.`,
+    });
+  }
+
   if (pkgHealth?.typosquatCandidates?.length > 0) {
     verdict = policy.blockTyposquats ? 'BLOCK' : (verdict === 'BLOCK' ? 'BLOCK' : 'WARN');
     reasons.push({
@@ -298,6 +500,7 @@ export function evaluatePolicy(packageName, pkgHealth, sizeInfo, policy) {
           r.code === 'PACKAGE_DEPRECATED' ||
           r.code === 'INSTALL_SCRIPTS' ||
           r.code === 'KNOWN_VULNERABILITY' ||
+          r.code === 'OSV_UNAVAILABLE_BLOCKED' ||
           r.code === 'PROVENANCE_REQUIRED' ||
           r.code === 'INTEGRITY_REQUIRED' ||
           r.code === 'PINNED_VERSION_REQUIRED' ||

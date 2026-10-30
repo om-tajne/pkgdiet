@@ -100,6 +100,15 @@ test("MCP — full protocol lifecycle covers all 4 tools", async () => {
         name: "check_dependencies",
         arguments: { packageNames: ["moment", "dayjs"], environment: "ci" }
       }
+    },
+
+    // explain_verdict
+    {
+      jsonrpc: "2.0", id: 7, method: "tools/call",
+      params: {
+        name: "explain_verdict",
+        arguments: { packageName: "moment" }
+      }
     }
   ]);
 
@@ -115,6 +124,7 @@ test("MCP — full protocol lifecycle covers all 4 tools", async () => {
   assert.ok(toolNames.includes("check_dependencies"), "tools/list must expose check_dependencies");
   assert.ok(toolNames.includes("suggest_alternative"),"tools/list must expose suggest_alternative");
   assert.ok(toolNames.includes("get_policy"),         "tools/list must expose get_policy");
+  assert.ok(toolNames.includes("explain_verdict"),    "tools/list must expose explain_verdict");
 
   // ── get_policy ───────────────────────────────────────────────────────────────
   const policyRes = responses.find(r => r.id === 3);
@@ -124,6 +134,10 @@ test("MCP — full protocol lifecycle covers all 4 tools", async () => {
   assert.equal(typeof policy.validation.valid, "boolean", "get_policy: validation.valid must be boolean");
   assert.ok(Array.isArray(policy.validation.errors),   "get_policy: validation.errors must be array");
   assert.ok(Array.isArray(policy.validation.warnings), "get_policy: validation.warnings must be array");
+  assert.ok(Array.isArray(policy.validation.issues),   "get_policy: validation.issues must be array");
+  assert.ok(policy.threatModel,                        "get_policy: threatModel must be present");
+  assert.equal(policy.threatModel.reference,          "docs/THREAT-MODEL.md");
+  assert.match(policy.threatModel.notice,             /advisory guidance/i);
 
   // ── check_dependency ─────────────────────────────────────────────────────────
   const checkRes = responses.find(r => r.id === 4);
@@ -175,6 +189,14 @@ test("MCP — full protocol lifecycle covers all 4 tools", async () => {
     assert.ok(Array.isArray(r.reasons || []),   "check_dependencies: each result must have reasons array");
   }
 
+  // ── explain_verdict ──────────────────────────────────────────────────────────
+  const explainRes = responses.find(r => r.id === 7);
+  assert.ok(explainRes?.result, "explain_verdict should succeed");
+  const explain = JSON.parse(explainRes.result.content[0].text);
+  assert.equal(explain.packageName, "moment");
+  assert.ok(explain.appliedPolicy, "explain_verdict: appliedPolicy must be present");
+  assert.ok(explain.securityEvidence, "explain_verdict: securityEvidence must be present");
+
   // ── stdout hygiene ──────────────────────────────────────────────────────────
   assert.ok(!stderrBuf.includes("jsonrpc"),
     "stderr must not contain JSON-RPC payloads");
@@ -218,6 +240,18 @@ test("MCP — invalid arguments are rejected, not silently accepted", async () =
     {
       jsonrpc: "2.0", id: 14, method: "tools/call",
       params: { name: "nonexistent_tool", arguments: {} }
+    },
+
+    // explain_verdict: missing packageName
+    {
+      jsonrpc: "2.0", id: 15, method: "tools/call",
+      params: { name: "explain_verdict", arguments: {} }
+    },
+
+    // explain_verdict: invalid packageName
+    {
+      jsonrpc: "2.0", id: 16, method: "tools/call",
+      params: { name: "explain_verdict", arguments: { packageName: "invalid package with spaces!" } }
     }
   ]);
 
@@ -254,5 +288,19 @@ test("MCP — invalid arguments are rejected, not silently accepted", async () =
   assert.ok(
     unknownToolRes?.result?.isError === true || unknownToolRes?.error != null,
     "Unknown tool must return isError:true or a JSON-RPC error"
+  );
+
+  // explain_verdict: missing packageName
+  const missingExplainPkg = responses.find(r => r.id === 15);
+  assert.ok(
+    missingExplainPkg?.result?.isError === true || missingExplainPkg?.error != null,
+    "explain_verdict without packageName must be rejected"
+  );
+
+  // explain_verdict: invalid packageName
+  const invalidExplainPkg = responses.find(r => r.id === 16);
+  assert.ok(
+    invalidExplainPkg?.result?.isError === true || invalidExplainPkg?.error != null,
+    "explain_verdict with invalid packageName must return isError:true"
   );
 });

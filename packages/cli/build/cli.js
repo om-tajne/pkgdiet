@@ -342,7 +342,14 @@ program
     }
     fs.writeFileSync('pkgdiet-pr-comment.md', result.markdown);
     if (options.sarif) {
-        const sarif = { version: '2.1.0', $schema: 'https://json.schemastore.org/sarif-2.1.0.json', runs: [{ tool: { driver: { name: 'PkgDiet', rules: [] } }, results: result.results.filter(r => r.verdict !== 'ALLOW').map(r => ({ level: r.verdict === 'BLOCK' ? 'error' : 'warning', ruleId: r.reasons?.[0]?.code || 'PKGDIET_POLICY', message: { text: (r.reasons || []).map(x => typeof x === 'string' ? x : x.message).join(' ') }, locations: [{ physicalLocation: { artifactLocation: { uri: 'package.json' } } }] })) }] };
+        const { validatePolicy } = await import('@pkgdiet/core/dist/policy.js');
+        const { buildSarifReport } = await import('@pkgdiet/core/dist/sarif.js');
+        const policyValidation = validatePolicy(policy);
+        const sarif = buildSarifReport({
+            policyIssues: policyValidation.issues || [],
+            dependencyResults: result.results || [],
+            projectPath: process.cwd()
+        });
         fs.writeFileSync(options.sarif, JSON.stringify(sarif, null, 2));
     }
     if (!options.dryRun) {
@@ -514,7 +521,7 @@ All operations are non-destructive: existing files are never overwritten.`)
 // ─── pr ───────────────────────────────────────────────────────────────────────
 program
     .command('pr')
-    .description('Generate a reviewer-ready pull request for adding PkgDiet to any GitHub repo')
+    .description('Generate a reviewer-ready pull request template for adding PkgDiet to your repository')
     .option('--type <type>', 'PR type: ci (GitHub Actions), mcp (agent config), or all', 'all')
     .option('--agent <agent>', 'Agent for MCP PR: cursor, claude, copilot, windsurf, cline, all', 'all')
     .option('--repo <name>', 'Target repo name (defaults to current project name)')
@@ -586,10 +593,19 @@ program
     .command('policy-check')
     .description('Validate the repository’s .pkgdietrc.json policy')
     .option('-p, --path <path>', 'Path to project containing .pkgdietrc.json', '.')
+    .option('--sarif <file>', 'Write policy validation issues as a SARIF report')
     .action(async (options) => {
     const { loadPolicy, validatePolicy } = await import('@pkgdiet/core/dist/policy.js');
     const policy = loadPolicy(options.path);
-    const { errors, warnings } = validatePolicy(policy);
+    const { errors, warnings, issues } = validatePolicy(policy);
+    if (options.sarif) {
+        const { buildSarifReport } = await import('@pkgdiet/core/dist/sarif.js');
+        const sarif = buildSarifReport({
+            policyIssues: issues || [],
+            projectPath: options.path || process.cwd()
+        });
+        fs.writeFileSync(options.sarif, JSON.stringify(sarif, null, 2));
+    }
     console.log('\n🥗 PkgDiet Policy Validation\n');
     if (errors.length === 0 && warnings.length === 0) {
         console.log('✅ Policy is valid — no issues found.\n');
@@ -689,7 +705,7 @@ function buildFixSuggestion(pkgName, result) {
 // ─── demo ───────────────────────────────────────────────────────────────────────────────
 program
     .command('demo')
-    .description('Show live proof that PkgDiet blocks risky AI-generated dependencies before install')
+    .description('Demonstrate local policy evaluation against simulated risky package installs')
     .option('--json', 'Output machine-readable JSON proof')
     .addHelpText('after', `
 Demonstrates real-time enforcement against known-risky packages:
@@ -777,7 +793,7 @@ Verdicts are based on live registry and OSV.dev data — results may vary over t
         const warned = results.filter(r => r.verdict === 'WARN').length;
         console.log(chalk.bold('\uD83D\uDCCA Demo Summary: ' + blocked + ' blocked, ' + warned + ' warned'));
         console.log(chalk.gray('   These checks run automatically before every npm install in your AI agent.'));
-        console.log(chalk.gray('   Setup: npx pkgdiet@2.0.1 init'));
+        console.log(chalk.gray('   Setup: npx pkgdiet init'));
         console.log(chalk.gray('   Docs:  github.com/om-tajne/pkgdiet\n'));
     }
 });

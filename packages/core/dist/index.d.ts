@@ -11,6 +11,9 @@
  * }
  */
 import './alternatives.js';
+export { loadPolicy, validatePolicy, evaluatePolicy, applyEnvironment, DEFAULT_POLICY, POLICY_DIAGNOSTIC_CODES } from './policy.js';
+export { parseInstallCommands, splitCommandChains, tokenizeShellCommand, parsePackageSpec } from './commandParser.js';
+export { buildSarifReport, SARIF_RULES } from './sarif.js';
 /**
  * Run a full dependency audit for a project.
  *

@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { validatePolicy, evaluatePolicy, applyEnvironment, DEFAULT_POLICY } from '../src/policy.js';
+import { validatePolicy, evaluatePolicy, applyEnvironment, DEFAULT_POLICY, POLICY_DIAGNOSTIC_CODES } from '../src/policy.js';
 
 // ── validatePolicy ─────────────────────────────────────────────────────────────
 
@@ -217,4 +217,174 @@ test('applyEnvironment — environment-specific blockedPackages replace base whe
   };
   const result = applyEnvironment(policy, 'ci');
   assert.deepEqual(result.blockedPackages, ['ci-blocked']);
+});
+
+test('allowedPackages — supports object format with reason and active expiry', () => {
+  const policy = {
+    ...DEFAULT_POLICY,
+    allowedPackages: [
+      { package: 'legacy-pkg', reason: 'migration in progress', expiresAt: '2099-01-01' }
+    ]
+  };
+  const res = evaluatePolicy('legacy-pkg', { score: 10, flags: [] }, null, policy);
+  assert.equal(res.verdict, 'ALLOW');
+  assert.equal(res.ignored, true);
+  assert.ok(res.reasons[0].message.includes('migration in progress'));
+});
+
+test('allowedPackages — expired entry no longer allows low health package', () => {
+  const policy = {
+    ...DEFAULT_POLICY,
+    blockOnLowHealth: true,
+    minHealthScore: 60,
+    allowedPackages: [
+      { package: 'expired-pkg', reason: 'temporary exception', expiresAt: '2020-01-01' }
+    ]
+  };
+  const validation = validatePolicy(policy);
+  assert.ok(validation.warnings.some(w => w.includes('expired on 2020-01-01')));
+
+  const res = evaluatePolicy('expired-pkg', { score: 10, flags: [] }, null, policy);
+  assert.equal(res.verdict, 'BLOCK');
+  assert.ok(res.reasons.some(r => r.code === 'ALLOW_EXCEPTION_EXPIRED'));
+});
+
+// ── Audit traceability for allowedPackages exemptions ─────────────────────────
+
+test('validatePolicy — expiring exemption without reason produces an audit warning', () => {
+  const policy = {
+    ...DEFAULT_POLICY,
+    allowedPackages: [
+      { package: 'audit-pkg', expiresAt: '2099-01-01' } // active expiry, missing reason
+    ]
+  };
+  const { warnings } = validatePolicy(policy);
+  const reasonWarns = warnings.filter(w => w.includes('has no documented reason'));
+  assert.equal(reasonWarns.length, 1, 'Expected exactly one audit warning for missing reason');
+  assert.ok(reasonWarns[0].includes('audit-pkg'));
+});
+
+test('validatePolicy — empty or whitespace-only reason produces an audit warning', () => {
+  for (const invalidReason of ['', '   ', null, undefined, 123]) {
+    const policy = {
+      ...DEFAULT_POLICY,
+      allowedPackages: [
+        { package: 'test-pkg', reason: invalidReason }
+      ]
+    };
+    const { warnings } = validatePolicy(policy);
+    assert.ok(
+      warnings.some(w => w.includes('has no documented reason') && w.includes('test-pkg')),
+      `Expected reason warning for invalid reason: ${JSON.stringify(invalidReason)}`
+    );
+  }
+});
+
+test('validatePolicy — bare string exemption produces an audit warning', () => {
+  const policy = {
+    ...DEFAULT_POLICY,
+    allowedPackages: ['bare-string-pkg']
+  };
+  const { warnings } = validatePolicy(policy);
+  assert.ok(warnings.some(w => w.includes('bare-string-pkg') && w.includes('has no documented reason')));
+});
+
+test('validatePolicy — valid exemption with reason produces no exemption warnings', () => {
+  const policy = {
+    ...DEFAULT_POLICY,
+    allowedPackages: [
+      { package: 'valid-pkg', reason: 'SEC-104: Approved legacy exception', expiresAt: '2099-01-01' }
+    ]
+  };
+  const { warnings } = validatePolicy(policy);
+  assert.equal(warnings.filter(w => w.includes('allowedPackages')).length, 0);
+});
+
+test('validatePolicy — issues array provides structured objects with code, severity, and metadata', () => {
+  const policy = {
+    ...DEFAULT_POLICY,
+    minHealthScore: 80,
+    warnHealthScore: 50, // inverted thresholds error
+    allowedPackages: [
+      { package: 'unreasoned-pkg' }, // missing reason warning
+      { package: 'expired-pkg', expiresAt: '2020-01-01', reason: 'Legacy' } // expired warning
+    ]
+  };
+  const { errors, warnings, issues, structuredErrors, structuredWarnings } = validatePolicy(policy);
+
+  assert.ok(Array.isArray(issues), 'issues must be an array');
+  assert.equal(issues.length, errors.length + warnings.length);
+
+  const invertedIssue = issues.find(i => i.code === 'INVALID_HEALTH_THRESHOLDS');
+  assert.ok(invertedIssue);
+  assert.equal(invertedIssue.severity, 'error');
+  assert.equal(invertedIssue.field, 'minHealthScore');
+
+  const missingReasonIssue = issues.find(i => i.code === 'EXEMPTION_MISSING_REASON');
+  assert.ok(missingReasonIssue);
+  assert.equal(missingReasonIssue.severity, 'warning');
+  assert.equal(missingReasonIssue.package, 'unreasoned-pkg');
+
+  const expiredIssue = issues.find(i => i.code === 'EXEMPTION_EXPIRED');
+  assert.ok(expiredIssue);
+  assert.equal(expiredIssue.severity, 'warning');
+  assert.equal(expiredIssue.package, 'expired-pkg');
+
+  assert.equal(structuredErrors.length, 1);
+  assert.equal(structuredWarnings.length, 2);
+});
+
+test('validatePolicy — options.structured=true returns structured errors and warnings', () => {
+  const policy = {
+    ...DEFAULT_POLICY,
+    minHealthScore: 10, // lax threshold
+    allowedPackages: ['bare-pkg'] // missing reason
+  };
+  const { errors, warnings } = validatePolicy(policy, { structured: true });
+  assert.equal(errors.length, 0);
+  assert.ok(warnings.some(w => w.code === 'EXEMPTION_MISSING_REASON' && w.package === 'bare-pkg'));
+  assert.ok(warnings.some(w => w.code === 'LAX_HEALTH_THRESHOLD' && w.field === 'minHealthScore'));
+});
+
+test('evaluatePolicy — trims whitespace from exemption reasons', () => {
+  const policy = {
+    ...DEFAULT_POLICY,
+    allowedPackages: [
+      { package: 'padded-pkg', reason: '   SEC-104: Approved exception   ' }
+    ]
+  };
+  const res = evaluatePolicy('padded-pkg', { score: 10 }, null, policy);
+  assert.equal(res.verdict, 'ALLOW');
+  assert.equal(res.reasons[0].reason, 'SEC-104: Approved exception');
+  assert.ok(res.reasons[0].message.includes('Package is explicitly allowed in policy (SEC-104: Approved exception).'));
+});
+
+test('evaluatePolicy — whitespace-only exemption reason normalizes to null', () => {
+  const policy = {
+    ...DEFAULT_POLICY,
+    allowedPackages: [
+      { package: 'blank-reason-pkg', reason: '    ' }
+    ]
+  };
+  const res = evaluatePolicy('blank-reason-pkg', { score: 10 }, null, policy);
+  assert.equal(res.verdict, 'ALLOW');
+  assert.equal(res.reasons[0].reason, null);
+  assert.equal(res.reasons[0].message, 'Package is explicitly allowed in policy.');
+});
+
+test('POLICY_DIAGNOSTIC_CODES — contract surface is frozen and matches known schema', () => {
+  assert.ok(Object.isFrozen(POLICY_DIAGNOSTIC_CODES), 'POLICY_DIAGNOSTIC_CODES must be frozen');
+  const expectedCodes = {
+    INVALID_HEALTH_THRESHOLDS: 'INVALID_HEALTH_THRESHOLDS',
+    INVALID_FAIL_ON: 'INVALID_FAIL_ON',
+    INVALID_SECURITY_MODE: 'INVALID_SECURITY_MODE',
+    PACKAGE_RULE_CONFLICT: 'PACKAGE_RULE_CONFLICT',
+    EXEMPTION_MISSING_REASON: 'EXEMPTION_MISSING_REASON',
+    EXEMPTION_EXPIRED: 'EXEMPTION_EXPIRED',
+    LAX_HEALTH_THRESHOLD: 'LAX_HEALTH_THRESHOLD',
+    HIGH_SIZE_LIMIT: 'HIGH_SIZE_LIMIT',
+    DEPRECATED_ALLOWED: 'DEPRECATED_ALLOWED',
+    UNKNOWN_ENVIRONMENT_KEY: 'UNKNOWN_ENVIRONMENT_KEY',
+  };
+  assert.deepEqual({ ...POLICY_DIAGNOSTIC_CODES }, expectedCodes);
 });

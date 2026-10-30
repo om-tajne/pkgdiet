@@ -15,10 +15,94 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   workspace reference, and package-lock entries. PkgDiet remains a local-first
   CLI, MCP server, and GitHub Action.
 
+### Security — OSV failure-mode fix (behavioral change)
+
+> **This is a behavioral change.** Projects using `securityMode: "fail-closed"` will
+> now receive `BLOCK` verdicts when the OSV advisory feed is unreachable. Projects using
+> the default `securityMode: "fail-open"` will receive `WARN` instead of the previous
+> silent pass. **Absence of evidence is no longer treated as evidence of absence.**
+
+#### Problem (pre-fix)
+When the OSV advisory API was unavailable (timeout, network error, HTTP 5xx/4xx), the
+health module returned `status: 'unavailable'` with `vulnerabilities: []`. This was
+**indistinguishable** from a successful check that found no vulnerabilities. Policy
+evaluation silently produced a clean pass — even under `securityMode: "fail-closed"`.
+
+#### Fix
+`fetchOsvAdvisories` now returns a structured result with an explicit `osvChecked` boolean
+and `osvErrorCode` on every failure path. Policy evaluation treats `osvChecked: false` as
+a distinct state that escalates per `securityMode`:
+
+| `securityMode` | OSV unreachable behavior |
+|---|---|
+| `fail-open` (default) | `WARN` + reason code `OSV_UNAVAILABLE` |
+| `fail-closed` | `BLOCK` + reason code `OSV_UNAVAILABLE_BLOCKED` |
+
+`status: 'skipped'` (offline mode / `PKGDIET_ADVISORIES=0`) is unchanged — it does not
+trigger escalation.
+
+#### New error taxonomy (`osvErrorCode`)
+| Code | Cause |
+|---|---|
+| `timeout` | OSV POST exceeded `FETCH_TIMEOUT_MS` |
+| `network_error` | TCP/DNS failure before a response was received |
+| `http_429` | Rate limit exhausted after retries |
+| `http_503` | Service unavailable after retries (or any 5xx) |
+| `http_404` | Ambiguous — OSV does not reliably distinguish "no record" from "bad request" |
+| `http_<N>` | Other non-retryable HTTP error |
+| `invalid_json` | OSV returned non-parseable response body |
+| `null` | Check succeeded (`osvChecked: true`) |
+
+#### New output fields (additive, no breaking changes)
+All surfaces (`checkPackage`, CLI `--json`, MCP `check_dependency`) now include:
+
+```json
+"advisoryVerification": {
+  "osvChecked":   true,
+  "osvErrorCode": null,
+  "osvCheckedAt": "2026-10-28T17:30:00.000Z"
+},
+"cacheProvenance": {
+  "fromCache":  false,
+  "cachedAt":   null,
+  "cacheAgeMs": null
+}
+```
+
+- `osvChecked: false` always means **unverified** — never infer safety from
+  `vulnerabilities.length === 0` when `osvChecked` is `false`.
+- `osvCheckedAt` is `null` on every failure path; it is only set on a successful
+  200 response. This prevents a failure timestamp from being mistaken for
+  verification time.
+- `cacheAgeMs` lets agents distinguish a fresh registry fetch from a near-expired
+  cache entry.
+
+#### New reason codes (public API surface)
+| Code | Verdict | Condition |
+|---|---|---|
+| `OSV_UNAVAILABLE` | `WARN` | `securityMode: "fail-open"` and OSV unreachable |
+| `OSV_UNAVAILABLE_BLOCKED` | `BLOCK` | `securityMode: "fail-closed"` and OSV unreachable |
+
+#### OSV retry behavior
+OSV HTTP 429 and 5xx responses are now retried up to `MAX_RETRIES` (3) times with
+exponential backoff before marking `osvChecked: false`. The final HTTP status is
+preserved in `osvErrorCode` (e.g. `http_429` vs `http_503`). Timeout and network
+errors are not retried — they have already waited `FETCH_TIMEOUT_MS` (10 s default).
+
+#### Cache interaction
+Cached health results that contain `osvChecked: false` (from a prior failed OSV fetch)
+**retain their degraded policy treatment on every cache hit** until the entry expires
+and a fresh check is performed. `fromCache: true` does not suppress `OSV_UNAVAILABLE`
+escalation. This is intentional: cache age does not make an unverified CVE status verified.
+
 ### Documentation
 
 - Aligned the root architecture guide with the implemented three-verdict model,
   current policy schema, MCP tool set, and CI `failOn` configuration.
+- Added security-verification semantics section to `docs/MCP.md`.
+- Added OSV error-code reference and `securityMode` behavior table to `docs/POLICY.md`.
+- Updated `check_dependency` MCP tool description to document all new response fields
+  and state explicitly that `osvChecked: false` means unverified, not safe.
 
 ---
 

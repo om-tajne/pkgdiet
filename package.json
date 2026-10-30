@@ -5,7 +5,7 @@
   "workspaces": ["packages/*"],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "test": "npm run build && node --test packages/core/tests/run.contract.test.js packages/core/tests/policy.unit.test.js packages/core/tests/checker.unit.test.js packages/core/tests/parity.integration.test.js packages/core/tests/e2e-github-actions.test.js packages/cli/tests/audit.test.js packages/mcp/tests/mcp.test.js packages/ai-tool/tests/core.test.js",
+    "test": "npm run build && node --test packages/core/tests/run.contract.test.js packages/core/tests/policy.unit.test.js packages/core/tests/checker.unit.test.js packages/core/tests/commandParser.unit.test.js packages/core/tests/sarif.unit.test.js packages/core/tests/smoke.test.js packages/core/tests/parity.integration.test.js packages/core/tests/e2e-github-actions.test.js packages/cli/tests/audit.test.js packages/cli/tests/agentHooks.test.js packages/mcp/tests/mcp.test.js packages/ai-tool/tests/core.test.js",
     "lint": "npm run lint --workspaces --if-present"
   },
   "devDependencies": {

@@ -3,7 +3,7 @@
  * Scores package health based on npm registry metadata.
  */
 
-import { getCached, batchSetCached } from './cache.js';
+import { getCached, getCachedWithMeta, batchSetCached } from './cache.js';
 import { timeSince } from './utils.js';
 import { findTyposquatCandidates } from './security.js';
 
@@ -85,24 +85,103 @@ async function fetchWithRetry(url, retries = MAX_RETRIES) {
   return { data: null, status: 'network_error' };
 }
 
+/**
+ * Fetch OSV advisories for a package@version.
+ *
+ * HTTP status semantics:
+ *   200        → osvChecked: true, parse vulns array (empty array = no known advisories)
+ *   404        → osvChecked: false, errorCode: 'http_404'
+ *                OSV's POST /v1/query does not distinguish "package unknown" from
+ *                "malformed request" via 404, so we cannot safely treat it as a
+ *                confirmed-clean result. Mark as unverified; policy escalates
+ *                per securityMode. Cache expiry will trigger a fresh attempt.
+ *   429 / 5xx  → transient; retried up to MAX_RETRIES times with exponential
+ *                backoff. The final response status is preserved in errorCode
+ *                (e.g. 'http_429' vs 'http_503') so callers can distinguish
+ *                rate-limit exhaustion from a service outage.
+ *   other 4xx  → non-retryable client error; mark unavailable with http_<status>
+ *   timeout    → mark unavailable with errorCode 'timeout' (not retried — already
+ *                waited FETCH_TIMEOUT_MS)
+ *   network    → mark unavailable with errorCode 'network_error' (not retried)
+ *   invalid JSON → mark unavailable with errorCode 'invalid_json'
+ *
+ * osvCheckedAt is set to the ISO timestamp of the successful OSV response only.
+ * It is null on every failure path so callers never mistake an error timestamp
+ * for a successful verification time.
+ *
+ * IMPORTANT: 'skipped' (PKGDIET_ADVISORIES=0 or no version resolved) is
+ * semantically different from 'unavailable'. Policy must never treat 'skipped'
+ * as an outage — it is an explicit opt-out or a missing-version condition.
+ */
 async function fetchOsvAdvisories(packageName, version) {
-  if (!ADVISORIES_ENABLED || !version) return { status: 'skipped', vulnerabilities: [] };
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const response = await fetch(OSV_API, {
-      method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ package: { ecosystem: 'npm', name: packageName }, version }),
-      signal: controller.signal,
-    });
-    const data = response.ok ? await response.json() : null;
-    return { status: response.ok ? 'ok' : 'unavailable', vulnerabilities: data?.vulns || [] };
-  } catch {
-    return { status: 'unavailable', vulnerabilities: [] };
-  } finally {
-    clearTimeout(timer);
+  if (!ADVISORIES_ENABLED || !version) {
+    return { status: 'skipped', osvChecked: false, vulnerabilities: [], errorCode: null, osvCheckedAt: null };
   }
+
+  const body = JSON.stringify({ package: { ecosystem: 'npm', name: packageName }, version });
+  let lastErrorCode = 'network_error';
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(OSV_API, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body,
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
+      // Transient server/rate errors — retry with backoff.
+      // Preserve the actual status in lastErrorCode so retry exhaustion
+      // reports 'http_429' vs 'http_503' accurately.
+      if ((response.status === 429 || response.status >= 500) && attempt < MAX_RETRIES) {
+        lastErrorCode = `http_${response.status}`;
+        const delay = RETRY_DELAY_MS * Math.pow(2, attempt);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+
+      // Any non-OK response (including 404 and other 4xx) is treated as unverified.
+      // We do not promote 404 to "confirmed clean" because OSV's API does not
+      // reliably distinguish "no record" from "malformed request" via 404.
+      if (!response.ok) {
+        return {
+          status: 'unavailable',
+          osvChecked: false,
+          vulnerabilities: [],
+          errorCode: `http_${response.status}`,
+          osvCheckedAt: null,
+        };
+      }
+
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        return { status: 'unavailable', osvChecked: false, vulnerabilities: [], errorCode: 'invalid_json', osvCheckedAt: null };
+      }
+
+      return {
+        status: 'ok',
+        osvChecked: true,
+        vulnerabilities: data?.vulns || [],
+        errorCode: null,
+        osvCheckedAt: new Date().toISOString(),
+      };
+
+    } catch (err) {
+      clearTimeout(timer);
+      // Timeout and network errors are not retried.
+      const errorCode = err.name === 'AbortError' ? 'timeout' : 'network_error';
+      return { status: 'unavailable', osvChecked: false, vulnerabilities: [], errorCode, osvCheckedAt: null };
+    }
+  }
+
+  // Exhausted retries — report the last observed HTTP status class.
+  return { status: 'unavailable', osvChecked: false, vulnerabilities: [], errorCode: lastErrorCode, osvCheckedAt: null };
 }
 
 // ── Concurrency pool ──────────────────────────────────────────────────────────
@@ -142,12 +221,14 @@ async function withConcurrency(tasks, limit) {
 /**
  * Fetch health data for a single package from npm registry.
  */
-export async function fetchPackageHealth(packageName, projectPath, useCache) {
-  // Check cache first
+export async function fetchPackageHealth(packageName, projectPath, useCache, targetVersion = null) {
+  // Check cache first (scoped by version if specific version requested)
+  const cacheKey = targetVersion ? `health:${targetVersion}` : 'health';
   if (useCache) {
-    const cached = getCached(projectPath, packageName, 'health');
-    if (cached) {
-      return { ...cached, fromCache: true };
+    const meta = getCachedWithMeta(projectPath, packageName, cacheKey) ||
+      (targetVersion ? null : getCachedWithMeta(projectPath, packageName, 'health'));
+    if (meta) {
+      return { ...meta.data, fromCache: true, cachedAt: meta.fetchedAt, cacheAgeMs: meta.ageMs };
     }
   }
 
@@ -206,21 +287,32 @@ export async function fetchPackageHealth(packageName, projectPath, useCache) {
   const maintainers      = registryData.maintainers || [];
   const latestVersion    = registryData['dist-tags']?.latest;
   const latestMeta       = latestVersion ? registryData.versions?.[latestVersion] : null;
+  const resolvedVersion  = (targetVersion && registryData.versions?.[targetVersion])
+    ? targetVersion
+    : latestVersion;
+  const versionMeta      = resolvedVersion ? registryData.versions?.[resolvedVersion] : latestMeta;
   const monthlyDownloads = downloadsResult.data?.downloads || 0;
-  const deprecated       = registryData.versions?.[latestVersion]?.deprecated || null;
-  const advisoryResult = await fetchOsvAdvisories(packageName, latestVersion);
+  const deprecated       = versionMeta?.deprecated || null;
+  const advisoryResult   = await fetchOsvAdvisories(packageName, resolvedVersion);
   const typosquatCandidates = findTyposquatCandidates(packageName);
 
-  // Install scripts
+  // Install scripts — all hooks that execute arbitrary code during install lifecycle.
+  // Includes preinstall (runs before install), install, postinstall, prepare (runs on
+  // npm install for local packages), prepack, and preuninstall/postuninstall (run on remove).
+  // OSV advisories confirm real-world exfiltration via preinstall and postinstall hooks.
   const installScripts = [];
-  if (latestMeta?.scripts) {
-    for (const scriptName of ['preinstall', 'install', 'postinstall']) {
-      if (latestMeta.scripts[scriptName]) installScripts.push(scriptName);
+  if (versionMeta?.scripts) {
+    for (const scriptName of [
+      'preinstall', 'install', 'postinstall',
+      'prepare', 'prepack', 'postpack',
+      'preuninstall', 'postuninstall',
+    ]) {
+      if (versionMeta.scripts[scriptName]) installScripts.push(scriptName);
     }
   }
 
   // TypeScript types
-  let hasTypes         = !!(latestMeta?.types || latestMeta?.typings);
+  let hasTypes         = !!(versionMeta?.types || versionMeta?.typings);
   let hasExternalTypes = false;
 
   if (!hasTypes && !packageName.startsWith('@types/')) {
@@ -293,20 +385,76 @@ export async function fetchPackageHealth(packageName, projectPath, useCache) {
   if (installScripts.length > 0) {
     flags.push({ type: 'warning', label: `Install scripts (${installScripts.join(', ')})` });
   }
-  if (advisoryResult.vulnerabilities.length > 0) {
+  if (advisoryResult.osvChecked && advisoryResult.vulnerabilities.length > 0) {
     flags.push({ type: 'critical', label: `Known vulnerabilities (${advisoryResult.vulnerabilities.length})` });
+  } else if (!advisoryResult.osvChecked && advisoryResult.status !== 'skipped') {
+    flags.push({ type: 'warning', label: `OSV advisory check unavailable (${advisoryResult.errorCode})` });
   }
   if (typosquatCandidates.length > 0) {
     flags.push({ type: 'warning', label: `Name resembles ${typosquatCandidates.join(', ')}` });
   }
 
-  const unpackedSize    = latestMeta?.dist?.unpackedSize || 0;
-  const dependencyCount = Object.keys(latestMeta?.dependencies || {}).length;
+  const unpackedSize    = versionMeta?.dist?.unpackedSize || latestMeta?.dist?.unpackedSize || 0;
+  const dependencyCount = Object.keys(versionMeta?.dependencies || latestMeta?.dependencies || {}).length;
+
+  // ── Score explanation ──────────────────────────────────────────────────────
+  // Human-readable breakdown so agents and UIs can justify a decision without
+  // re-running the evaluation. Each component describes what was measured and
+  // the band it fell into.
+
+  const scoreExplanation = {
+    components: [
+      {
+        name: 'lastPublish',
+        weight: 0.35,
+        rawValue: scores.lastPublish,
+        contribution: Math.round(scores.lastPublish * 0.35),
+        summary: lastPublish
+          ? (() => { const { months } = timeSince(lastPublish); return months < 6 ? 'Published within 6 months (active)' : months < 12 ? 'Published within 12 months' : months < 24 ? 'Not published in 12–24 months' : 'Not published in 2+ years (stale)'; })()
+          : 'No publish date available',
+      },
+      {
+        name: 'downloads',
+        weight: 0.25,
+        rawValue: scores.downloads,
+        contribution: Math.round(scores.downloads * 0.25),
+        summary: monthlyDownloads > 1_000_000 ? 'Very high adoption (>1M/month)' :
+                 monthlyDownloads > 100_000  ? 'High adoption (>100K/month)' :
+                 monthlyDownloads > 10_000   ? 'Moderate adoption (>10K/month)' :
+                 monthlyDownloads > 1_000    ? 'Low adoption (>1K/month)' :
+                                              'Very low adoption (<1K/month)',
+      },
+      {
+        name: 'maintainers',
+        weight: 0.20,
+        rawValue: scores.maintainers,
+        contribution: Math.round(scores.maintainers * 0.20),
+        summary: maintainers.length > 3  ? `Well-maintained (${maintainers.length} maintainers)` :
+                 maintainers.length >= 2 ? `Jointly maintained (${maintainers.length} maintainers)` :
+                 maintainers.length === 1 ? 'Single-maintainer risk' :
+                                           'No maintainers listed',
+      },
+      {
+        name: 'types',
+        weight: 0.20,
+        rawValue: scores.types,
+        contribution: Math.round(scores.types * 0.20),
+        summary: hasTypes ? 'Bundled TypeScript types' :
+                 hasExternalTypes ? '@types/* package available' :
+                                   'No TypeScript types found',
+      },
+    ],
+    deprecatedCap: !!deprecated,
+    finalScore: totalScore,
+  };
 
   const result = {
     name: packageName,
+    version: resolvedVersion || null,
+    targetVersion: targetVersion || null,
     score: totalScore,
     scores,
+    scoreExplanation,
     flags,
     deprecated: !!deprecated,
     lastPublish: lastPublish ? timeSince(lastPublish).text : 'unknown',
@@ -317,9 +465,12 @@ export async function fetchPackageHealth(packageName, projectPath, useCache) {
     installScripts,
     unpackedSize,
     dependencyCount,
-    hasProvenance: Boolean(latestMeta?.dist?.attestations?.provenance || latestMeta?.dist?.provenance || latestMeta?.publishConfig?.provenance),
-    integrityCheck: latestMeta?.dist?.integrity ? 'present' : 'missing',
+    hasProvenance: Boolean(versionMeta?.dist?.attestations?.provenance || versionMeta?.dist?.provenance || versionMeta?.publishConfig?.provenance || latestMeta?.dist?.attestations?.provenance),
+    integrityCheck: (versionMeta?.dist?.integrity || latestMeta?.dist?.integrity) ? 'present' : 'missing',
     advisoryStatus: advisoryResult.status,
+    osvChecked: advisoryResult.osvChecked,
+    osvErrorCode: advisoryResult.errorCode || null,
+    osvCheckedAt: advisoryResult.osvCheckedAt,
     vulnerabilityIds: advisoryResult.vulnerabilities.map(item => item.id).filter(Boolean),
     typosquatCandidates,
     skipped: false,

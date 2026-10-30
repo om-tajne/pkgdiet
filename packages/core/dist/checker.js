@@ -100,11 +100,15 @@ export async function checkPackage(packageSpec, projectPath = process.cwd(), opt
     if (!policy) {
         policy = loadPolicy(projectPath);
     }
-    // Parse `pkg@version` → `pkg`
+    // Parse `pkg@version` → `pkg` and `targetVersion`
     let packageName = packageSpec;
+    let targetVersion = options.version || null;
     const atIndex = packageSpec.indexOf('@', 1);
     if (atIndex > 0) {
         packageName = packageSpec.substring(0, atIndex);
+        if (!targetVersion) {
+            targetVersion = packageSpec.substring(atIndex + 1);
+        }
     }
     // Normalize to lowercase — npm package names are always lowercase.
     // AI agents sometimes pass PascalCase names derived from natural language
@@ -133,7 +137,7 @@ export async function checkPackage(packageSpec, projectPath = process.cwd(), opt
         };
     }
     // 1. Fetch health & size
-    const healthResult = await fetchPackageHealth(packageName, projectPath, true);
+    const healthResult = await fetchPackageHealth(packageName, projectPath, true, targetVersion);
     if (healthResult.skipped) {
         if (healthResult.notFound) {
             if (isScopeMappedInNpmrc(packageName, projectPath)) {
@@ -162,7 +166,8 @@ export async function checkPackage(packageSpec, projectPath = process.cwd(), opt
     // persisting here keeps a rejected or unavailable lookup out of the cache
     // while preserving the cache module's TTL and atomic-write behavior.
     if (!healthResult.fromCache) {
-        setCached(projectPath, packageName, 'health', healthResult);
+        const cacheKey = targetVersion ? `health:${targetVersion}` : 'health';
+        setCached(projectPath, packageName, cacheKey, healthResult);
     }
     // 2. Cost impact
     const sizeInfo = { unpackedSize: healthResult.unpackedSize };
@@ -210,23 +215,35 @@ export async function checkPackage(packageSpec, projectPath = process.cwd(), opt
         !efficiencyFlag;
     return {
         name: packageName,
+        version: healthResult.version || targetVersion || null,
+        targetVersion: targetVersion || null,
         verdict: evaluation.verdict,
         reasons: evaluation.reasons,
         healthScore: healthResult.score,
+        scoreExplanation: healthResult.scoreExplanation || null,
         costEstimate,
         alternatives,
         flags: healthResult.flags,
         efficiencyFlag,
         hasProvenance,
         integrityCheck,
+        fromCache: healthResult.fromCache || false,
+        cachedAt: healthResult.cachedAt || null,
+        cacheAgeMs: healthResult.cacheAgeMs || null,
+        osvChecked: healthResult.osvChecked ?? null,
+        osvErrorCode: healthResult.osvErrorCode || null,
+        osvCheckedAt: healthResult.osvCheckedAt || null,
         evidence: {
             checkedAt: new Date().toISOString(),
             registry: 'npm',
             advisorySource: healthResult.advisoryStatus === 'ok' ? 'OSV' : healthResult.advisoryStatus,
+            osvChecked: healthResult.osvChecked ?? null,
+            osvErrorCode: healthResult.osvErrorCode || null,
+            osvCheckedAt: healthResult.osvCheckedAt || null,
             vulnerabilityIds: healthResult.vulnerabilityIds || [],
             typosquatCandidates: healthResult.typosquatCandidates || [],
             blocked: evaluation.verdict === 'BLOCK',
-            blockReasons: evaluation.reasons.filter(reason => ['KNOWN_VULNERABILITY', 'PACKAGE_DEPRECATED', 'INSTALL_SCRIPTS', 'PROVENANCE_REQUIRED', 'INTEGRITY_REQUIRED', 'POSSIBLE_TYPOSQUAT', 'DEPENDENCY_CONFUSION'].includes(reason.code)).map(reason => reason.code),
+            blockReasons: evaluation.reasons.filter(reason => ['KNOWN_VULNERABILITY', 'PACKAGE_DEPRECATED', 'INSTALL_SCRIPTS', 'PROVENANCE_REQUIRED', 'INTEGRITY_REQUIRED', 'POSSIBLE_TYPOSQUAT', 'DEPENDENCY_CONFUSION', 'OSV_UNAVAILABLE_BLOCKED'].includes(reason.code)).map(reason => reason.code),
         },
         certified,
     };
