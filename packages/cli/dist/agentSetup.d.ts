@@ -1,4 +1,5 @@
 export declare const SUPPORTED_AGENTS: string[];
+export declare const SAFE_NAME_REGEX: RegExp;
 export declare function verifyAgents(cwd: any): ({
     agent: string;
     configured: boolean;
@@ -15,4 +16,6 @@ export declare function verifyAgents(cwd: any): ({
     configured: boolean;
     file: any;
 })[];
+export declare function generateCodexGuardScript(cliVersion?: string): string;
+export declare function generateClaudeCodeGuardScript(cliVersion?: string): string;
 export declare function setupAgents(agents: any, cwd: any, options?: {}): Promise<void>;

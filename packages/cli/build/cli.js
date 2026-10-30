@@ -521,7 +521,7 @@ All operations are non-destructive: existing files are never overwritten.`)
 // ─── pr ───────────────────────────────────────────────────────────────────────
 program
     .command('pr')
-    .description('Generate a reviewer-ready pull request for adding PkgDiet to any GitHub repo')
+    .description('Generate a reviewer-ready pull request template for adding PkgDiet to your repository')
     .option('--type <type>', 'PR type: ci (GitHub Actions), mcp (agent config), or all', 'all')
     .option('--agent <agent>', 'Agent for MCP PR: cursor, claude, copilot, windsurf, cline, all', 'all')
     .option('--repo <name>', 'Target repo name (defaults to current project name)')
@@ -705,7 +705,7 @@ function buildFixSuggestion(pkgName, result) {
 // ─── demo ───────────────────────────────────────────────────────────────────────────────
 program
     .command('demo')
-    .description('Show live proof that PkgDiet blocks risky AI-generated dependencies before install')
+    .description('Demonstrate local policy evaluation against simulated risky package installs')
     .option('--json', 'Output machine-readable JSON proof')
     .addHelpText('after', `
 Demonstrates real-time enforcement against known-risky packages:
@@ -793,7 +793,7 @@ Verdicts are based on live registry and OSV.dev data — results may vary over t
         const warned = results.filter(r => r.verdict === 'WARN').length;
         console.log(chalk.bold('\uD83D\uDCCA Demo Summary: ' + blocked + ' blocked, ' + warned + ' warned'));
         console.log(chalk.gray('   These checks run automatically before every npm install in your AI agent.'));
-        console.log(chalk.gray('   Setup: npx pkgdiet@2.0.1 init'));
+        console.log(chalk.gray('   Setup: npx pkgdiet init'));
         console.log(chalk.gray('   Docs:  github.com/om-tajne/pkgdiet\n'));
     }
 });
