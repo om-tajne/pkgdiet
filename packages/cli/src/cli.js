@@ -192,7 +192,8 @@ program
         console.log(`\n${icon} ${pkgName}${chalk.green(certBadge)}`);
         console.log(`  Health:      ${result.healthScore !== null ? result.healthScore + '/100' : 'N/A'}`);
         console.log(`  Verdict:     ${result.verdict}`);
-        console.log(`  Reasons:     ${result.reasons.join('; ')}`);
+        const reasonsText = (result.reasons || []).map(r => typeof r === 'string' ? r : (r.message || r.code || '')).filter(Boolean).join('; ');
+        console.log(`  Reasons:     ${reasonsText || 'None'}`);
         console.log(`  Added Size:  ${result.costEstimate?.addedSizeMB ?? '?'}MB`);
         console.log(`  Cost Impact: $${result.costEstimate?.monthlyCiCost100Builds?.toFixed(3) ?? '?'}/mo CI`);
         if (result.alternatives && result.alternatives.length > 0) {
@@ -464,7 +465,8 @@ program
     } else {
       console.log('⚠️ Drift detected in dependencies:');
       driftedPackages.forEach(d => {
-        console.log(`- ${d.name} (${d.verdict}): ${d.reasons.join(' ')}`);
+        const reasonsText = (d.reasons || []).map(r => typeof r === 'string' ? r : (r.message || r.code || '')).filter(Boolean).join('; ');
+        console.log(`- ${d.name} (${d.verdict}): ${reasonsText}`);
       });
       process.exit(1);
     }
@@ -725,7 +727,7 @@ function buildFixSuggestion(pkgName, result) {
   const { verdict, reasons = [], alternatives = [] } = result;
   if (verdict === 'ALLOW') return null;
 
-  const reasonStr = reasons.join(' ').toLowerCase();
+  const reasonStr = reasons.map(r => typeof r === 'string' ? r : (r.message || r.code || '')).join(' ').toLowerCase();
   const firstAlt = alternatives.length > 0
     ? (typeof alternatives[0] === 'string' ? alternatives[0] : (alternatives[0].replacement || alternatives[0].name))
     : null;

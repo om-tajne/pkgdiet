@@ -97,7 +97,8 @@ export function renderPackageCheck(result, pkgName) {
   console.log(`\n${icon} ${pkgName}`);
   console.log(`   Health:      ${result.healthScore !== null ? result.healthScore + '/100' : 'N/A'}`);
   console.log(`   Verdict:     ${result.verdict}`);
-  console.log(`   Reasons:     ${result.reasons.join('; ')}`);
+  const reasonsText = (result.reasons || []).map(r => typeof r === 'string' ? r : (r.message || r.code || '')).filter(Boolean).join('; ');
+  console.log(`   Reasons:     ${reasonsText || 'None'}`);
   console.log(`   Added Size:  ${result.costEstimate?.addedSizeMB ?? '?'}MB`);
   if (result.costEstimate?.monthlyCiCost100Builds !== undefined) {
     console.log(`   Cost Impact: $${result.costEstimate.monthlyCiCost100Builds.toFixed(3)}/mo CI`);
