@@ -1,5 +1,5 @@
 name: 'PkgDiet'
-description: 'Dependency safety gate — ALLOW/WARN/BLOCK verdict on every new npm package added in a PR. Works with Claude, Cursor, Copilot, and all MCP agents.'
+description: 'Dependency policy gate and security guardrails for npm packages in pull requests and AI agents.'
 author: 'om-tajne'
 
 branding:
