@@ -131,6 +131,15 @@ PkgDiet uses each agent's **native hook API** to block installs — not just adv
 
 > **How PreToolUse hooks work:** When Claude Code or Codex generates a Bash tool call containing `npm install`, the registered hook script runs first. If PkgDiet returns a non-zero exit code (exit code 2 for Claude Code), the agent sees the denial reason and aborts the install — the command never runs.
 
+### Claude Code Plugin
+
+PkgDiet is packaged as a Claude Code plugin featuring bundled MCP tools, slash commands (`/pkgdiet:check`, `/pkgdiet:audit`), skill definitions, and PreToolUse execution hooks:
+
+```bash
+/plugin install github:om-tajne/pkgdiet
+```
+*(Or `/plugin install pkgdiet@claude-plugins-official` once listed in the official directory)*
+
 ---
 
 ## 🔄 The 3-Phase Policy Loop

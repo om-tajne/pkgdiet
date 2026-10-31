@@ -59,3 +59,6 @@ packages/core/tests/fixtures/e2e-temp-repo/
 # MCP publisher local binary
 mcp-publisher.exe
 mcp-publisher*.tar.gz
+
+claude-plugins-official/
+
