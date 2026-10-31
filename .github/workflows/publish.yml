@@ -159,3 +159,25 @@ jobs:
 
       - name: Publish pkgdiet
         run: npm publish --workspace=packages/cli --access public --provenance
+
+  # 🌐 Publish to MCP Registry (after npm packages land) 🌐
+  publish-mcp-registry:
+    name: Publish to MCP Registry
+    if: github.event.repository.private == false
+    needs: publish-cli
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Install mcp-publisher
+        run: |
+          curl -sSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Authenticate and Publish to MCP Registry
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish server.json

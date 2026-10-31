@@ -14,7 +14,13 @@
       "version": "2.0.1",
       "transport": {
         "type": "stdio"
-      }
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp"
+        }
+      ]
     }
   ]
 }
