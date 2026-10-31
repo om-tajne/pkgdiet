@@ -180,4 +180,14 @@ jobs:
       - name: Authenticate and Publish to MCP Registry
         run: |
           ./mcp-publisher login github-oidc
-          ./mcp-publisher publish server.json
+          OUTPUT=$(./mcp-publisher publish server.json 2>&1) || {
+            STATUS=$?
+            if echo "$OUTPUT" | grep -qi "already exists"; then
+              echo "Notice: This version is already published and active on the MCP Registry."
+              echo "$OUTPUT"
+              exit 0
+            fi
+            echo "$OUTPUT"
+            exit $STATUS
+          }
+          echo "$OUTPUT"
