@@ -16,7 +16,7 @@
   "dependencies": {
     "@pkgdiet/core": "2.0.1",
     "@pkgdiet/mcp": "2.0.1",
-    "chalk": "^6.0.0",
+    "chalk": "^6.0.1",
     "commander": "^15.0.0",
     "ora": "^9.4.1",
     "prompts": "^2.4.2"
