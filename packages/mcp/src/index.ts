@@ -1,10 +1,21 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { createRequire } from "node:module";
 import { checkPackage } from "@pkgdiet/core/dist/checker.js";
 import { getAlternatives } from "@pkgdiet/core/dist/alternatives.js";
 import { loadPolicy, applyEnvironment, validatePolicy } from "@pkgdiet/core/dist/policy.js";
 import { assertPackageName, partitionPackageNames } from "@pkgdiet/core/dist/validation.js";
+
+// Report the real package version instead of a hand-maintained literal.
+function readServerVersion(): string {
+  try {
+    const { version } = createRequire(import.meta.url)("../package.json");
+    if (typeof version === "string" && version) return version;
+  } catch { /* fall back below */ }
+  return "2.0.2";
+}
+const SERVER_VERSION = readServerVersion();
 
 // ── Rate limiter (per-process, token bucket) ─────────────────────────────────
 // Applies to stdio MCP running in a single process.
@@ -42,13 +53,15 @@ const RATE_EXCEEDED_RESPONSE = {
 const TOOL_TIMEOUT_MS = Number(process.env.PKGDIET_TOOL_TIMEOUT_MS || "15000");
 
 function withToolTimeout<T>(promise: Promise<T>): Promise<T | { isError: true; content: { type: "text"; text: string }[] }> {
-  const timeout = new Promise<{ isError: true; content: { type: "text"; text: string }[] }>(resolve =>
-    setTimeout(() => resolve({
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<{ isError: true; content: { type: "text"; text: string }[] }>(resolve => {
+    timer = setTimeout(() => resolve({
       isError: true,
       content: [{ type: "text" as const, text: JSON.stringify({ code: "TOOL_TIMEOUT", message: "Tool timed out — registry may be slow. Try again." }) }],
-    }), TOOL_TIMEOUT_MS)
-  );
-  return Promise.race([promise, timeout]);
+    }), TOOL_TIMEOUT_MS);
+  });
+  // Always clear the timer so settled calls do not leave dangling handles.
+  return Promise.race([promise, timeout]).finally(() => { if (timer) clearTimeout(timer); });
 }
 
 // ── Bounded concurrency for batch checks ─────────────────────────────────────
@@ -77,7 +90,7 @@ async function withConcurrency<T>(tasks: Array<() => Promise<T>>, limit: number)
 export function createMcpServer() {
   const server = new McpServer({
     name:    "pkgdiet",
-    version: "2.0.1",
+    version: SERVER_VERSION,
   });
 
   // ── check_dependency ────────────────────────────────────────────────────────

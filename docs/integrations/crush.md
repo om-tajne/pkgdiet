@@ -1,34 +1,42 @@
 # Crush Integration
 
-PkgDiet integrates directly with Crush (by charmbracelet) to prevent its terminal coding agent from auto-installing deprecated, bloated, or malicious packages during code generation.
+Register PkgDiet as an MCP server for [Crush](https://github.com/charmbracelet/crush) (Charm).
 
-## Setup Instructions
+**Support status:** Supported — `agent-setup` writes the configuration; behavior is advisory.
 
-1.  **Start the PkgDiet MCP Server**:
-    Ensure the PkgDiet server is running in the background.
+## Setup
 
-    \\\ash
-    npx -y pkgdiet@2.0.1 mcp
-    \\\
+Automatic (writes `crush.json` with a stdio MCP entry and keeps any existing settings):
 
-2.  **Add the MCP Server to Crush**:
-    You can add the PkgDiet MCP server to Crush using the crushrc configuration file. Run the following command in your terminal or add it to ~/.config/crush/crushrc:
+```bash
+npx pkgdiet@2.0.2 agent-setup --agent crush
+```
 
-    \\\ash
-    mcp add pkgdiet --command npx --args -y pkgdiet@2.0.1 mcp
-    \\\
+Manual: add this to `crush.json` in the project root:
 
-3.  **Activate the Guardrail Skill**:
-    Ensure your project has the PkgDiet skill enabled in your .agents/skills or .crush/skills directory.
+```json
+{
+  "$schema": "https://charm.land/crush.json",
+  "mcp": {
+    "pkgdiet": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "pkgdiet@2.0.2", "mcp"]
+    }
+  }
+}
+```
 
-## Example Usage
+Add the rule below to your `AGENTS.md` (`npx pkgdiet@2.0.2 agent-setup --agent universal` does this):
 
-When you ask Crush to add a dependency:
+> Before recommending, adding, or installing an npm package, call the PkgDiet `check_dependency` MCP tool. Do not install packages with a BLOCK verdict. For WARN, explain the trade-off and prefer a compatible recommended alternative.
 
-**You**: \dd the request package to handle HTTP calls\
 
-**Crush**:
-> Checking dependency \equest\ via PkgDiet...
->
-> ⚠️ **Warning:** The \equest\ package has been deprecated since 2020.
-> I will block this installation. I recommend using a modern alternative like \xios\ or the native \etch\ API instead. Would you like me to install \xios\?
+## What the agent sees
+
+The PkgDiet MCP server exposes read-only tools (`check_dependency`, `check_dependencies`, `suggest_alternative`, `get_policy`, `explain_verdict`). A BLOCK verdict is advisory guidance to the agent; enforce it for everyone with the CI gate (see [CI.md](../CI.md)).
+
+## Notes
+
+- PkgDiet only reads public npm metadata and OSV.dev advisories and never installs anything. See [LEGAL.md](../../LEGAL.md) for data flows and trademark notices.
+- Product names belong to their owners; this guide does not imply endorsement.

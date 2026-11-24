@@ -11,7 +11,7 @@ that owns dependency security:
 
 ```bash
 cp templates/pkgdietrc-default.json .pkgdietrc.json
-npx pkgdiet@2.0.1 policy-check
+npx pkgdiet@2.0.2 policy-check
 ```
 
 The starter policy is fail-open for developer registry outages and applies a
@@ -38,7 +38,7 @@ it does not populate a developer's local cache.
 Run the gate with the CI environment so that the fail-closed overlay applies:
 
 ```bash
-npx -y pkgdiet@2.0.1 ci --base origin/main --env ci
+npx -y pkgdiet@2.0.2 ci --base origin/main --env ci
 ```
 
 Use the pull request base reference in a pull-request workflow rather than
@@ -51,7 +51,7 @@ setup command to configure supported clients:
 
 ```bash
 cp templates/pkgdiet.agent-rules.md .cursorrules
-npx pkgdiet@2.0.1 agent-setup --detect
+npx pkgdiet@2.0.2 agent-setup --detect
 ```
 
 The instructions tell agents to stop on `BLOCK` and `ERROR`, request review on
@@ -64,8 +64,8 @@ For framework-tool adapters, see
 
 ## 4. Verify the rollout
 
-1. Run `npx pkgdiet@2.0.1 policy-check`.
-2. Check a known package with `npx pkgdiet@2.0.1 check lodash --json`.
+1. Run `npx pkgdiet@2.0.2 policy-check`.
+2. Check a known package with `npx pkgdiet@2.0.2 check lodash --json`.
 3. Confirm the CI job runs on a dependency-only pull request.
 4. Confirm your protected branch requires the PkgDiet check.
 5. Test one MCP `check_dependency` call from an enabled client.

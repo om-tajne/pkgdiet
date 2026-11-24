@@ -31,7 +31,7 @@ jobs:
         id: pkgdiet
         # Runs the CI gate comparing against the base branch of the PR.
         # This will exit 1 if blocked packages or policy tampering is detected.
-        run: npx -y pkgdiet@2.0.1 ci --base origin/${{ github.base_ref }}
+        run: npx -y pkgdiet@2.0.2 ci --base origin/${{ github.base_ref }}
         
       - name: Comment on PR (If Issues Found)
         if: failure() && steps.pkgdiet.outcome == 'failure'

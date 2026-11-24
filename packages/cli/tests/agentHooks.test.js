@@ -9,7 +9,7 @@ import { generateCodexGuardScript, generateClaudeCodeGuardScript, SAFE_NAME_REGE
 test('agent hooks — end-to-end execution of Codex PreToolUse guard script', async (t) => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pkgdiet-hook-test-'));
   const scriptPath = path.join(tmpDir, 'guard.mjs');
-  fs.writeFileSync(scriptPath, generateCodexGuardScript('2.0.1'), 'utf8');
+  fs.writeFileSync(scriptPath, generateCodexGuardScript('2.0.2'), 'utf8');
 
   // Helper to run guard script with stdin JSON payload, pointing cwd to repo root
   const runGuard = (inputObj, rawStdin = null) => {
@@ -108,7 +108,7 @@ test('agent hooks — degraded fallback mode fails closed when core parser is un
   const scriptPath = path.join(tmpDir, 'guard-degraded.mjs');
 
   // Generate guard script with simulated failed core import
-  let scriptContent = generateCodexGuardScript('2.0.1');
+  let scriptContent = generateCodexGuardScript('2.0.2');
   // Sabotage the import attempt so it stays null
   scriptContent = scriptContent.replace(
     'let parseInstallCommands;',
@@ -182,8 +182,8 @@ test('agent hooks — degraded fallback mode fails closed when core parser is un
 
 test('agent hooks — Windows shell injection metacharacters rejected by SAFE_NAME_REGEX', () => {
   // Verify generated scripts embed the exact exported regex
-  const codexScript = generateCodexGuardScript('2.0.1');
-  const claudeScript = generateClaudeCodeGuardScript('2.0.1');
+  const codexScript = generateCodexGuardScript('2.0.2');
+  const claudeScript = generateClaudeCodeGuardScript('2.0.2');
   assert.ok(codexScript.includes(SAFE_NAME_REGEX.toString()), 'Codex script must embed exact SAFE_NAME_REGEX');
   assert.ok(claudeScript.includes(SAFE_NAME_REGEX.toString()), 'Claude Code script must embed exact SAFE_NAME_REGEX');
 
@@ -213,7 +213,7 @@ test('agent hooks — Claude Code hook schema compatibility and execution contra
   const scriptPath = path.join(tmpDir, 'guard-claude.mjs');
 
   // Extract the node script from generateClaudeCodeGuardScript
-  const fullBashScript = generateClaudeCodeGuardScript('2.0.1');
+  const fullBashScript = generateClaudeCodeGuardScript('2.0.2');
   const nodeStartMarker = 'node -e "\n';
   const nodeEndMarker = '\n" 2>/dev/null';
   const start = fullBashScript.indexOf(nodeStartMarker) + nodeStartMarker.length;
@@ -275,9 +275,9 @@ test('agent hooks — real documented Claude Code and Codex runtime payload fixt
   const codexScriptPath = path.join(tmpDir, 'guard-codex.mjs');
   const claudeScriptPath = path.join(tmpDir, 'guard-claude.mjs');
 
-  fs.writeFileSync(codexScriptPath, generateCodexGuardScript('2.0.1'), 'utf8');
+  fs.writeFileSync(codexScriptPath, generateCodexGuardScript('2.0.2'), 'utf8');
 
-  const fullBash = generateClaudeCodeGuardScript('2.0.1');
+  const fullBash = generateClaudeCodeGuardScript('2.0.2');
   const nodeStart = 'node -e "\n';
   const nodeEnd = '\n" 2>/dev/null';
   const s = fullBash.indexOf(nodeStart) + nodeStart.length;
@@ -334,7 +334,7 @@ test('agent hooks — real documented Claude Code and Codex runtime payload fixt
 });
 
 test('agent hooks — Claude Code guard script template validation', () => {
-  const script = generateClaudeCodeGuardScript('2.0.1');
+  const script = generateClaudeCodeGuardScript('2.0.2');
   assert.match(script, /#!/);
   assert.match(script, /decision:\s*'block'/);
   assert.match(script, /exit 2/);

@@ -14,6 +14,15 @@ Tested client support matrix for MCP and CI integrations.
 | GitHub Copilot | stdio | `.github/mcp.json` | ✅ Supported |
 | Claude Code | stdio | CLI (`claude mcp add`) + `CLAUDE.md` | ✅ Supported |
 | Windsurf | stdio | `.windsurfrules` (rules only — no MCP JSON written) | ⚠️ Agent rules only |
+| VS Code | stdio | `.vscode/mcp.json` | ✅ Supported |
+| Gemini CLI | stdio | `.gemini/settings.json` + `GEMINI.md` | ✅ Supported |
+| Qwen Code | stdio | `.qwen/settings.json` + `QWEN.md` | ✅ Supported |
+| opencode | stdio | `opencode.json` | ✅ Supported |
+| Crush | stdio | `crush.json` | ✅ Supported |
+| Roo Code / Kilo Code / Amazon Q | stdio | `.roo/mcp.json`, `.kilocode/mcp.json`, `.amazonq/mcp.json` | 🧪 Experimental |
+| Any `AGENTS.md` agent | rule file | `AGENTS.md` + `.mcp.json` (`agent-setup --agent universal`) | 🤝 Community-supported |
+
+See [agent-support.md](agent-support.md) for the full matrix and enforcement levels.
 | Antigravity | stdio | `.gemini/antigravity/mcp/pkgdiet/mcp.json` | ✅ Supported |
 | Qwen Code | stdio | `packages/core/src/skills/bundled/` | ✅ Supported |
 | DeepSeek Harness | stdio | `.agents/skills/` | ✅ Supported |
@@ -57,7 +66,7 @@ All supported clients use the same JSON block. Place it in the client-specific c
   "mcpServers": {
     "pkgdiet": {
       "command": "npx",
-      "args": ["-y", "pkgdiet@2.0.1", "mcp"]
+      "args": ["-y", "pkgdiet@2.0.2", "mcp"]
     }
   }
 }
@@ -70,7 +79,7 @@ All supported clients use the same JSON block. Place it in the client-specific c
 | Claude Desktop (Windows) | `%APPDATA%\Claude\claude_desktop_config.json` |
 | Cline | VS Code settings or `cline_mcp_settings.json` |
 | GitHub Copilot | `<project>/.github/mcp.json` |
-| Claude Code | `claude mcp add pkgdiet -- npx -y pkgdiet@2.0.1 mcp` |
+| Claude Code | `claude mcp add pkgdiet -- npx -y pkgdiet@2.0.2 mcp` |
 | Antigravity | `<project>/.antigravity/mcp.json` |
 
 ---
@@ -80,14 +89,14 @@ All supported clients use the same JSON block. Place it in the client-specific c
 To write the config for all detected clients in the current project — with preview and confirmation:
 
 ```bash
-npx pkgdiet@2.0.1 agent-setup --detect
+npx pkgdiet@2.0.2 agent-setup --detect
 ```
 
 For a specific client:
 
 ```bash
-npx pkgdiet@2.0.1 agent-setup --agent cursor
-npx pkgdiet@2.0.1 agent-setup --agent claude-desktop
+npx pkgdiet@2.0.2 agent-setup --agent cursor
+npx pkgdiet@2.0.2 agent-setup --agent claude-desktop
 ```
 
 ---
@@ -115,7 +124,7 @@ MCP uses standard input and output as its protocol channel, so run the container
 with `-i` and **without** `-t` (a pseudo-terminal).
 
 ```text
-docker run --rm -i -v <absolute-project-path>:/workspace pkgdiet-mcp:2.0.1
+docker run --rm -i -v <absolute-project-path>:/workspace pkgdiet-mcp:2.0.2
 ```
 
 - `-i` keeps standard input open for MCP requests.
@@ -140,7 +149,7 @@ that the client officially supports.
         "-i",
         "-v",
         "/path/to/your/project:/workspace",
-        "pkgdiet-mcp:2.0.1"
+        "pkgdiet-mcp:2.0.2"
       ]
     }
   }

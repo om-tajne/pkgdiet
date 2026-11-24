@@ -5,8 +5,10 @@
 
 import fs from 'fs';
 import path from 'path';
+import { CLI_VERSION } from './version.js';
+import { readJsonObject, detectAgents } from './agentSetup.js';
 
-const MCP_ENTRY = { command: 'npx', args: ['-y', 'pkgdiet@2.0.1', 'mcp'] };
+const MCP_ENTRY = { command: 'npx', args: ['-y', `pkgdiet@${CLI_VERSION}`, 'mcp'] };
 
 const AI_RULE = 'Before recommending, adding, or installing an npm package, call the PkgDiet `check_dependency` MCP tool. Do not install packages with a BLOCK verdict. For WARN, explain the trade-off and prefer a compatible recommended alternative.';
 
@@ -56,7 +58,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           fetch-depth: 0
-      - uses: om-tajne/pkgdiet@v2.0.1
+      - uses: om-tajne/pkgdiet@v${CLI_VERSION}
         with:
           base: \${{ github.event.pull_request.base.sha }}
           environment: ci
@@ -98,15 +100,23 @@ function appendRule(filePath, label) {
 }
 
 function writeMcpJson(filePath, label) {
-  ensureDir(path.dirname(filePath));
-  let data = {};
-  if (fs.existsSync(filePath)) {
-    try { data = JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch (_) {}
-    if (data?.mcpServers?.pkgdiet) { console.log(`  ⏭  ${label} already configured — skipped`); return false; }
+  let data;
+  try {
+    data = readJsonObject(filePath);
+  } catch (err) {
+    console.log(`  ⚠️  ${label}: ${err.message}`);
+    return false;
   }
-  if (!data.mcpServers) data.mcpServers = {};
+  if (data?.mcpServers?.pkgdiet) { console.log(`  ⏭  ${label} already configured — skipped`); return false; }
+  if (!data.mcpServers || typeof data.mcpServers !== 'object') data.mcpServers = {};
   data.mcpServers.pkgdiet = MCP_ENTRY;
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n');
+  try {
+    ensureDir(path.dirname(filePath));
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n');
+  } catch (err) {
+    console.log(`  ⚠️  ${label}: cannot write (${err.code || err.message})`);
+    return false;
+  }
   console.log(`  ✅ Updated ${label}`);
   return true;
 }
@@ -153,6 +163,12 @@ export async function runInit(cwd, options = {}) {
     await setupAgents(['codex'], cwd);
     // Claude Code: PreToolUse bash install guard + MCP server
     await setupAgents(['claude-code'], cwd);
+    // Universal AGENTS.md rule (read by many coding agents) + project .mcp.json
+    await setupAgents(['universal'], cwd);
+    // Any other supported agent whose project markers already exist (VS Code, Gemini CLI, opencode, ...)
+    const handledAbove = new Set(['cursor', 'windsurf', 'cline', 'copilot', 'claude-code', 'codex', 'universal']);
+    const extra = detectAgents(cwd).filter(a => !handledAbove.has(a));
+    if (extra.length > 0) await setupAgents(extra, cwd);
 
     // Claude Desktop — global, platform-aware
     try {

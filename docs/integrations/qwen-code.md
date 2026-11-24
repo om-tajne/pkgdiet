@@ -1,41 +1,40 @@
 # Qwen Code Integration
 
-PkgDiet integrates directly with Qwen Code to prevent it from auto-installing deprecated, bloated, or malicious packages during code generation.
+Register PkgDiet as an MCP server for [Qwen Code](https://github.com/QwenLM/qwen-code) so it can check npm packages before installing them.
 
-## Setup Instructions
+**Support status:** Supported — `agent-setup` writes the configuration; behavior is advisory.
 
-1.  **Start the PkgDiet MCP Server**:
-    Ensure the PkgDiet server is running in the background.
+## Setup
 
-    \\\ash
-    npx -y pkgdiet@2.0.1 mcp
-    \\\
+Automatic (writes `.qwen/settings.json` and a `QWEN.md` rule, backing up existing files):
 
-2.  **Add the MCP Server to Qwen Code**:
-    Qwen Code supports MCP via its settings configuration. Add the following to your global Qwen Code settings file (usually located at \~/.config/qwen-code/settings.json\ or via \/settings\ in the terminal):
+```bash
+npx pkgdiet@2.0.2 agent-setup --agent qwen-code
+```
 
-    \\\json
-    {
-      "mcpServers": {
-        "pkgdiet": {
-          "command": "npx",
-          "args": ["-y", "pkgdiet@2.0.1", "mcp"]
-        }
-      }
+Manual: add this to `.qwen/settings.json` (project) or your user-level Qwen Code settings:
+
+```json
+{
+  "mcpServers": {
+    "pkgdiet": {
+      "command": "npx",
+      "args": ["-y", "pkgdiet@2.0.2", "mcp"]
     }
-    \\\
+  }
+}
+```
 
-3.  **Activate the Guardrail Skill**:
-    Ensure your project (or global .qwen config) has the PkgDiet skill enabled.
+Then add this rule to `QWEN.md`:
 
-## Example Usage
+> Before recommending, adding, or installing an npm package, call the PkgDiet `check_dependency` MCP tool. Do not install packages with a BLOCK verdict. For WARN, explain the trade-off and prefer a compatible recommended alternative.
 
-When you ask Qwen Code to add a dependency:
 
-**You**: \qwen add the request package to handle HTTP calls\
+## What the agent sees
 
-**Qwen Code**:
-> Calling \check_dependency\ on \equest\...
->
-> ⚠️ **Warning from PkgDiet:** The \equest\ package has been deprecated since 2020.
-> I will not install this package. I recommend using a modern alternative like \xios\ or the native \etch\ API instead. Would you like me to install \xios\?
+The PkgDiet MCP server exposes read-only tools (`check_dependency`, `check_dependencies`, `suggest_alternative`, `get_policy`, `explain_verdict`). A BLOCK verdict is advisory guidance to the agent; enforce it for everyone with the CI gate (see [CI.md](../CI.md)).
+
+## Notes
+
+- PkgDiet only reads public npm metadata and OSV.dev advisories and never installs anything. See [LEGAL.md](../../LEGAL.md) for data flows and trademark notices.
+- Product names belong to their owners; this guide does not imply endorsement.

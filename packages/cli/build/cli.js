@@ -18,6 +18,22 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 const require = createRequire(import.meta.url);
 const { version } = require('../package.json');
+// Last-resort handlers: an uncaught failure must never surface as a raw stack trace or
+// be mistaken for a policy verdict. Exit code 2 = tool error (1 is reserved for BLOCK).
+function fatal(err) {
+    const message = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`\nPkgDiet error: ${message}\n`);
+    if (process.env.PKGDIET_DEBUG && err instanceof Error && err.stack)
+        process.stderr.write(`${err.stack}\n`);
+    else
+        process.stderr.write('Set PKGDIET_DEBUG=1 for a stack trace.\n');
+    process.exit(2);
+}
+process.on('unhandledRejection', fatal);
+process.on('uncaughtException', fatal);
+// Closing a pipe early (e.g. `pkgdiet audit --json | head`) is not an error.
+process.stdout.on('error', err => { if (err.code === 'EPIPE')
+    process.exit(0); throw err; });
 const program = new Command();
 program
     .name('pkgdiet')
@@ -197,10 +213,10 @@ program
     .description('Start the MCP JSON-RPC server over stdio for MCP-compatible AI coding agents')
     .addHelpText('after', `
 Tip: Run this once manually to warm the npm cache before connecting your agent:
-  $ npx pkgdiet@2.0.1 mcp
+  $ npx pkgdiet@2.0.2 mcp
 
 Then add to your agent config (e.g. .cursor/mcp.json or claude_desktop_config.json):
-  { "pkgdiet": { "command": "npx", "args": ["-y", "pkgdiet@2.0.1", "mcp"] } }
+  { "pkgdiet": { "command": "npx", "args": ["-y", "pkgdiet@2.0.2", "mcp"] } }
 
 Or run: npx pkgdiet agent-setup --all   to configure all agents automatically.`)
     .action(async () => {
@@ -439,7 +455,7 @@ To configure AI coding agents directly (non-interactive):
   $ npx pkgdiet agent-setup --agent cursor                 Configure only Cursor
   $ npx pkgdiet agent-setup --agent claude-desktop windsurf
 
-Supported agents: codex, cursor, claude-code, claude-desktop, windsurf, cline, copilot, antigravity`)
+Supported agents: codex, cursor, claude-code, claude-desktop, windsurf, cline, copilot, antigravity,\n  vscode, gemini-cli, qwen-code, opencode, crush, roo, kilo, amazon-q, universal (AGENTS.md)`)
     .action(async () => {
     process.env.PKGDIET_MCP_MODE = '1';
     const { runSetupWizard } = await import('./setupWizard.js');
@@ -448,7 +464,7 @@ Supported agents: codex, cursor, claude-code, claude-desktop, windsurf, cline, c
 program
     .command('agent-setup')
     .description('Configure PkgDiet for AI coding agents and supported install guards')
-    .option('-a, --agent <agents...>', 'Agents to configure (codex, cursor, claude-code, claude-desktop, cline, windsurf, copilot, antigravity)')
+    .option('-a, --agent <agents...>', 'Agents to configure (codex, cursor, claude-code, claude-desktop, cline, windsurf, copilot, antigravity, vscode, gemini-cli, qwen-code, opencode, crush, roo, kilo, amazon-q, universal)')
     .option('--detect', 'Detect and configure agents used in this project')
     .option('--all', 'Configure all supported agents')
     .option('--dry-run', 'Show what would be modified without making changes')
@@ -489,6 +505,7 @@ program
     await setupAgents(agents, process.cwd(), {
         dryRun: options.dryRun,
         detect: options.detect,
+        all: options.all,
         remove: options.remove
     });
 });
@@ -772,7 +789,7 @@ Verdicts are based on live registry and OSV.dev data — results may vary over t
     if (options.json) {
         const out = {
             tool: 'PkgDiet',
-            version: '2.0.1',
+            version,
             timestamp: new Date().toISOString(),
             summary: results.filter(r => r.verdict === 'BLOCK').length + ' blocked, ' +
                 results.filter(r => r.verdict === 'WARN').length + ' warned, ' +
@@ -829,4 +846,4 @@ if (process.argv.length === 2 ||
     (process.argv.length > 2 && !knownCommands.includes(process.argv[2]))) {
     process.argv.splice(2, 0, 'audit');
 }
-program.parse();
+program.parseAsync().catch(fatal);

@@ -1,42 +1,42 @@
 # OpenCode Integration
 
-PkgDiet can be integrated directly into [OpenCode](https://github.com/anomalyco/opencode) to act as a dependency guardrail. By registering PkgDiet as a local Skill, OpenCode will automatically audit npm packages for health, bundle size, and maintenance status before installing them.
+Register PkgDiet as a local MCP server for [OpenCode](https://opencode.ai).
 
-## Setup Instructions
+**Support status:** Supported — `agent-setup` writes the configuration; behavior is advisory.
 
-### 1. Create the PkgDiet Skill
-OpenCode uses the `.opencode/skills/` directory to load agent instructions and capabilities.
+## Setup
 
-In your project root, create a new directory for the skill:
+Automatic (writes `opencode.json`, preserving existing settings):
+
 ```bash
-mkdir -p .opencode/skills/pkgdiet
+npx pkgdiet@2.0.2 agent-setup --agent opencode
 ```
 
-Create a file at `.opencode/skills/pkgdiet/SKILL.md` and paste the following policy:
+Manual: add this to `opencode.json` in the project root:
 
-```markdown
----
-name: pkgdiet-dependency-guardrail
-description: Prevents OpenCode from installing deprecated or unhealthy npm packages by enforcing pre-install checks.
----
-
-# Dependency Management Policy
-
-You have access to the `pkgdiet` MCP server. Whenever you are about to suggest or run an `npm install`, `yarn add`, or `pnpm add` command, you MUST follow these rules:
-
-1. **Pre-Check:** Call the `check_dependency` tool on every package you intend to install.
-2. **Handle ALLOW:** If the verdict is ALLOW, you may proceed with the installation.
-3. **Handle BLOCK:** If the verdict is BLOCK, you MUST NOT install the package. Call the `suggest_alternative` tool to find a modern replacement, and ask the user for permission to install the replacement instead.
-4. **Handle WARN:** If the verdict is WARN, inform the user of the health score/size impact and ask if they still want to proceed.
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "pkgdiet": {
+      "type": "local",
+      "command": ["npx", "-y", "pkgdiet@2.0.2", "mcp"],
+      "enabled": true
+    }
+  }
+}
 ```
 
-### 2. Connect the MCP Server
-Depending on your OpenCode configuration, you can expose the PkgDiet MCP server so the `check_dependency` tool is available to the skill. 
+OpenCode also reads `AGENTS.md`; run `npx pkgdiet@2.0.2 agent-setup --agent universal` to add the PkgDiet rule there:
 
-Run the server via `npx`:
-```bash
-npx -y pkgdiet mcp
-```
+> Before recommending, adding, or installing an npm package, call the PkgDiet `check_dependency` MCP tool. Do not install packages with a BLOCK verdict. For WARN, explain the trade-off and prefer a compatible recommended alternative.
 
-### 3. Start Coding
-When you run `opencode`, it will now automatically follow the `pkgdiet-dependency-guardrail` skill. If you ask it to "add a package to fetch HTTP requests," it will intercept requests for outdated packages (like `request`) and intelligently suggest modern equivalents (like `fetch` or `axios`) based on PkgDiet's local heuristics.
+
+## What the agent sees
+
+The PkgDiet MCP server exposes read-only tools (`check_dependency`, `check_dependencies`, `suggest_alternative`, `get_policy`, `explain_verdict`). A BLOCK verdict is advisory guidance to the agent; enforce it for everyone with the CI gate (see [CI.md](../CI.md)).
+
+## Notes
+
+- PkgDiet only reads public npm metadata and OSV.dev advisories and never installs anything. See [LEGAL.md](../../LEGAL.md) for data flows and trademark notices.
+- Product names belong to their owners; this guide does not imply endorsement.

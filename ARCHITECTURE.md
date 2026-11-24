@@ -1,14 +1,14 @@
-# PkgDiet 2.0.1 Architecture Guide
+# PkgDiet 2.0.2 Architecture Guide
 ## Local-first dependency policy for AI-assisted development
 
-PkgDiet 2.0.1 evolves PkgDiet from a dependency-analysis CLI into a local-first, repository-owned dependency policy workflow for JavaScript and TypeScript projects. It helps developers and compatible AI coding agents evaluate candidate npm dependencies before they are introduced, then independently verifies dependency changes in pull-request CI.
+PkgDiet 2.0.2 evolves PkgDiet from a dependency-analysis CLI into a local-first, repository-owned dependency policy workflow for JavaScript and TypeScript projects. It helps developers and compatible AI coding agents evaluate candidate npm dependencies before they are introduced, then independently verifies dependency changes in pull-request CI.
 
 PkgDiet returns structured `ALLOW`, `WARN`, or `BLOCK` package decisions based on repository policy and available package metadata. A registry outage becomes `WARN` in fail-open mode and `BLOCK` in fail-closed mode. The CI gate may additionally report `UNKNOWN` only as an internal evaluation-error placeholder, not as a normal package-policy decision. PkgDiet complements vulnerability scanning, lockfile integrity controls, code review, and broader software-supply-chain security practices; it does not replace them.
 
 ---
 
 ## 1. Monorepo Architecture
-To maintain consistent evaluation across interfaces, PkgDiet 2.0.1 splits its logic into version-locked packages:
+To maintain consistent evaluation across interfaces, PkgDiet 2.0.2 splits its logic into version-locked packages:
 
 1. **`@pkgdiet/core`**: The universal policy parser and evaluation engine. It contains the logic that fetches registry metadata, calculates health scores, applies exceptions, and returns deterministic verdicts.
 2. **`pkgdiet` (The CLI)**: The developer-facing terminal interface. It consumes `@pkgdiet/core` to run interactive setups, audit existing workspaces, and act as the CI evaluation gate.
@@ -106,7 +106,7 @@ Before publishing, PkgDiet releases should verify package contents using `npm pa
 ---
 
 ## Summary
-PkgDiet 2.0.1 establishes a consistent dependency-policy workflow:
+PkgDiet 2.0.2 establishes a consistent dependency-policy workflow:
 1. A developer or compatible AI coding agent evaluates a candidate package.
 2. `@pkgdiet/core` applies repository policy and returns an explainable decision.
 3. CLI and MCP expose that decision locally.

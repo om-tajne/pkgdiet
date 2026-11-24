@@ -32,7 +32,7 @@
 Start the stdio MCP server on demand:
 
 ```bash
-npx -y pkgdiet@2.0.1 mcp
+npx -y pkgdiet@2.0.2 mcp
 ```
 
 Or configure all detected AI coding agents in your workspace automatically:
@@ -68,7 +68,7 @@ Edit your `claude_desktop_config.json`:
   "mcpServers": {
     "pkgdiet": {
       "command": "npx",
-      "args": ["-y", "pkgdiet@2.0.1", "mcp"]
+      "args": ["-y", "pkgdiet@2.0.2", "mcp"]
     }
   }
 }
@@ -81,7 +81,7 @@ Add to `.cursor/mcp.json`:
   "mcpServers": {
     "pkgdiet": {
       "command": "npx",
-      "args": ["-y", "pkgdiet@2.0.1", "mcp"]
+      "args": ["-y", "pkgdiet@2.0.2", "mcp"]
     }
   }
 }
@@ -89,7 +89,7 @@ Add to `.cursor/mcp.json`:
 
 ### Claude Code CLI
 ```bash
-claude mcp add pkgdiet -- npx -y pkgdiet@2.0.1 mcp
+claude mcp add pkgdiet -- npx -y pkgdiet@2.0.2 mcp
 ```
 
 ### Google Antigravity
@@ -99,7 +99,7 @@ Add to `.gemini/antigravity/mcp/pkgdiet/mcp.json`:
   "mcpServers": {
     "pkgdiet": {
       "command": "npx",
-      "args": ["-y", "pkgdiet@2.0.1", "mcp"]
+      "args": ["-y", "pkgdiet@2.0.2", "mcp"]
     }
   }
 }

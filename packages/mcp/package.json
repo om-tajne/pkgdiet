@@ -1,6 +1,6 @@
 {
   "name": "@pkgdiet/mcp",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
-    "@pkgdiet/core": "2.0.1",
+    "@pkgdiet/core": "2.0.2",
     "zod": "^4.6.7"
   },
   "description": "Official MCP server for PkgDiet. Evaluates npm packages before AI agents install them.",

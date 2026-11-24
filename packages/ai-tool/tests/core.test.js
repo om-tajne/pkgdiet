@@ -19,7 +19,7 @@ test('adapter invokes pkgdiet through an argument vector', () => {
   assert.equal(result.verdict, 'ALLOW');
   assert.deepEqual(received, {
     command: 'npx',
-    args: ['-y', 'pkgdiet@2.0.1', 'check', 'react', '--json', '--env', 'ci'],
+    args: ['-y', 'pkgdiet@2.0.2', 'check', 'react', '--json', '--env', 'ci'],
     options: { encoding: 'utf8', timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] },
   });
 });
