@@ -52,7 +52,7 @@ const runCheck = names => {
   if (fs.existsSync(localBin)) {
     return spawnSync(localBin, ['check', '--json', ...names], { cwd, encoding: 'utf8', shell: process.platform === 'win32' });
   }
-  return spawnSync('npx', ['-y', 'pkgdiet@2.0.1', 'check', '--json', ...names], { cwd, encoding: 'utf8', shell: process.platform === 'win32' });
+  return spawnSync('npx', ['-y', 'pkgdiet@2.0.2', 'check', '--json', ...names], { cwd, encoding: 'utf8', shell: process.platform === 'win32' });
 };
 
 // Try importing core commandParser
@@ -149,7 +149,7 @@ for (const cmd of cmds) {
   if (names.length > 0) {
     const check = runCheck(names);
     if (check.status !== 0) {
-      deny('🔒 PkgDiet blocked this install — one or more packages failed policy. Run: npx -y pkgdiet@2.0.1 check ' + names.join(' ') + ' --json');
+      deny('🔒 PkgDiet blocked this install — one or more packages failed policy. Run: npx -y pkgdiet@2.0.2 check ' + names.join(' ') + ' --json');
     }
   }
 }

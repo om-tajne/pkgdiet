@@ -1,32 +1,35 @@
 # Vibe Kanban Integration
 
-PkgDiet integrates with Vibe Kanban to enforce dependency guardrails across all of its supported coding agents (Claude Code, Codex, Gemini CLI, Cursor, etc.). 
+Use PkgDiet with Vibe Kanban (and the coding agents it launches) through the standard MCP stdio transport and the cross-agent `AGENTS.md` convention.
 
-## Setup Instructions
+**Support status:** Community-supported — generic MCP stdio and `AGENTS.md` only; not individually verified.
 
-1.  **Start the PkgDiet MCP Server**:
-    Ensure the PkgDiet server is running in the background or remotely.
+## Setup
 
-    \\\ash
-    npx -y pkgdiet@2.0.1 mcp
-    \\\
+1. Declare a stdio MCP server named `pkgdiet` in the tool's MCP configuration. PkgDiet speaks MCP over stdio only; there is no host or port to configure.
 
-2.  **Add the MCP Server to the Agent Configurations**:
-    Since Vibe Kanban acts as a harness for other agents, you can configure the MCP connection globally in your agent's config or inside the specific workspace configuration.
+```json
+{
+  "command": "npx",
+  "args": ["-y", "pkgdiet@2.0.2", "mcp"]
+}
+```
 
-    For example, if using the Vibe Kanban UI, you can specify the global MCP server endpoint:
-    - MCP Host: \127.0.0.1\
-    - MCP Port: \[Your Server Port]\
+2. Add the PkgDiet rule to the project's agent instructions (`npx pkgdiet@2.0.2 agent-setup --agent universal` writes it to `AGENTS.md`):
 
-3.  **Activate the Guardrail Skill**:
-    Add the PkgDiet skill to your workspace's .agents/skills directory so that whichever agent you select in Vibe Kanban will load it.
+> Before recommending, adding, or installing an npm package, call the PkgDiet `check_dependency` MCP tool. Do not install packages with a BLOCK verdict. For WARN, explain the trade-off and prefer a compatible recommended alternative.
 
-## Example Usage
+Vibe Kanban launches other agents (Claude Code, Codex, Gemini CLI, Cursor, …). Configure PkgDiet for the agents you select with `agent-setup --detect` in the project, so the rule files and MCP entries travel with the repository.
 
-When you create an issue in Vibe Kanban to "Add a new API endpoint using request" and assign an agent to it:
 
-**Vibe Kanban Agent**:
-> Checking dependency \equest\ via PkgDiet...
->
-> ⚠️ **Warning:** The \equest\ package has been deprecated since 2020.
-> I will block this installation. I recommend using a modern alternative like \xios\ or the native \etch\ API instead. I will update your code to use \xios\.
+
+## What the agent sees
+
+The PkgDiet MCP server exposes read-only tools (`check_dependency`, `check_dependencies`, `suggest_alternative`, `get_policy`, `explain_verdict`). A BLOCK verdict is advisory guidance to the agent; enforce it for everyone with the CI gate (see [CI.md](../CI.md)).
+
+Configuration file names and keys differ between tools and versions; check the tool's own MCP documentation for where a stdio server is declared.
+
+## Notes
+
+- PkgDiet only reads public npm metadata and OSV.dev advisories and never installs anything. See [LEGAL.md](../../LEGAL.md) for data flows and trademark notices.
+- Product names belong to their owners; this guide does not imply endorsement.

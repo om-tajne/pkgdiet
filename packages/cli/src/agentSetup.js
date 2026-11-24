@@ -1,70 +1,227 @@
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+import os from 'os';
+import { execFileSync } from 'child_process';
+import { CLI_VERSION } from './version.js';
 
-export const SUPPORTED_AGENTS = ['codex', 'cursor', 'windsurf', 'cline', 'copilot', 'claude-code', 'claude-desktop', 'antigravity'];
+export const SUPPORTED_AGENTS = [
+  'codex', 'cursor', 'windsurf', 'cline', 'copilot', 'claude-code', 'claude-desktop', 'antigravity',
+  'vscode', 'gemini-cli', 'qwen-code', 'opencode', 'crush', 'roo', 'kilo', 'amazon-q', 'universal',
+];
 export const SAFE_NAME_REGEX = /^(@[a-zA-Z0-9_.-]+\/)?[a-zA-Z0-9_.-]+$/;
+
+/** Friendly aliases accepted by `agent-setup --agent`. */
+export const AGENT_ALIASES = {
+  claude: 'claude-code',
+  'claude_code': 'claude-code',
+  claudecode: 'claude-code',
+  desktop: 'claude-desktop',
+  gemini: 'gemini-cli',
+  'gemini_cli': 'gemini-cli',
+  qwen: 'qwen-code',
+  'qwen_code': 'qwen-code',
+  'vs-code': 'vscode',
+  'vs_code': 'vscode',
+  roocode: 'roo',
+  'roo-code': 'roo',
+  kilocode: 'kilo',
+  'kilo-code': 'kilo',
+  q: 'amazon-q',
+  amazonq: 'amazon-q',
+  'amazon_q': 'amazon-q',
+  agents: 'universal',
+  'agents-md': 'universal',
+  'agents.md': 'universal',
+  openhands: 'universal',
+};
+
+export function normalizeAgentName(name) {
+  const key = String(name || '').trim().toLowerCase();
+  if (SUPPORTED_AGENTS.includes(key)) return key;
+  return AGENT_ALIASES[key] || null;
+}
 
 // ── Enforcement modes ─────────────────────────────────────────────────────────
 // Each agent has a real enforcement mode, not just advisory rules:
 //
-//  codex        PreToolUse hook → node script exits non-zero → Codex aborts the tool call
+//  codex        PreToolUse hook → node script returns a structured deny → Codex aborts the tool call
 //  claude-code  PreToolUse hook → bash script exits non-zero → Claude Code aborts the tool call
 //  cursor       .cursor/rules/*.mdc  (always-applied) + MCP check_dependency guard rule
 //  windsurf     .windsurfrules       advisory + MCP check_dependency guard rule
 //  cline        MCP check_dependency + cline_mcp_settings.json
 //  copilot      MCP check_dependency + .github/mcp.json
+//  vscode       MCP check_dependency via .vscode/mcp.json
+//  gemini-cli   MCP via .gemini/settings.json + GEMINI.md advisory rule
+//  qwen-code    MCP via .qwen/settings.json + QWEN.md advisory rule
+//  opencode     MCP via opencode.json
+//  crush        MCP via crush.json
+//  roo / kilo   MCP via .roo/mcp.json and .kilocode/mcp.json
+//  amazon-q     MCP via .amazonq/mcp.json
 //  antigravity  MCP check_dependency (native Antigravity MCP config)
 //  claude-desktop  global claude_desktop_config.json MCP entry
+//  universal    AGENTS.md advisory rule (read by many agents) + project .mcp.json
+//
+// Hooks (codex, claude-code) are the only mechanisms that can actually stop a command.
+// Every other target is advisory guidance to the agent; CI is the merge control.
+
+/**
+ * JSON config targets that register the PkgDiet MCP server. `key` is a dotted path
+ * into the JSON document; `shape` adapts the canonical { command, args } entry to
+ * each tool's schema.
+ */
+const JSON_MCP_TARGETS = {
+  cursor: { file: ['.cursor', 'mcp.json'], key: 'mcpServers.pkgdiet' },
+  cline: { file: ['cline_mcp_settings.json'], key: 'mcpServers.pkgdiet' },
+  copilot: { file: ['.github', 'mcp.json'], key: 'mcpServers.pkgdiet' },
+  vscode: { file: ['.vscode', 'mcp.json'], key: 'servers.pkgdiet', shape: e => ({ type: 'stdio', ...e }) },
+  'gemini-cli': { file: ['.gemini', 'settings.json'], key: 'mcpServers.pkgdiet', rules: 'GEMINI.md' },
+  'qwen-code': { file: ['.qwen', 'settings.json'], key: 'mcpServers.pkgdiet', rules: 'QWEN.md' },
+  roo: { file: ['.roo', 'mcp.json'], key: 'mcpServers.pkgdiet' },
+  kilo: { file: ['.kilocode', 'mcp.json'], key: 'mcpServers.pkgdiet' },
+  'amazon-q': { file: ['.amazonq', 'mcp.json'], key: 'mcpServers.pkgdiet' },
+  opencode: {
+    file: ['opencode.json'], key: 'mcp.pkgdiet', schema: 'https://opencode.ai/config.json',
+    shape: e => ({ type: 'local', command: [e.command, ...e.args], enabled: true }),
+  },
+  crush: {
+    file: ['crush.json'], key: 'mcp.pkgdiet', schema: 'https://charm.land/crush.json',
+    shape: e => ({ type: 'stdio', ...e }),
+  },
+};
+
+const RULE_BEGIN = '<!-- pkgdiet:begin -->';
+const RULE_END = '<!-- pkgdiet:end -->';
+
+export class AgentConfigError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'AgentConfigError';
+  }
+}
+
+/**
+ * Read a JSON object from disk. Missing or empty files yield {}. A file that exists
+ * but cannot be parsed throws instead of being treated as empty — silently replacing a
+ * user's agent configuration (it may hold other MCP servers, or JSONC comments) would
+ * be data loss.
+ */
+export function readJsonObject(filePath) {
+  if (!fs.existsSync(filePath)) return {};
+  let raw;
+  try {
+    raw = fs.readFileSync(filePath, 'utf8');
+  } catch (err) {
+    throw new AgentConfigError(`Cannot read ${filePath}: ${err.message}`);
+  }
+  if (raw.charCodeAt(0) === 0xfeff) raw = raw.slice(1);
+  if (!raw.trim()) return {};
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new AgentConfigError(`${filePath} is not valid JSON (${err.message}). PkgDiet left it untouched; fix or remove comments/trailing commas and re-run.`);
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new AgentConfigError(`${filePath} must contain a JSON object. PkgDiet left it untouched.`);
+  }
+  return parsed;
+}
+
+/** Write via temp file + rename so an interrupted run never leaves a truncated config. */
+function writeFileAtomic(filePath, content, mode) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const tmp = `${filePath}.pkgdiet-tmp-${process.pid}`;
+  try {
+    fs.writeFileSync(tmp, content, mode ? { mode } : undefined);
+    fs.renameSync(tmp, filePath);
+  } catch (err) {
+    try { fs.rmSync(tmp, { force: true }); } catch { /* best effort */ }
+    throw new AgentConfigError(`Cannot write ${filePath}: ${err.code || err.message}`);
+  }
+}
+
+function getAtPath(obj, dotted) {
+  return dotted.split('.').reduce((cur, k) => (cur && typeof cur === 'object' ? cur[k] : undefined), obj);
+}
+
+function claudeDesktopConfigPath() {
+  const home = os.homedir();
+  if (process.platform === 'win32') {
+    return path.join(process.env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'Claude', 'claude_desktop_config.json');
+  }
+  if (process.platform === 'darwin') {
+    return path.join(home, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
+  }
+  return '';
+}
+
+/** Agents whose project markers are present in `cwd`. */
+export function detectAgents(cwd) {
+  const has = (...p) => fs.existsSync(path.join(cwd, ...p));
+  const found = [];
+  if (has('.cursor')) found.push('cursor');
+  if (has('.codex')) found.push('codex');
+  if (has('.windsurf') || has('.windsurfrules')) found.push('windsurf');
+  if (has('cline_mcp_settings.json') || has('.cline')) found.push('cline');
+  if (has('.github', 'copilot') || has('.github', 'copilot-instructions.md')) found.push('copilot');
+  if (has('CLAUDE.md') || has('.claude')) found.push('claude-code');
+  if (has('.vscode')) found.push('vscode');
+  if (has('.gemini') || has('GEMINI.md')) found.push('gemini-cli');
+  if (has('.qwen') || has('QWEN.md')) found.push('qwen-code');
+  if (has('opencode.json') || has('.opencode')) found.push('opencode');
+  if (has('crush.json') || has('.crush.json') || has('.crush')) found.push('crush');
+  if (has('.roo') || has('.roomodes')) found.push('roo');
+  if (has('.kilocode')) found.push('kilo');
+  if (has('.amazonq')) found.push('amazon-q');
+  if (has('AGENTS.md')) found.push('universal');
+  return found;
+}
 
 export function verifyAgents(cwd) {
-  const checks = {
-    cursor: path.join(cwd, '.cursor', 'mcp.json'),
-    cline: path.join(cwd, 'cline_mcp_settings.json'),
-    copilot: path.join(cwd, '.github', 'mcp.json'),
-    antigravity: path.join(cwd, '.gemini', 'antigravity', 'mcp', 'pkgdiet', 'mcp.json'),
-    codex: path.join(cwd, '.codex', 'hooks.json'),
-  };
-
   const claudeHooksDir = path.join(cwd, '.claude', 'hooks');
   const claudeSettingsPath = path.join(cwd, '.claude', 'settings.json');
 
-  const results = SUPPORTED_AGENTS.map(agent => {
+  const safeJson = file => {
+    try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
+  };
+
+  return SUPPORTED_AGENTS.map(agent => {
     if (agent === 'windsurf') return { agent, configured: fs.existsSync(path.join(cwd, '.windsurfrules')), mode: 'rule' };
-    if (agent === 'codex') return {
-      agent,
-      configured: fs.existsSync(checks.codex) && fs.existsSync(path.join(cwd, '.codex', 'hooks', 'pkgdiet-install-guard.mjs')),
-      mode: 'install-hook',
-      file: checks.codex,
-    };
-    if (agent === 'claude-code') {
-      const hooksInstalled = fs.existsSync(path.join(claudeHooksDir, 'pkgdiet-install-guard.sh'));
-      const settingsHasHook = (() => {
-        try {
-          const s = JSON.parse(fs.readFileSync(claudeSettingsPath, 'utf8'));
-          return Array.isArray(s?.hooks?.PreToolUse) && s.hooks.PreToolUse.some(h => JSON.stringify(h).includes('pkgdiet'));
-        } catch { return false; }
-      })();
+    if (agent === 'universal') {
+      const agentsMd = path.join(cwd, 'AGENTS.md');
+      let configured = false;
+      try { configured = fs.readFileSync(agentsMd, 'utf8').includes('PkgDiet'); } catch { /* not present */ }
+      return { agent, configured, mode: 'rule', file: agentsMd };
+    }
+    if (agent === 'codex') {
+      const file = path.join(cwd, '.codex', 'hooks.json');
       return {
         agent,
-        configured: hooksInstalled && settingsHasHook,
+        configured: fs.existsSync(file) && fs.existsSync(path.join(cwd, '.codex', 'hooks', 'pkgdiet-install-guard.mjs')),
         mode: 'install-hook',
-        file: claudeSettingsPath,
+        file,
       };
     }
+    if (agent === 'claude-code') {
+      const hooksInstalled = fs.existsSync(path.join(claudeHooksDir, 'pkgdiet-install-guard.sh'));
+      const settings = safeJson(claudeSettingsPath);
+      const settingsHasHook = Array.isArray(settings?.hooks?.PreToolUse)
+        && settings.hooks.PreToolUse.some(h => JSON.stringify(h).includes('pkgdiet'));
+      return { agent, configured: hooksInstalled && settingsHasHook, mode: 'install-hook', file: claudeSettingsPath };
+    }
     if (agent === 'claude-desktop') return { agent, configured: false, mode: 'global-config' };
-    const file = checks[agent];
-    try {
-      const json = JSON.parse(fs.readFileSync(file, 'utf8'));
-      return { agent, configured: Boolean(json?.mcpServers?.pkgdiet || json?.command), file };
-    } catch { return { agent, configured: false, file }; }
+    if (agent === 'antigravity') {
+      const file = path.join(cwd, '.gemini', 'antigravity', 'mcp', 'pkgdiet', 'mcp.json');
+      return { agent, configured: Boolean(safeJson(file)?.command), file };
+    }
+    const target = JSON_MCP_TARGETS[agent];
+    const file = path.join(cwd, ...target.file);
+    return { agent, configured: Boolean(getAtPath(safeJson(file), target.key)), file };
   });
-
-  return results;
 }
 
-export function generateCodexGuardScript(cliVersion = '2.0.1') {
-  return `// Generated by PkgDiet v\${cliVersion}. Blocks unchecked npm, pnpm, yarn, and bun package installs from Codex.
+export function generateCodexGuardScript(cliVersion = CLI_VERSION) {
+  return `// Generated by PkgDiet v${cliVersion}. Blocks unchecked npm, pnpm, yarn, and bun package installs from Codex.
 // Codex PreToolUse Contract:
 // The Codex runner evaluates hookSpecificOutput.permissionDecision === 'deny' from stdout,
 // not the process exit code. All denials (policy failures, unpinned/bare/ambiguous installs,
@@ -110,7 +267,7 @@ const runCheck = names => {
     return spawnSync(localBin, ['check', '--json', ...names], { cwd, encoding: 'utf8', shell: process.platform === 'win32' });
   }
   if (process.env.PKGDIET_ALLOW_NPX_FALLBACK === '1') {
-    return spawnSync('npx', ['-y', 'pkgdiet@\${cliVersion}', 'check', '--json', ...names], { cwd, encoding: 'utf8', shell: process.platform === 'win32' });
+    return spawnSync('npx', ['-y', 'pkgdiet@${cliVersion}', 'check', '--json', ...names], { cwd, encoding: 'utf8', shell: process.platform === 'win32' });
   }
   return { status: 127, error: new Error('CLI_UNAVAILABLE'), stderr: 'Local PkgDiet CLI is not installed in node_modules' };
 };
@@ -243,9 +400,9 @@ for (const cmd of cmds) {
 `;
 }
 
-export function generateClaudeCodeGuardScript(cliVersion = '2.0.1') {
+export function generateClaudeCodeGuardScript(cliVersion = CLI_VERSION) {
   return `#!/usr/bin/env bash
-# Generated by PkgDiet v\${cliVersion} — blocks AI-generated dependency installs in Claude Code.
+# Generated by PkgDiet v${cliVersion} — blocks AI-generated dependency installs in Claude Code.
 # Hook type: PreToolUse (Bash)
 # Reads the tool call JSON from stdin, extracts package names, calls pkgdiet check.
 
@@ -290,7 +447,7 @@ const runCheck = names => {
     return spawnSync(localBin, ['check', '--json', ...names], { cwd, encoding: 'utf8', shell: process.platform === 'win32' });
   }
   if (process.env.PKGDIET_ALLOW_NPX_FALLBACK === '1') {
-    return spawnSync('npx', ['-y', 'pkgdiet@\${cliVersion}', 'check', '--json', ...names], { cwd, encoding: 'utf8', shell: process.platform === 'win32' });
+    return spawnSync('npx', ['-y', 'pkgdiet@${cliVersion}', 'check', '--json', ...names], { cwd, encoding: 'utf8', shell: process.platform === 'win32' });
   }
   return { status: 127, error: new Error('CLI_UNAVAILABLE'), stderr: 'Local PkgDiet CLI is not installed in node_modules' };
 };
@@ -433,53 +590,9 @@ fi
 `;
 }
 
-export async function setupAgents(agents, cwd, options = {}) {
-  const { dryRun = false, remove = false, detect = false, all = false } = options;
+const AI_RULE_CONTENT = 'Before recommending, adding, or installing an npm package, call the PkgDiet `check_dependency` MCP tool. Do not install packages with a BLOCK verdict. For WARN, explain the trade-off and prefer a compatible recommended alternative.';
 
-  let activeAgents = [...agents];
-
-  if (all) {
-    activeAgents = SUPPORTED_AGENTS;
-  } else if (detect) {
-    activeAgents = [];
-    if (fs.existsSync(path.join(cwd, '.cursor'))) activeAgents.push('cursor');
-    if (fs.existsSync(path.join(cwd, '.codex'))) activeAgents.push('codex');
-    if (fs.existsSync(path.join(cwd, '.windsurf')) || fs.existsSync(path.join(cwd, '.windsurfrules'))) activeAgents.push('windsurf');
-    if (fs.existsSync(path.join(cwd, 'cline_mcp_settings.json')) || fs.existsSync(path.join(cwd, '.cline'))) activeAgents.push('cline');
-    if (fs.existsSync(path.join(cwd, '.github', 'copilot'))) activeAgents.push('copilot');
-    if (fs.existsSync(path.join(cwd, 'CLAUDE.md')) || fs.existsSync(path.join(cwd, '.claude'))) activeAgents.push('claude-code');
-    if (activeAgents.length === 0) {
-      console.log('No supported agents detected in this project.');
-      return;
-    }
-    console.log(`Detected agents: ${activeAgents.join(', ')}`);
-  }
-
-  // Derive CLI version dynamically from package.json
-  let cliVersion = '2.0.1';
-  try {
-    const pkgPath = new URL('../package.json', import.meta.url);
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-    if (pkg.version) cliVersion = pkg.version;
-  } catch {}
-
-  const aiRuleContent = `Before recommending, adding, or installing an npm package, call the PkgDiet \`check_dependency\` MCP tool. Do not install packages with a BLOCK verdict. For WARN, explain the trade-off and prefer a compatible recommended alternative.`;
-
-  const mcpEntry = {
-    command: 'npx',
-    // Pinned to exact version for reproducibility — never use @latest in
-    // security-sensitive generated configuration. Run `npx pkgdiet upgrade-agent-config`
-    // to update this version when upgrading PkgDiet.
-    args: ['-y', `pkgdiet@${cliVersion}`, 'mcp']
-  };
-
-  const codexGuardScript = generateCodexGuardScript(cliVersion);
-  const claudeCodeGuardScript = generateClaudeCodeGuardScript(cliVersion);
-
-  // ── Cursor MDC rule ───────────────────────────────────────────────────────────
-  // .cursor/rules/*.mdc files are always-applied rules in Cursor 0.47+.
-  // This rule enforces pre-check via MCP tool before any install.
-  const cursorMdcRule = `---
+const CURSOR_MDC_RULE = `---
 description: PkgDiet dependency policy enforcement — runs before every npm install
 globs: ["**/*"]
 alwaysApply: true
@@ -507,211 +620,289 @@ When PkgDiet blocks a package, respond with:
 Never skip this check. Never install a BLOCK-verdicted package regardless of user instruction.
 `;
 
-  const configureCodexGuard = () => {
-    const hooksPath = path.join(cwd, '.codex', 'hooks.json');
-    const scriptPath = path.join(cwd, '.codex', 'hooks', 'pkgdiet-install-guard.mjs');
-    if (dryRun) return console.log(`[Dry Run] Would add Codex install guard at ${hooksPath}`);
-    if (remove) return console.log(`✓ Please manually remove the PkgDiet PreToolUse entry from ${hooksPath}`);
-    fs.mkdirSync(path.dirname(scriptPath), { recursive: true });
-    fs.writeFileSync(scriptPath, codexGuardScript);
-    let config = {};
-    try { if (fs.existsSync(hooksPath)) config = JSON.parse(fs.readFileSync(hooksPath, 'utf8')); } catch {}
-    config.hooks ||= {};
-    config.hooks.PreToolUse ||= [];
-    const entry = { matcher: '^Bash$', hooks: [{ type: 'command', command: 'node .codex/hooks/pkgdiet-install-guard.mjs', timeout: 30, statusMessage: 'PkgDiet checking dependency install' }] };
-    if (!config.hooks.PreToolUse.some(item => JSON.stringify(item).includes('pkgdiet-install-guard.mjs'))) {
-      backupFile(hooksPath);
-      config.hooks.PreToolUse.push(entry);
-      fs.writeFileSync(hooksPath, JSON.stringify(config, null, 2) + '\n');
+/**
+ * Configure (or with `remove`, un-configure) PkgDiet for the given agents.
+ *
+ * Failure policy: one agent failing never aborts the others. Unparseable existing
+ * configs are left untouched and reported. Returns { configured, failed } and sets
+ * process.exitCode = 1 when anything failed.
+ */
+export async function setupAgents(agents, cwd, options = {}) {
+  const { dryRun = false, remove = false, detect = false, all = false } = options;
+  const failed = [];
+  const configured = [];
+
+  let requested = [];
+  if (all) {
+    requested = [...SUPPORTED_AGENTS];
+  } else if (detect) {
+    requested = detectAgents(cwd);
+    if (requested.length === 0) {
+      console.log('No supported agents detected in this project.');
+      return { configured, failed };
     }
-    console.log(`✓ Added Codex install guard (.codex/hooks/pkgdiet-install-guard.mjs). Review and trust it with /hooks before use.`);
-  };
-
-  const configureClaudeCodeHooks = () => {
-    const settingsPath = path.join(cwd, '.claude', 'settings.json');
-    const scriptPath = path.join(cwd, '.claude', 'hooks', 'pkgdiet-install-guard.sh');
-    if (dryRun) return console.log(`[Dry Run] Would add Claude Code install guard at ${settingsPath}`);
-    if (remove) return console.log(`✓ Please manually remove the PkgDiet PreToolUse entry from ${settingsPath}`);
-
-    // Write the bash guard script
-    fs.mkdirSync(path.dirname(scriptPath), { recursive: true });
-    fs.writeFileSync(scriptPath, claudeCodeGuardScript);
-    // Make it executable on POSIX
-    try { execSync(`chmod +x "${scriptPath}"`); } catch {}
-
-    // Merge into .claude/settings.json
-    let settings = {};
-    try { if (fs.existsSync(settingsPath)) settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8')); } catch {}
-    settings.hooks ||= {};
-    settings.hooks.PreToolUse ||= [];
-    const hookEntry = {
-      matcher: 'Bash',
-      hooks: [{
-        type: 'command',
-        command: 'bash .claude/hooks/pkgdiet-install-guard.sh',
-        timeout: 30,
-      }]
-    };
-    if (!settings.hooks.PreToolUse.some(h => JSON.stringify(h).includes('pkgdiet-install-guard.sh'))) {
-      backupFile(settingsPath);
-      settings.hooks.PreToolUse.push(hookEntry);
-      fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+    console.log(`Detected agents: ${requested.join(', ')}`);
+  } else {
+    for (const raw of agents) {
+      const name = normalizeAgentName(raw);
+      if (!name) {
+        failed.push({ agent: raw, error: `Unknown agent "${raw}". Supported: ${SUPPORTED_AGENTS.join(', ')}` });
+        console.error(`✗ Unknown agent "${raw}". Supported: ${SUPPORTED_AGENTS.join(', ')}`);
+      } else {
+        requested.push(name);
+      }
     }
-    console.log(`✓ Added Claude Code PreToolUse hook (.claude/hooks/pkgdiet-install-guard.sh).`);
-    console.log(`  This blocks npm/pnpm/yarn installs that fail PkgDiet policy before Claude Code executes them.`);
-  };
+  }
+  const activeAgents = [...new Set(requested)];
 
-  const configureCursorMdc = () => {
-    const rulesDir = path.join(cwd, '.cursor', 'rules');
-    const mdcPath = path.join(rulesDir, 'pkgdiet.mdc');
-    if (dryRun) return console.log(`[Dry Run] Would create Cursor MDC rule at ${mdcPath}`);
-    if (remove) return console.log(`✓ Please manually remove ${mdcPath}`);
-    if (!fs.existsSync(rulesDir)) fs.mkdirSync(rulesDir, { recursive: true });
-    if (!fs.existsSync(mdcPath)) {
-      fs.writeFileSync(mdcPath, cursorMdcRule);
-      console.log(`✓ Created Cursor MDC rule (.cursor/rules/pkgdiet.mdc) — always-applied enforcement.`);
-    } else {
-      console.log(`✓ Cursor MDC rule already exists at ${mdcPath}`);
-    }
+  const cliVersion = CLI_VERSION;
+  const mcpEntry = {
+    command: 'npx',
+    // Pinned to exact version for reproducibility — never use @latest in
+    // security-sensitive generated configuration.
+    args: ['-y', `pkgdiet@${cliVersion}`, 'mcp'],
   };
 
   const backupFile = (filePath) => {
     if (fs.existsSync(filePath) && !dryRun) {
-      const ts = new Date().toISOString().replace(/[:\-\.T]/g, '').slice(0, 14);
+      const ts = new Date().toISOString().replace(/[:\-.T]/g, '').slice(0, 14);
       const backupPath = `${filePath}.pkgdiet-backup-${ts}`;
-      fs.copyFileSync(filePath, backupPath);
-      console.log(`✓ Created backup: ${path.basename(backupPath)}`);
+      try {
+        fs.copyFileSync(filePath, backupPath);
+        console.log(`✓ Created backup: ${path.basename(backupPath)}`);
+      } catch (err) {
+        throw new AgentConfigError(`Cannot back up ${filePath} (${err.code || err.message}); refusing to modify it.`);
+      }
     }
   };
 
-  const updateJson = (filePath, keyPath, value) => {
+  /** Set or remove a dotted key in a JSON config, preserving everything else. */
+  const updateJson = (filePath, keyPath, value, schema) => {
     if (dryRun) {
       console.log(`[Dry Run] Would ${remove ? 'remove from' : 'update'} ${filePath}`);
       return;
     }
-    const dir = path.dirname(filePath);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
-    backupFile(filePath);
-
-    let data = {};
-    if (fs.existsSync(filePath)) {
-      try { data = JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch (e) {}
+    if (remove && !fs.existsSync(filePath)) {
+      console.log(`○ ${filePath} not found — nothing to remove.`);
+      return;
     }
-
+    const data = readJsonObject(filePath); // throws (and writes nothing) on unparseable files
     const keys = keyPath.split('.');
-    let curr = data;
-    for (let i = 0; i < keys.length - 1; i++) {
-      if (!curr[keys[i]]) curr[keys[i]] = {};
-      curr = curr[keys[i]];
-    }
-
     const lastKey = keys[keys.length - 1];
-    if (remove) {
-      if (curr && curr[lastKey]) delete curr[lastKey];
-    } else {
-      curr[lastKey] = value;
+
+    let parent = data;
+    for (let i = 0; i < keys.length - 1; i++) {
+      if (!parent[keys[i]] || typeof parent[keys[i]] !== 'object' || Array.isArray(parent[keys[i]])) {
+        if (remove) { console.log(`○ PkgDiet is not configured in ${filePath}.`); return; }
+        parent[keys[i]] = {};
+      }
+      parent = parent[keys[i]];
     }
 
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+    if (remove) {
+      if (!(lastKey in parent)) { console.log(`○ PkgDiet is not configured in ${filePath}.`); return; }
+      backupFile(filePath);
+      delete parent[lastKey];
+    } else {
+      if (JSON.stringify(parent[lastKey]) === JSON.stringify(value)) {
+        console.log(`✓ ${filePath} already configured.`);
+        return;
+      }
+      backupFile(filePath);
+      parent[lastKey] = value;
+      if (schema && data.$schema === undefined) data.$schema = schema;
+    }
+    writeFileAtomic(filePath, JSON.stringify(data, null, 2) + '\n');
     console.log(`✓ ${remove ? 'Removed from' : 'Updated'} ${filePath}`);
   };
 
+  /** Append (or with `remove`, strip) the PkgDiet rule block in a text rules file. */
   const updateRuleFile = (filePath) => {
     if (dryRun) {
       console.log(`[Dry Run] Would ${remove ? 'remove rules from' : 'add rules to'} ${filePath}`);
       return;
     }
-    
     let rules = '';
-    if (fs.existsSync(filePath)) rules = fs.readFileSync(filePath, 'utf8');
+    if (fs.existsSync(filePath)) {
+      try { rules = fs.readFileSync(filePath, 'utf8'); } catch (err) {
+        throw new AgentConfigError(`Cannot read ${filePath}: ${err.code || err.message}`);
+      }
+    }
 
     if (remove) {
-      if (rules.includes('PkgDiet')) {
-        console.log(`✓ Please manually remove PkgDiet rules from ${filePath}`);
-      }
-    } else {
-      if (!rules.includes('PkgDiet')) {
+      const begin = rules.indexOf(RULE_BEGIN);
+      const end = rules.indexOf(RULE_END);
+      if (begin !== -1 && end > begin) {
         backupFile(filePath);
-        fs.writeFileSync(filePath, rules ? rules + '\n\n' + aiRuleContent : aiRuleContent);
-        console.log(`✓ Added PkgDiet rules to ${filePath}`);
-      } else {
-        console.log(`✓ ${filePath} already contains PkgDiet rules.`);
+        const next = (rules.slice(0, begin) + rules.slice(end + RULE_END.length)).replace(/\n{3,}/g, '\n\n').trim();
+        if (next) writeFileAtomic(filePath, next + '\n');
+        else fs.rmSync(filePath, { force: true });
+        console.log(`✓ Removed PkgDiet rules from ${filePath}`);
+      } else if (rules.includes('PkgDiet')) {
+        console.log(`✓ Please manually remove PkgDiet rules from ${filePath} (no PkgDiet markers found).`);
       }
+      return;
+    }
+
+    if (rules.includes('PkgDiet')) {
+      console.log(`✓ ${filePath} already contains PkgDiet rules.`);
+      return;
+    }
+    const block = `${RULE_BEGIN}\n${AI_RULE_CONTENT}\n${RULE_END}\n`;
+    backupFile(filePath);
+    writeFileAtomic(filePath, rules ? `${rules.replace(/\s+$/, '')}\n\n${block}` : block);
+    console.log(`✓ Added PkgDiet rules to ${filePath}`);
+  };
+
+  /** Add or remove a PreToolUse hook entry plus its script (codex / claude-code). */
+  const configureHook = ({ label, settingsPath, scriptPath, marker, entry, script, executable }) => {
+    if (dryRun) return console.log(`[Dry Run] Would ${remove ? 'remove' : 'add'} ${label} install guard at ${settingsPath}`);
+
+    if (remove) {
+      if (fs.existsSync(settingsPath)) {
+        const config = readJsonObject(settingsPath);
+        const list = config?.hooks?.PreToolUse;
+        if (Array.isArray(list)) {
+          const kept = list.filter(item => !JSON.stringify(item).includes(marker));
+          if (kept.length !== list.length) {
+            backupFile(settingsPath);
+            config.hooks.PreToolUse = kept;
+            if (kept.length === 0) delete config.hooks.PreToolUse;
+            writeFileAtomic(settingsPath, JSON.stringify(config, null, 2) + '\n');
+          }
+        }
+      }
+      fs.rmSync(scriptPath, { force: true });
+      return console.log(`✓ Removed ${label} install guard.`);
+    }
+
+    // Parse first: never write the guard script next to a settings file we cannot safely merge into.
+    const config = readJsonObject(settingsPath);
+    writeFileAtomic(scriptPath, script, executable ? 0o755 : undefined);
+    if (executable) { try { fs.chmodSync(scriptPath, 0o755); } catch { /* not supported on this FS */ } }
+    config.hooks ||= {};
+    config.hooks.PreToolUse ||= [];
+    if (!config.hooks.PreToolUse.some(item => JSON.stringify(item).includes(marker))) {
+      backupFile(settingsPath);
+      config.hooks.PreToolUse.push(entry);
+      writeFileAtomic(settingsPath, JSON.stringify(config, null, 2) + '\n');
+    }
+  };
+
+  const configureCodexGuard = () => {
+    configureHook({
+      label: 'Codex',
+      settingsPath: path.join(cwd, '.codex', 'hooks.json'),
+      scriptPath: path.join(cwd, '.codex', 'hooks', 'pkgdiet-install-guard.mjs'),
+      marker: 'pkgdiet-install-guard.mjs',
+      script: generateCodexGuardScript(cliVersion),
+      entry: { matcher: '^Bash$', hooks: [{ type: 'command', command: 'node .codex/hooks/pkgdiet-install-guard.mjs', timeout: 30, statusMessage: 'PkgDiet checking dependency install' }] },
+    });
+    if (!dryRun && !remove) console.log('✓ Added Codex install guard (.codex/hooks/pkgdiet-install-guard.mjs). Review and trust it with /hooks before use.');
+  };
+
+  const configureClaudeCodeHooks = () => {
+    configureHook({
+      label: 'Claude Code',
+      settingsPath: path.join(cwd, '.claude', 'settings.json'),
+      scriptPath: path.join(cwd, '.claude', 'hooks', 'pkgdiet-install-guard.sh'),
+      marker: 'pkgdiet-install-guard.sh',
+      script: generateClaudeCodeGuardScript(cliVersion),
+      executable: true,
+      entry: { matcher: 'Bash', hooks: [{ type: 'command', command: 'bash .claude/hooks/pkgdiet-install-guard.sh', timeout: 30 }] },
+    });
+    if (!dryRun && !remove) {
+      console.log('✓ Added Claude Code PreToolUse hook (.claude/hooks/pkgdiet-install-guard.sh).');
+      console.log('  This blocks npm/pnpm/yarn installs that fail PkgDiet policy before Claude Code executes them.');
+    }
+  };
+
+  const configureCursorMdc = () => {
+    const mdcPath = path.join(cwd, '.cursor', 'rules', 'pkgdiet.mdc');
+    if (dryRun) return console.log(`[Dry Run] Would ${remove ? 'remove' : 'create'} Cursor MDC rule at ${mdcPath}`);
+    if (remove) {
+      fs.rmSync(mdcPath, { force: true });
+      return console.log(`✓ Removed ${mdcPath}`);
+    }
+    if (fs.existsSync(mdcPath)) return console.log(`✓ Cursor MDC rule already exists at ${mdcPath}`);
+    writeFileAtomic(mdcPath, CURSOR_MDC_RULE);
+    console.log('✓ Created Cursor MDC rule (.cursor/rules/pkgdiet.mdc) — always-applied enforcement.');
+  };
+
+  const runClaudeCli = (args, okMessage, manualHint) => {
+    try {
+      execFileSync('claude', args, { cwd, stdio: 'ignore', timeout: 20000 });
+      console.log(okMessage);
+    } catch {
+      console.log(`⚠ Could not execute 'claude ${args.join(' ')}'. ${manualHint}`);
+    }
+  };
+
+  const configureAgent = (agent) => {
+    const jsonTarget = JSON_MCP_TARGETS[agent];
+    if (jsonTarget) {
+      const value = jsonTarget.shape ? jsonTarget.shape(mcpEntry) : mcpEntry;
+      updateJson(path.join(cwd, ...jsonTarget.file), jsonTarget.key, value, jsonTarget.schema);
+      if (agent === 'cursor') {
+        configureCursorMdc();
+        updateRuleFile(path.join(cwd, '.cursorrules'));
+      }
+      if (jsonTarget.rules) updateRuleFile(path.join(cwd, jsonTarget.rules));
+      return;
+    }
+
+    switch (agent) {
+      case 'codex':
+        return configureCodexGuard();
+      case 'windsurf':
+        return updateRuleFile(path.join(cwd, '.windsurfrules'));
+      case 'universal':
+        updateRuleFile(path.join(cwd, 'AGENTS.md'));
+        return updateJson(path.join(cwd, '.mcp.json'), 'mcpServers.pkgdiet', mcpEntry);
+      case 'claude-code':
+        configureClaudeCodeHooks(); // 1. native PreToolUse hook — real enforcement
+        if (!dryRun) {         // 2. MCP server via the native CLI
+          if (remove) runClaudeCli(['mcp', 'remove', 'pkgdiet'], '✓ Removed pkgdiet MCP server from Claude Code', 'Run manually: claude mcp remove pkgdiet');
+          else runClaudeCli(['mcp', 'add', 'pkgdiet', '--', 'npx', '-y', `pkgdiet@${cliVersion}`, 'mcp'], '✓ Added pkgdiet MCP server to Claude Code via native CLI', `Run manually: claude mcp add pkgdiet -- npx -y pkgdiet@${cliVersion} mcp`);
+        }
+        return updateRuleFile(path.join(cwd, 'CLAUDE.md')); // 3. CLAUDE.md advisory rule
+      case 'claude-desktop': {
+        const configPath = claudeDesktopConfigPath();
+        if (!configPath) throw new AgentConfigError('Cannot determine the Claude Desktop config path on this OS.');
+        return updateJson(configPath, 'mcpServers.pkgdiet', mcpEntry);
+      }
+      case 'antigravity': {
+        const configPath = path.join(cwd, '.gemini', 'antigravity', 'mcp', 'pkgdiet', 'mcp.json');
+        if (dryRun) return console.log(`[Dry Run] Would ${remove ? 'remove' : 'write'} Antigravity MCP config at ${configPath}`);
+        if (remove) {
+          fs.rmSync(path.dirname(configPath), { recursive: true, force: true });
+          return console.log(`✓ Removed Antigravity MCP config at ${configPath}`);
+        }
+        writeFileAtomic(configPath, JSON.stringify(mcpEntry, null, 2) + '\n');
+        return console.log(`✓ Configured Antigravity MCP at ${configPath}`);
+      }
+      default:
+        throw new AgentConfigError(`No configuration routine for agent "${agent}".`);
     }
   };
 
   for (const agent of activeAgents) {
     console.log(`\nConfiguring ${agent}...`);
-
-    if (agent === 'codex') {
-      configureCodexGuard();
-    }
-    else if (agent === 'cursor') {
-      updateJson(path.join(cwd, '.cursor', 'mcp.json'), 'mcpServers.pkgdiet', mcpEntry);
-      // MDC rule (always-applied enforcement, Cursor 0.47+)
-      configureCursorMdc();
-      // Legacy .cursorrules advisory rule
-      updateRuleFile(path.join(cwd, '.cursorrules'));
-    }
-    
-    else if (agent === 'windsurf') {
-      updateRuleFile(path.join(cwd, '.windsurfrules'));
-    }
-
-    else if (agent === 'cline') {
-      updateJson(path.join(cwd, 'cline_mcp_settings.json'), 'mcpServers.pkgdiet', mcpEntry);
-    }
-
-    else if (agent === 'copilot') {
-      updateJson(path.join(cwd, '.github', 'mcp.json'), 'mcpServers.pkgdiet', mcpEntry);
-    }
-
-    else if (agent === 'claude-code') {
-      // 1. Native PreToolUse hook — real enforcement
-      configureClaudeCodeHooks();
-      // 2. claude mcp add — MCP for check_dependency tool
-      if (!remove && !dryRun) {
-        try {
-          execSync('claude mcp add pkgdiet -- npx -y pkgdiet@2.0.1 mcp', { stdio: 'ignore' });
-          console.log(`✓ Added pkgdiet MCP server to Claude Code via native CLI`);
-        } catch (e) {
-          console.log(`⚠ Could not execute 'claude mcp add'. Run manually: claude mcp add pkgdiet -- npx -y pkgdiet@2.0.1 mcp`);
-        }
-      }
-      // 3. CLAUDE.md advisory rule
-      updateRuleFile(path.join(cwd, 'CLAUDE.md'));
-    }
-
-    else if (agent === 'claude-desktop') {
-      const isWin = process.platform === 'win32';
-      const isMac = process.platform === 'darwin';
-      const homedir = (await import('os')).default.homedir();
-      let configPath = '';
-      if (isWin) {
-        configPath = path.join(process.env.APPDATA || path.join(homedir, 'AppData', 'Roaming'), 'Claude', 'claude_desktop_config.json');
-      } else if (isMac) {
-        configPath = path.join(homedir, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
-      }
-      if (configPath) {
-        updateJson(configPath, 'mcpServers.pkgdiet', mcpEntry);
-      } else {
-        console.log('⚠ Cannot determine Claude Desktop config path on this OS.');
-      }
-    }
-    
-    else if (agent === 'antigravity') {
-      const agyDir = path.join(cwd, '.gemini', 'antigravity', 'mcp', 'pkgdiet');
-      if (!dryRun && !remove) {
-        if (!fs.existsSync(agyDir)) fs.mkdirSync(agyDir, { recursive: true });
-        const configPath = path.join(agyDir, 'mcp.json');
-        fs.writeFileSync(configPath, JSON.stringify(mcpEntry, null, 2));
-        console.log(`✓ Configured Antigravity MCP at ${configPath}`);
-      }
+    try {
+      configureAgent(agent);
+      configured.push(agent);
+    } catch (err) {
+      failed.push({ agent, error: err.message });
+      console.error(`✗ ${agent}: ${err.message}`);
     }
   }
 
-  if (!dryRun) {
+  if (failed.length > 0) {
+    process.exitCode = 1;
+    console.error(`\n⚠ ${failed.length} agent(s) were not configured: ${failed.map(f => f.agent).join(', ')}. Other agents were not affected.`);
+  }
+
+  if (!dryRun && configured.length > 0) {
     if (remove) {
       console.log('\n✨ PkgDiet agent guardrails have been removed.');
     } else {
@@ -719,4 +910,5 @@ Never skip this check. Never install a BLOCK-verdicted package regardless of use
       console.log('   Run `npx pkgdiet demo` to see a live enforcement proof.\n');
     }
   }
+  return { configured, failed };
 }

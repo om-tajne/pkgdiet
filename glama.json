@@ -2,6 +2,6 @@
   "version": 1,
   "name": "PkgDiet",
   "description": "Dependency policy for AI-assisted development. Evaluates npm packages before agents install them.",
-  "icon": "https://raw.githubusercontent.com/om-tajne/pkgdiet/main/docs/logo.png",
+  "icon": "https://raw.githubusercontent.com/om-tajne/pkgdiet/main/logo.png",
   "tags": ["npm", "dependencies", "security", "policy"]
 }

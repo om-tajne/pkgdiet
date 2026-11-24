@@ -419,9 +419,9 @@ if (archMd.includes('Experimental') && archMd.includes('No fixture tests')) {
   fail('docs/architecture.md must clarify lockfile parsers without fixtures as experimental');
 }
 
-// ── 22. 2.0.1 release metadata and MCP Registry identity ──────────────────
+// ── 22. 2.0.2 release metadata and MCP Registry identity ──────────────────
 
-const RELEASE_VERSION = '2.0.1';
+const RELEASE_VERSION = '2.0.2';
 const MCP_SERVER_NAME = 'io.github.om-tajne/pkgdiet';
 const publishedManifests = [
   ['packages/core/package.json', '@pkgdiet/core'],
@@ -450,7 +450,7 @@ if (!registryManifestText) {
   if (registryManifest.name !== MCP_SERVER_NAME) fail(`server.json: expected server name ${MCP_SERVER_NAME}`);
   if (registryManifest.version !== RELEASE_VERSION) fail(`server.json: expected version ${RELEASE_VERSION}`);
   if (pkg?.identifier !== 'pkgdiet' || pkg?.version !== RELEASE_VERSION || pkg?.transport?.type !== 'stdio') {
-    fail('server.json: must declare the pkgdiet@2.0.1 stdio launcher');
+    fail('server.json: must declare the pkgdiet@2.0.2 stdio launcher');
   } else {
     pass(`server.json: ${MCP_SERVER_NAME} → pkgdiet@${RELEASE_VERSION} (stdio)`);
   }

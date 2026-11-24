@@ -4,7 +4,7 @@ startCommand:
     command: npx
     args:
       - -y
-      - pkgdiet@2.0.1
+      - pkgdiet@2.0.2
       - mcp
 tools:
   - name: check_dependency

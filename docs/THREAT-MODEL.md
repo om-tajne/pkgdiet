@@ -1,6 +1,6 @@
 # PkgDiet Threat Model & Data Flow Reference
 
-**Version:** 2.0.1  
+**Version:** 2.0.2  
 **Target:** Maintainers, Security Auditors, and Enterprise Adopters  
 
 ---

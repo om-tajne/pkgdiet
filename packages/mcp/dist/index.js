@@ -1,10 +1,22 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { createRequire } from "node:module";
 import { checkPackage } from "@pkgdiet/core/dist/checker.js";
 import { getAlternatives } from "@pkgdiet/core/dist/alternatives.js";
 import { loadPolicy, applyEnvironment, validatePolicy } from "@pkgdiet/core/dist/policy.js";
 import { assertPackageName, partitionPackageNames } from "@pkgdiet/core/dist/validation.js";
+// Report the real package version instead of a hand-maintained literal.
+function readServerVersion() {
+    try {
+        const { version } = createRequire(import.meta.url)("../package.json");
+        if (typeof version === "string" && version)
+            return version;
+    }
+    catch { /* fall back below */ }
+    return "2.0.2";
+}
+const SERVER_VERSION = readServerVersion();
 // ── Rate limiter (per-process, token bucket) ─────────────────────────────────
 // Applies to stdio MCP running in a single process.
 // If multiple MCP processes run, each has its own limit — document this boundary.
@@ -37,11 +49,16 @@ const RATE_EXCEEDED_RESPONSE = {
 // ── Tool-level wall-clock timeout ─────────────────────────────────────────────
 const TOOL_TIMEOUT_MS = Number(process.env.PKGDIET_TOOL_TIMEOUT_MS || "15000");
 function withToolTimeout(promise) {
-    const timeout = new Promise(resolve => setTimeout(() => resolve({
-        isError: true,
-        content: [{ type: "text", text: JSON.stringify({ code: "TOOL_TIMEOUT", message: "Tool timed out — registry may be slow. Try again." }) }],
-    }), TOOL_TIMEOUT_MS));
-    return Promise.race([promise, timeout]);
+    let timer;
+    const timeout = new Promise(resolve => {
+        timer = setTimeout(() => resolve({
+            isError: true,
+            content: [{ type: "text", text: JSON.stringify({ code: "TOOL_TIMEOUT", message: "Tool timed out — registry may be slow. Try again." }) }],
+        }), TOOL_TIMEOUT_MS);
+    });
+    // Always clear the timer so settled calls do not leave dangling handles.
+    return Promise.race([promise, timeout]).finally(() => { if (timer)
+        clearTimeout(timer); });
 }
 // ── Bounded concurrency for batch checks ─────────────────────────────────────
 const BATCH_MAX_SIZE = 50;
@@ -65,7 +82,7 @@ async function withConcurrency(tasks, limit) {
 export function createMcpServer() {
     const server = new McpServer({
         name: "pkgdiet",
-        version: "2.0.1",
+        version: SERVER_VERSION,
     });
     // ── check_dependency ────────────────────────────────────────────────────────
     server.tool("check_dependency", "Evaluate a single npm package against the active PkgDiet policy to determine if it is safe, lightweight, and healthy to install. Use this read-only tool before proposing or installing any package. It returns a structured verdict (ALLOW, WARN, BLOCK), health score, cost impact, and supply-chain evidence. A BLOCK is a successful policy decision and must not be bypassed; execution failures are returned as MCP tool errors. It does not install packages, edit files, or modify the project.\n\nResponse fields:\n- verdict: ALLOW | WARN | BLOCK. Never bypass a BLOCK.\n- advisoryVerification.osvChecked: true = OSV security advisory feed confirmed (no CVEs, or CVEs listed in evidence). false = advisory feed was UNREACHABLE — this means CVE status is UNVERIFIED, not safe. Do not treat osvChecked:false as a clean security result.\n- advisoryVerification.osvErrorCode: reason the feed was unavailable (timeout, network_error, http_503, etc.) when osvChecked is false.\n- advisoryVerification.osvCheckedAt: ISO timestamp of the successful OSV check, or null if the check failed.\n- cacheProvenance.fromCache: true if npm metadata came from local cache rather than a live registry fetch.\n- cacheProvenance.cachedAt: ISO timestamp when the cached entry was originally fetched.\n- cacheProvenance.cacheAgeMs: age of the cache entry in milliseconds.", {

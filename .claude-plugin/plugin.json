@@ -1,7 +1,7 @@
 {
   "name": "pkgdiet",
   "displayName": "PkgDiet",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Dependency policy gate and security guardrails to stop AI coding agents from installing risky npm packages.",
   "author": {
     "name": "Om Tajne",

@@ -8,7 +8,7 @@ PkgDiet is ready for **enterprise adoption pilots** with transparent opt-in depl
 
 ## Administrator Rollout Checklist
 - [ ] Client version is recorded and verified against PkgDiet documentation.
-- [ ] PkgDiet package version is explicitly pinned (e.g., `@2.0.1`).
+- [ ] PkgDiet package version is explicitly pinned (e.g., `@2.0.2`).
 - [ ] Local MCP server launches successfully.
 - [ ] `tools/list` returns the expected four tools.
 - [ ] `check_dependency` returns a valid result.
@@ -36,7 +36,7 @@ For teams adopting PkgDiet on a per-repository basis:
 
 ## 3. Individual Developer Configuration
 For individual developers seeking safer AI recommendations:
-* Run `npx -y pkgdiet@2.0.1 setup`
+* Run `npx -y pkgdiet@2.0.2 setup`
 * The interactive wizard will detect installed agents, preview exact configuration changes, and ask for confirmation before writing.
 
 ---

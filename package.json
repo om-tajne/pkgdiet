@@ -1,13 +1,13 @@
 {
   "name": "pkgdiet-monorepo",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "private": true,
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "test": "npm run build && node --test packages/core/tests/run.contract.test.js packages/core/tests/policy.unit.test.js packages/core/tests/checker.unit.test.js packages/core/tests/commandParser.unit.test.js packages/core/tests/sarif.unit.test.js packages/core/tests/smoke.test.js packages/core/tests/parity.integration.test.js packages/core/tests/e2e-github-actions.test.js packages/cli/tests/audit.test.js packages/cli/tests/agentHooks.test.js packages/mcp/tests/mcp.test.js packages/ai-tool/tests/core.test.js",
+    "test": "npm run build && node --test packages/core/tests/run.contract.test.js packages/core/tests/policy.unit.test.js packages/core/tests/checker.unit.test.js packages/core/tests/commandParser.unit.test.js packages/core/tests/sarif.unit.test.js packages/core/tests/smoke.test.js packages/core/tests/parity.integration.test.js packages/core/tests/e2e-github-actions.test.js packages/cli/tests/audit.test.js packages/cli/tests/agentHooks.test.js packages/cli/tests/agentSetup.test.js packages/mcp/tests/mcp.test.js packages/ai-tool/tests/core.test.js",
     "lint": "npm run lint --workspaces --if-present"
   },
   "devDependencies": {
@@ -41,8 +41,8 @@
     "body-parser": "^2.4.0",
     "qs": "^6.17.1",
     "brace-expansion": "^5.0.12",
-    "hono": "^4.13.14",
-    "@hono/node-server": "^2.1.5",
+    "hono": "^4.13.21",
+    "@hono/node-server": "^2.1.11",
     "ip-address": "^10.7.5",
     "fast-uri": "^4.2.3",
     "zod": "^4.6.7",

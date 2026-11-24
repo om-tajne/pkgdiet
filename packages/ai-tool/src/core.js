@@ -48,7 +48,7 @@ export function createDependencyChecker(execute = execFileSync) {
       // command string. Package names therefore cannot alter the command.
       const raw = execute(
         'npx',
-        ['-y', 'pkgdiet@2.0.1', 'check', name, '--json', '--env', env],
+        ['-y', 'pkgdiet@2.0.2', 'check', name, '--json', '--env', env],
         { encoding: 'utf8', timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] }
       );
       const result = JSON.parse(raw);

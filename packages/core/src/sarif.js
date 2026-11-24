@@ -259,7 +259,7 @@ export function buildSarifReport({ policyIssues = [], dependencyResults = [], pr
         tool: {
           driver: {
             name: 'PkgDiet',
-            version: '2.0.1',
+            version: '2.0.2',
             informationUri: 'https://github.com/om-tajne/pkgdiet',
             rules: SARIF_RULES,
           },

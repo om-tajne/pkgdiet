@@ -45,7 +45,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: om-tajne/pkgdiet@v2.0.1
+      - uses: om-tajne/pkgdiet@v2.0.2
         with:
           base: \${{ github.event.pull_request.base.sha }}
           dry-run: 'true'
@@ -55,7 +55,7 @@ const MCP_CONFIG = `{
   "mcpServers": {
     "pkgdiet": {
       "command": "npx",
-      "args": ["-y", "pkgdiet@2.0.1", "mcp"]
+      "args": ["-y", "pkgdiet@2.0.2", "mcp"]
     }
   }
 }`;

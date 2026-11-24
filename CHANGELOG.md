@@ -9,6 +9,52 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-11-24
+
+### Added
+
+- **Universal agent support.** `agent-setup` now configures VS Code (`.vscode/mcp.json`), Gemini CLI,
+  Qwen Code, opencode, Crush, Roo Code, Kilo Code, Amazon Q Developer, and a `universal` target that
+  writes the cross-agent `AGENTS.md` rule plus a project `.mcp.json`. Friendly aliases (`claude`,
+  `gemini`, `qwen`, `agents-md`, …) are accepted, `--detect` recognises the new agents' project files,
+  and `pkgdiet init` adds `AGENTS.md` and any agents it detects.
+- `agent-setup --remove` now really reverses changes: JSON entries, marker-delimited rule blocks,
+  Codex/Claude Code hook entries and scripts, the Cursor rule, and the Antigravity entry.
+- `THIRD_PARTY_NOTICES.md` and `scripts/generate-third-party-notices.mjs` (`--check` fails on stale
+  output or a non-permissive production license).
+- `LEGAL.md`: data sources and attribution, AI-agent and automation responsibilities, package-license
+  scope, warranty, and expanded trademark notice.
+- Tests for agent setup (`packages/cli/tests/agentSetup.test.js`).
+
+### Fixed
+
+- Generated Codex and Claude Code guard scripts contained a literal `${cliVersion}` in the `npx`
+  fallback (`pkgdiet@${cliVersion}`) and header comment; they now embed the real version.
+- `agent-setup` and `init` no longer overwrite an agent config file that cannot be parsed (for example
+  JSONC with comments), which previously replaced the user's other MCP servers with `{}`. The file is
+  left untouched and reported.
+- One failing agent no longer aborts the rest; unknown agent names are reported instead of silently
+  ignored; the process exits non-zero when anything failed.
+- Config writes are atomic and idempotent (no backup spam on no-op re-runs); `chmod` and
+  `claude mcp add` use argument arrays instead of shell strings, and `claude mcp add` is pinned to the
+  running version rather than a hard-coded one.
+- MCP server reports its real package version and clears the per-call timeout timer.
+- CLI converts uncaught errors into a one-line message with exit code 2 (never exit code 1, which is
+  reserved for BLOCK) and ignores `EPIPE` on closed pipes.
+- Corrupted integration guides (`qwen-code`, `crush`, `pi`, `deepseek-harness`, `vibe-kanban`,
+  `opencode`) rewritten; invalid instructions (a host/port for a stdio-only server, unverified config
+  paths) removed. Fixed the broken icon URL in `glama.json`.
+
+### Security
+
+- Raised the `hono` (4.13.21) and `@hono/node-server` (2.1.11) overrides, pulled in through the MCP SDK, to clear
+  the open moderate advisories; `npm audit` now reports 0 vulnerabilities.
+
+### Changed
+
+- Version references across docs, templates, and manifests pinned to 2.0.2.
+
+
 ### Removed
 
 - Removed the unsupported hosted integration, its deployment, schema, tests,
@@ -251,6 +297,7 @@ End of life. Upgrade to v2.0.0.
 
 ---
 
-[Unreleased]: https://github.com/om-tajne/pkgdiet/compare/v2.0.1...HEAD
+[Unreleased]: https://github.com/om-tajne/pkgdiet/compare/v2.0.2...HEAD
+[2.0.2]: https://github.com/om-tajne/pkgdiet/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/om-tajne/pkgdiet/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/om-tajne/pkgdiet/releases/tag/v2.0.0

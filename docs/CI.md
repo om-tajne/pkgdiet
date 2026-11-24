@@ -28,7 +28,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: om-tajne/pkgdiet@v2.0.1
+      - uses: om-tajne/pkgdiet@v2.0.2
         with:
           base: ${{ github.event.pull_request.base.sha }}
           environment: ci
@@ -44,7 +44,7 @@ jobs:
 | `fail-on` | `BLOCK` | Failure threshold: `BLOCK` or `WARN` |
 | `dry-run` | `false` | Print results without failing |
 | `working-directory` | `.` | Subdirectory containing `package.json` |
-| `version` | `2.0.1` | PkgDiet version to use |
+| `version` | `2.0.2` | PkgDiet version to use |
 | `node-version` | `20` | Node.js version |
 | `sarif-file` | (empty) | Optional path for a SARIF findings report |
 
@@ -61,7 +61,7 @@ jobs:
 ## CLI CI command
 
 ```bash
-npx -y pkgdiet@2.0.1 ci --base HEAD~1 --env ci
+npx -y pkgdiet@2.0.2 ci --base HEAD~1 --env ci
 ```
 
 ### Options
@@ -110,7 +110,7 @@ jobs:
           node-version: 20
 
       - name: Run PkgDiet CI gate
-        run: npx -y pkgdiet@2.0.1 ci --base HEAD~1 --env ci
+        run: npx -y pkgdiet@2.0.2 ci --base HEAD~1 --env ci
 ```
 
 ---
@@ -139,7 +139,7 @@ Review policy changes independently of dependency changes when possible.
 ## JSON output in CI
 
 ```bash
-npx pkgdiet@2.0.1 ci --base HEAD~1 --env ci --json > ci-results.json 2>ci-diagnostics.log
+npx pkgdiet@2.0.2 ci --base HEAD~1 --env ci --json > ci-results.json 2>ci-diagnostics.log
 ```
 
 JSON goes to stdout. Human-readable diagnostics go to stderr.
